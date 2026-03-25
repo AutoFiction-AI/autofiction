@@ -1,0 +1,12 @@
+runs/
+generated_novels/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.coverage
+.pytest_cache/
+*.swp
+.claude/
+.venv/
+venv/

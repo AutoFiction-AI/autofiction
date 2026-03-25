@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "chapter_id",
+    "cycle",
+    "input_snapshot_hash",
+    "findings",
+    "must_fix_count",
+    "non_negotiables",
+    "acceptance_targets"
+  ],
+  "properties": {
+    "chapter_id": {
+      "type": "string",
+      "pattern": "^chapter_[0-9]{2}$"
+    },
+    "cycle": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "input_snapshot_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "finding_id",
+          "source",
+          "severity",
+          "chapter_id",
+          "evidence",
+          "problem",
+          "rewrite_direction",
+          "acceptance_test"
+        ],
+        "properties": {
+          "finding_id": { "type": "string", "minLength": 1 },
+          "source": { "type": "string", "minLength": 1 },
+          "severity": { "type": "string", "enum": ["MEDIUM", "HIGH", "CRITICAL"] },
+          "chapter_id": { "type": "string", "pattern": "^chapter_[0-9]{2}$" },
+          "evidence": { "type": "string", "minLength": 1 },
+          "problem": { "type": "string", "minLength": 1 },
+          "rewrite_direction": { "type": "string", "minLength": 1 },
+          "acceptance_test": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": true
+      }
+    },
+    "must_fix_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "non_negotiables": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "acceptance_targets": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "do_not_change": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "style_constraints": {
+      "type": "object",
+      "properties": {
+        "dialogue_rules": { "type": "object" },
+        "prose_style_profile": { "type": "object" },
+        "aesthetic_risk_policy": { "type": "object" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "character_voice_profiles",
+    "dialogue_rules",
+    "prose_style_profile",
+    "aesthetic_risk_policy"
+  ],
+  "properties": {
+    "character_voice_profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "character_id",
+          "public_register",
+          "private_register",
+          "syntax_signature",
+          "lexical_signature",
+          "forbidden_generic_lines",
+          "stress_tells",
+          "profanity_profile",
+          "contraction_level",
+          "interruption_habit",
+          "self_correction_tendency",
+          "indirectness",
+          "repetition_tolerance",
+          "evasion_style",
+          "sentence_completion_style"
+        ],
+        "properties": {
+          "character_id": { "type": "string", "minLength": 1 },
+          "public_register": { "type": "string", "minLength": 1 },
+          "private_register": { "type": "string", "minLength": 1 },
+          "syntax_signature": { "type": "string", "minLength": 1 },
+          "lexical_signature": { "type": "string", "minLength": 1 },
+          "forbidden_generic_lines": { "type": "string", "minLength": 1 },
+          "stress_tells": { "type": "string", "minLength": 1 },
+          "profanity_profile": { "type": "string", "minLength": 1 },
+          "contraction_level": {
+            "type": "string",
+            "minLength": 1,
+            "enum": ["high", "moderate", "low", "variable"],
+            "description": "How often this character contracts in speech: high (almost always), moderate (usually, uncontracted for emphasis), low (notably formal), variable (shifts with pressure/audience)."
+          },
+          "interruption_habit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "How this character interrupts, cuts in, or refuses interruption under pressure."
+          },
+          "self_correction_tendency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "How this character revises themselves mid-speech when pressured, evasive, or self-conscious."
+          },
+          "indirectness": {
+            "type": "string",
+            "minLength": 1,
+            "description": "How directly or obliquely this character says difficult things."
+          },
+          "repetition_tolerance": {
+            "type": "string",
+            "minLength": 1,
+            "description": "How much purposeful repetition fits this character before it feels false or mechanical."
+          },
+          "evasion_style": {
+            "type": "string",
+            "minLength": 1,
+            "description": "How this character dodges, redirects, narrows, or withholds when cornered."
+          },
+          "sentence_completion_style": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Whether this character tends to finish, trail off, restart, or repair sentences under pressure."
+          },
+          "example_lines": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "description": "CALIBRATION-ONLY lines illustrating this character's voice. These lines must NEVER be copied, paraphrased, or echoed verbatim in any draft. They exist solely to show register, rhythm, and tone."
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "dialogue_rules": {
+      "type": "object",
+      "required": [
+        "anti_transcript_cadence",
+        "required_leverage_shifts_per_scene",
+        "max_consecutive_low_info_replies",
+        "idiolect_separation_required",
+        "default_contraction_use"
+      ],
+      "properties": {
+        "anti_transcript_cadence": { "type": "boolean" },
+        "required_leverage_shifts_per_scene": { "type": "integer", "minimum": 0 },
+        "max_consecutive_low_info_replies": { "type": "integer", "minimum": 2, "description": "Maximum consecutive low-info replies in EXPOSITORY volleys (briefing-style info exchange). Does NOT apply to organic small talk, social texture, or aftermath exchanges — those may run longer without penalty." },
+        "idiolect_separation_required": { "type": "boolean" },
+        "default_contraction_use": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Baseline contraction policy for all dialogue (e.g. 'high — contractions are the norm; uncontracted forms reserved for emphasis or character-specific formality')."
+        }
+      },
+      "additionalProperties": true
+    },
+    "prose_style_profile": {
+      "type": "object",
+      "required": [
+        "narrative_tense",
+        "narrative_distance",
+        "rhythm_target",
+        "sensory_bias",
+        "diction",
+        "forbidden_drift_patterns",
+        "chapter_texture_variance"
+      ],
+      "properties": {
+        "narrative_tense": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The narrative tense used consistently across the entire novel (e.g. 'past tense' or 'present tense'). All chapters must use the same tense unless a deliberate, documented exception is planned."
+        },
+        "narrative_distance": { "type": "string", "minLength": 1 },
+        "rhythm_target": { "type": "string", "minLength": 1 },
+        "sensory_bias": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "diction": { "type": "string", "minLength": 1 },
+        "forbidden_drift_patterns": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "chapter_texture_variance": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Guidance on varying chapter rhythm across the book: alternate high-intensity scenes with reflective interiority, vary scene count, dialogue density, and pacing so no two consecutive chapters feel structurally identical."
+        }
+      },
+      "additionalProperties": true
+    },
+    "aesthetic_risk_policy": {
+      "type": "object",
+      "required": [
+        "sanitization_disallowed",
+        "dark_content_allowed_when_character_true",
+        "profanity_allowed_when_scene_pressure_warrants",
+        "euphemism_penalty",
+        "creative_risk_policy"
+      ],
+      "properties": {
+        "sanitization_disallowed": { "type": "boolean" },
+        "dark_content_allowed_when_character_true": { "type": "boolean" },
+        "profanity_allowed_when_scene_pressure_warrants": { "type": "boolean" },
+        "euphemism_penalty": { "type": "string", "minLength": 1 },
+        "creative_risk_policy": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

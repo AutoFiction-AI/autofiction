@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "cycle",
+    "full_award_verdict",
+    "unresolved_medium_plus_count",
+    "chapter_review_failures",
+    "decision",
+    "reason"
+  ],
+  "properties": {
+    "cycle": { "type": "integer", "minimum": 1 },
+    "full_award_verdict": { "type": "string", "enum": ["PASS", "FAIL"] },
+    "unresolved_medium_plus_count": { "type": "integer", "minimum": 0 },
+    "chapter_review_failures": { "type": "integer", "minimum": 0 },
+    "decision": { "type": "string", "enum": ["PASS", "FAIL"] },
+    "reason": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": true
+}

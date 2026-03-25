@@ -1,0 +1,106 @@
+You are running CHAPTER REVIEW for `{{CHAPTER_ID}}`.
+
+Inputs:
+1. Chapter text: `{{CHAPTER_INPUT_FILE}}`
+2. Cycle story context pack: `{{GLOBAL_CYCLE_CONTEXT_FILE}}`
+3. Boundary context pack: `{{CHAPTER_BOUNDARY_CONTEXT_FILE}}`
+4. Style bible: `outline/style_bible.json`
+5. Continuity sheet: `{{CONTINUITY_SHEET_FILE}}`
+6. Constitution: `config/constitution.md`
+
+Context isolation requirement:
+1. Do not read any prior review comments, revision reports, or cycle history.
+2. Use only the inputs listed above for this stage (chapter text, context packs, style bible, continuity sheet, and constitution).
+3. When judging reader legibility or accidental obscurity, do not let the context packs or continuity sheet excuse missing on-page clarity. Use those inputs to detect contradiction and prior establishment, not to fill gaps the chapter itself failed to render.
+
+Task:
+1. Review with four lenses: `award`, `craft`, `dialogue`, `prose`.
+2. Fail by default unless evidence supports pass-level quality.
+3. Report all unresolved `MEDIUM+` issues.
+4. Provide concrete rewrite direction and measurable acceptance tests.
+4b. Be exhaustive, but keep findings genuinely distinct. If the same passage supports multiple materially different defects, you may emit multiple findings. Do not split one defect into near-synonymous findings with the same corrective work.
+5. Evaluate character-voice consistency against `outline/style_bible.json`.
+6. Evaluate prose style and dialogue realism against `outline/style_bible.json`.
+7. Flag sanitization as a HIGH craft finding. Sanitization drift — euphemism replacing specificity, summary replacing scene, moral safety valves defusing narrative tension — is the single most common aesthetic failure in AI-generated fiction. Treat it with the same severity as broken causality or voice collapse. Also flag timidity — scenes where the prose retreats from the emotional or physical reality the premise establishes — as MEDIUM.
+7b. When reviewing a comedy-driven chapter, do not flag sustained humor as "sanitization" or "timidity." Flag the comic equivalents instead: deflated humor where the narrator explains the joke, characters breaking comic voice to deliver earnest lessons, or inconsistent tonal register where the chapter cannot decide if it is funny or serious. Comic commitment is a craft virtue, not a flaw.
+8. Flag mechanical repetition caused by over-literal reuse of style-bible token lists (lexical signatures/stress tells) when it flattens prose or dialogue.
+9. Flag stilted over-formality in dialogue when scene pressure/register calls for contractions, slang, interruption, or colloquial rhythm.
+9b. Do not flag productive roughness as a defect. Slight disfluency, evasion, topic-slippage, self-correction, unfinished social grace, repeated words, or incomplete-but-legible turns are often signs of living speech. Treat them as virtues when they are character-true and scene-pressured.
+9c. Flag composed dialogue. If a pressured scene turns messy human speech into thesis statements, balanced mini-speeches, over-explicit emotional summaries, compressed insights, perfectly timed rhetorical questions, or quotable aphorisms, the dialogue is written-about rather than spoken-through. Narrator admiration of how a line "landed," "cut," or "silenced the room" is corroborating evidence, not a separate requirement. Mark as MEDIUM if isolated, HIGH if it is the chapter's dominant dialogue register.
+9d. When auditing composed dialogue, explicitly check for these sub-modes even if you ultimately report them in one finding: thesis-speech, aphoristic or quotable lines, mic-drop rhetorical questions, mini-speech diagnosis, and narrator admiration of how dialogue landed. Do not let consolidation make you stop looking for the distinct ways a scene can sound over-written.
+10. Flag marked prose constructions that recur mechanically within the chapter. Do not flag ordinary grammar or unavoidable connective syntax. Look for repeated sentence scaffolds, metaphor templates, facial-expression defaults, or somatic defaults distinctive enough to read as autopilot. One instance may be a choice; three or more distinct uses in a chapter is a likely tic.
+11. Flag stretches of 10+ consecutive paragraphs where the focalizer has no internal experience (thought, sensation, memory, self-assessment). Chapters that lose interiority become screenplays. Mark as MEDIUM.
+12. Flag any named character with 3+ lines of dialogue or significant action who, within this chapter, reads as pure function because the scene gives them zero independent interiority or personal detail. Mark as MEDIUM only when the local flattening is visible on the page and the provided boundary/context packs do not clearly suggest that richer characterization has already been established and is being deliberately withheld here. Escalate to HIGH only when the provided boundary/context packs make it clear that the character is recurring across chapters as pure function.
+13. Flag intimacy fade-to-black: any scene where characters' physical or sexual intimacy is implied but not rendered — cutting away, summarizing ("they spent the night together"), or jumping to aftermath — when the narrative context calls for presence. This is the content type most prone to involuntary sanitization. Mark as HIGH.
+14. Check the chapter against `{{CONTINUITY_SHEET_FILE}}`. Flag any contradiction with a canonical fact — wrong character age, inconsistent physical detail, timeline violation, object state mismatch, spatial impossibility, or violation of established world rules. Mark continuity contradictions as HIGH.
+15. Check narrative tense against `prose_style_profile.narrative_tense` in the style bible. If the chapter uses a different tense from the declared canonical tense (e.g. present tense when the style bible declares past tense), flag as HIGH. Occasional embedded-present in memory or interior thought is acceptable; sustained narrative tense drift is not.
+16. Flag convenience-discovery logic. If the chapter relies on a hidden room, secret archive, overheard revelation, lucky wrong turn, or other plot-critical concealment device, check whether the text makes clear why access happens now, why others have not already made the same discovery, and what immediate cost, obstacle, or uncertainty keeps the beat from reading as a plot handout. Mark as MEDIUM when the plausibility is weak but locally repairable; mark as HIGH when the chapter's turn depends on obvious convenience.
+16b. Flag structural recurrence. If a scene's central exchange, reveal, confrontation, debrief, bridge conversation, or moral diagnosis mainly restates an already-established conflict, pattern, or thesis without adding a new fact, cost, decision, witness, operational test, public consequence, or relational shift, mark as MEDIUM. Mark as HIGH when the chapter's major turn depends on reheating an existing pattern. In middle-book chapters, ending with the same central understanding, relationship state, and tactical situation is strong evidence of this failure. Bridge scenes count when they mainly translate the previous scene into cleaner thematic language instead of creating new pressure. Do not penalize deliberate ritual, motif, obsession, running jokes, or recurring domestic labor when the recurrence changes meaning or pressure. Deliberate accumulative variation — the same kind of test under materially changed conditions — is not a defect.
+16c. Flag operational-legibility failure. For any scene driven by a specialized process — technical, magical, legal, financial, military, artistic, erotic, scientific, or otherwise expert — check whether a cold reader can state from the chapter text what the focal character is trying to do, what constraint or input they are working with, what observable change occurs, and what remains hypothesis rather than fact. A scene may preserve deeper mystery while still making local cause and effect legible. Mark accidental obscurity as MEDIUM or HIGH depending on how much dramatic weight the chapter asks the reader to place on the unclear process.
+16d. Flag unearned uptake. If another character suddenly understands, trusts, or productively opposes a specialized process or hidden logic, check whether the chapter has shown what they are responding to and at what level. Mark as MEDIUM when the inference chain is weak but repairable; mark as HIGH when a scene's turn depends on a leap the page has not earned.
+16e. Flag underseeded payoff or late-arriving solution. If a reveal, emotional reversal, capability, object use, interpretive breakthrough, or escape from pressure carries major dramatic weight in this chapter but lacks sufficient on-page setup or clearly established prior scaffolding from the provided context, mark as MEDIUM or HIGH depending on how much the chapter depends on the surprise feeling earned rather than merely surprising. This is distinct from convenience: a beat can be causally possible yet still feel underprepared. Use the current chapter's row in the story context pack when it includes explicit `setups_to_plant` or `payoffs_to_land` metadata: if this chapter was supposed to plant a tracked seed and the seed never becomes concretely legible on the page, emit a finding for the setup chapter; if this chapter is supposed to land a tracked payoff and the landing still feels underprepared, say so explicitly. Because this stage does not read full prior chapters, use HIGH only when the missing setup is clear from the chapter plus provided context; otherwise prefer MEDIUM and describe what earlier groundwork seems missing.
+16f. Flag unearned chapter sprawl. If a chapter's length is not justified by new dramatic payload — because once the primary reveal, confrontation, aftermath turn, or relational shift has landed, later paragraphs mainly restage, translate, or certify what the reader already understands — mark as MEDIUM. Mark as HIGH when the chapter's center of gravity depends on that repetition. Do not penalize quiet, aftermath, ritual, meals, domestic routine, comic riffing, or low-information conversation when each beat changes pressure, relationship, or texture in a way the chapter genuinely needs. A long chapter is acceptable when the pages buy distinct turns; it is a defect when they buy only additional emphasis.
+16g. Flag overstatement after arrival. When action, image, or dialogue has already made a chapter's point legible, and later narration or dialogue translates that point into abstract summary, moral paraphrase, or thesis language instead of creating a new turn, mark as MEDIUM. Prefer findings that identify exactly where the scene first lands its meaning and where later material starts re-proving it.
+16h. Flag opening reorientation drag. If the chapter's opening spends substantial paragraph-level weight re-establishing premise-baseline facts, environment, pressures, roles, or conditions that should already be legible by this point from the chapter plus the provided context packs, rather than introducing this chapter's new local pressure or changed situation, mark as MEDIUM. Because this stage does not read full prior chapters, use this finding only when the opening's restatement is strongly signaled by the chapter itself and the provided context, not on mere suspicion that similar material may have appeared elsewhere.
+
+Dialogue register audit:
+1. For each speaking character, check their `contraction_level` in the style bible. Flag unjustified uncontracted forms whenever they make a line read stiffer than the character, scene, period, and world support — even if the chapter's broader dialogue is otherwise functional. Do not flag deliberate formality, ritual language, legalistic speech, historical cadence, or emphatic full-form diction when character-true.
+2. Check `default_contraction_use` in `dialogue_rules`. If the book-wide default is high contraction use, do not require chapter-wide collapse before flagging the issue: one clearly wrong stiff line may warrant a finding when the corrective work is local and concrete.
+3. Flag scenes where two or more characters sound interchangeable in register, syntax, and rhythm.
+3b. If the style bible indicates indirectness, interruption, self-correction, evasion, or unfinished-turn behavior for a character, do not penalize those features merely for being messy; flag only when the chapter erases them into clean generic speech or repeats them so mechanically that they stop feeling human.
+3c. Flag dialogue-template recurrence. If a chapter's major exchanges reuse the same turn-shape often enough to feel generated rather than lived — for example question-correction-explanation, accusation-technical deflection-human rejoinder, or offer-refusal-restatement — mark as MEDIUM. Mark as HIGH if the chapter's main confrontations depend on that repeated ladder and no new pressure enters. Do not penalize deliberate refrain or ritualized speech unless it stops doing new dramatic work.
+4. If any `example_lines` from the style bible appear verbatim or near-verbatim in the chapter text, flag this as a finding — example lines are calibration-only and must never be reproduced. Mark as MEDIUM by default. Escalate to HIGH when the copied material is repeated, lands inside a chapter-defining emotional or structural beat, or is conspicuous enough to damage voice integrity on first read.
+
+Acceptance test guidance:
+1. Acceptance tests must describe a concrete, observable property of the revised text (e.g. "Character X uses contractions in at least 3 of 5 lines in this exchange," "The scene ends with a physical consequence, not a summary statement").
+2. Avoid purely mechanical bean-counting tests (e.g. "reduce by 40%") unless tied to specific named passages.
+3. Tests should be verifiable by reading the revised passage — not by running automated metrics.
+4. For findings about sprawl, over-explanation, or unearned length, acceptance tests must name the specific dramatic work that must remain after compression — chapter engine, state shift, and must-land beats — rather than merely demanding "tighter pacing."
+4b. For findings about structural recurrence, acceptance tests must name the new proof, operational test, public consequence, irreversible choice, or relationship change the revised chapter must supply. "Make it less repetitive" is not sufficient.
+
+Required output:
+1. `{{REVIEW_OUTPUT_FILE}}`
+
+`{{REVIEW_OUTPUT_FILE}}` contract:
+1. Top-level fields:
+2. `chapter_id` (string)
+3. `verdicts` object with keys:
+4. `award`, `craft`, `dialogue`, `prose` (`PASS|FAIL`)
+5. `findings` (array)
+6. `summary` (string)
+7. Each finding object must contain:
+8. `finding_id` (string; stable within this chapter)
+9. `source` (`award|craft|dialogue|prose`)
+10. `severity` (`MEDIUM|HIGH|CRITICAL`)
+11. `chapter_id` (must equal `{{CHAPTER_ID}}`)
+12. `evidence` (must cite `{{CHAPTER_INPUT_FILE}}:<line>`)
+13. `problem` (string)
+14. `rewrite_direction` (string; must include local target spans/lines in `{{CHAPTER_INPUT_FILE}}:<line>` form; strategy options allowed; percentage-only directives are forbidden unless scenes are explicitly named)
+15. `acceptance_test` (string; concrete and verifiable by reading the revised passage, with explicit pass/fail criteria anchored to specific lines/spans)
+
+Example structure only. Do not copy wording, IDs, evidence, or summary language from this example. The `summary` may be brief or detailed, but it must appear at the top level of the JSON object.
+
+```json
+{
+  "chapter_id": "chapter_01",
+  "verdicts": {
+    "award": "FAIL",
+    "craft": "FAIL",
+    "dialogue": "PASS",
+    "prose": "PASS"
+  },
+  "findings": [
+    {
+      "finding_id": "EXAMPLE_FINDING",
+      "source": "craft",
+      "severity": "MEDIUM",
+      "chapter_id": "chapter_01",
+      "evidence": "{{CHAPTER_INPUT_FILE}}:12; {{CHAPTER_INPUT_FILE}}:18",
+      "problem": "...",
+      "rewrite_direction": "...",
+      "acceptance_test": "..."
+    }
+  ],
+  "summary": "..."
+}
+```
