@@ -7697,7 +7697,15 @@ class NovelPipelineRunner:
         verdict = data.get("verdict")
         if isinstance(verdict, str):
             normalized_verdict = verdict.strip().upper()
-            if normalized_verdict != verdict:
+            canonical_verdict = re.sub(r"[\s-]+", "_", normalized_verdict)
+            if canonical_verdict in {
+                "REVISE",
+                "CONDITIONAL_PASS",
+                "PASS_WITH_CONDITIONS",
+            }:
+                data["verdict"] = "FAIL"
+                repairs.append(f"verdict normalized from {normalized_verdict} to FAIL")
+            elif normalized_verdict != verdict:
                 data["verdict"] = normalized_verdict
                 repairs.append("verdict normalized")
 
@@ -7710,6 +7718,11 @@ class NovelPipelineRunner:
             for idx, finding in enumerate(findings, start=1):
                 if not isinstance(finding, dict):
                     continue
+                if not str(finding.get("finding_id", "")).strip():
+                    legacy_finding_id = str(finding.get("id", "")).strip()
+                    if legacy_finding_id:
+                        finding["finding_id"] = legacy_finding_id
+                        repairs.append(f"findings[{idx}].finding_id mapped from id")
                 severity = str(finding.get("severity", "")).strip()
                 normalized_severity = severity.upper()
                 if normalized_severity and normalized_severity != severity:
@@ -7728,6 +7741,14 @@ class NovelPipelineRunner:
                     if description:
                         finding["problem"] = description
                         repairs.append(f"findings[{idx}].problem mapped from description")
+
+                if not str(finding.get("rewrite_direction", "")).strip():
+                    legacy_fix = str(finding.get("fix", "")).strip()
+                    if legacy_fix:
+                        finding["rewrite_direction"] = legacy_fix
+                        repairs.append(
+                            f"findings[{idx}].rewrite_direction mapped from fix"
+                        )
 
                 evidence = self._flatten_full_award_evidence(finding.get("evidence", ""))
                 if evidence and evidence != finding.get("evidence"):
@@ -7771,13 +7792,20 @@ class NovelPipelineRunner:
                             f"pattern_findings[{idx}].pattern_id mapped from finding_id"
                         )
                     else:
+                        legacy_id = str(pattern.get("id", "")).strip()
+                        if legacy_id:
+                            pattern["pattern_id"] = legacy_id
+                            repairs.append(
+                                f"pattern_findings[{idx}].pattern_id mapped from id"
+                            )
+                            pattern_id = legacy_id
                         problem_basis = (
                             str(pattern.get("global_problem", "")).strip()
                             or str(pattern.get("problem", "")).strip()
                             or str(pattern.get("description", "")).strip()
                         )
                         slug = re.sub(r"[^A-Z0-9]+", "_", problem_basis.upper()).strip("_")
-                        if slug:
+                        if slug and not str(pattern.get("pattern_id", "")).strip():
                             pattern["pattern_id"] = slug[:48]
                             repairs.append(
                                 f"pattern_findings[{idx}].pattern_id synthesized"
@@ -7789,6 +7817,19 @@ class NovelPipelineRunner:
                         repairs.append(
                             f"pattern_findings[{idx}].global_problem mapped from description"
                         )
+
+                if not isinstance(pattern.get("affected_chapters"), list):
+                    legacy_affected = pattern.get("chapter_ids")
+                    if isinstance(legacy_affected, list):
+                        pattern["affected_chapters"] = legacy_affected
+                        repairs.append(
+                            f"pattern_findings[{idx}].affected_chapters mapped from chapter_ids"
+                        )
+
+                pattern_rewrite_seed = (
+                    str(pattern.get("rewrite_direction", "")).strip()
+                    or str(pattern.get("fix", "")).strip()
+                )
 
                 chapter_hits = pattern.get("chapter_hits")
                 if not isinstance(chapter_hits, list):
@@ -7811,7 +7852,7 @@ class NovelPipelineRunner:
                             pattern.get("evidence", "")
                         )
                         legacy_rewrite_direction = self._augment_full_award_rewrite_direction(
-                            pattern.get("rewrite_direction", ""),
+                            pattern_rewrite_seed,
                             legacy_evidence,
                             novel_file,
                         )
@@ -7834,7 +7875,10 @@ class NovelPipelineRunner:
                                 "rewrite_direction": legacy_rewrite_direction,
                                 "acceptance_test": legacy_acceptance,
                             }
-                            legacy_hit_id = str(pattern.get("finding_id", "")).strip()
+                            legacy_hit_id = (
+                                str(pattern.get("finding_id", "")).strip()
+                                or str(pattern.get("id", "")).strip()
+                            )
                             if legacy_hit_id:
                                 chapter_hit["finding_id"] = legacy_hit_id
                             pattern["chapter_hits"] = [chapter_hit]
@@ -7867,6 +7911,13 @@ class NovelPipelineRunner:
                 for hit_idx, hit in enumerate(chapter_hits, start=1):
                     if not isinstance(hit, dict):
                         continue
+                    if not str(hit.get("finding_id", "")).strip():
+                        legacy_hit_id = str(hit.get("id", "")).strip()
+                        if legacy_hit_id:
+                            hit["finding_id"] = legacy_hit_id
+                            repairs.append(
+                                f"pattern_findings[{idx}].chapter_hits[{hit_idx}].finding_id mapped from id"
+                            )
                     severity = str(hit.get("severity", "")).strip()
                     normalized_severity = severity.upper()
                     if normalized_severity and normalized_severity != severity:
@@ -7893,7 +7944,24 @@ class NovelPipelineRunner:
                             repairs.append(
                                 f"pattern_findings[{idx}].chapter_hits[{hit_idx}].problem mapped from description"
                             )
-                        elif str(pattern.get("global_problem", "")).strip():
+                        else:
+                            local_problem = str(hit.get("local_problem", "")).strip()
+                            if local_problem:
+                                hit["problem"] = local_problem
+                                repairs.append(
+                                    f"pattern_findings[{idx}].chapter_hits[{hit_idx}].problem mapped from local_problem"
+                                )
+                            else:
+                                local_note = str(hit.get("local_note", "")).strip()
+                                if local_note:
+                                    hit["problem"] = local_note
+                                    repairs.append(
+                                        f"pattern_findings[{idx}].chapter_hits[{hit_idx}].problem mapped from local_note"
+                                    )
+                        if (
+                            not str(hit.get("problem", "")).strip()
+                            and str(pattern.get("global_problem", "")).strip()
+                        ):
                             hit["problem"] = str(pattern.get("global_problem", "")).strip()
                             repairs.append(
                                 f"pattern_findings[{idx}].chapter_hits[{hit_idx}].problem defaulted from global_problem"
@@ -7905,6 +7973,16 @@ class NovelPipelineRunner:
                         repairs.append(
                             f"pattern_findings[{idx}].chapter_hits[{hit_idx}].evidence flattened"
                         )
+
+                    if not str(hit.get("rewrite_direction", "")).strip():
+                        local_fix = str(hit.get("fix", "")).strip()
+                        rewrite_seed = local_fix or pattern_rewrite_seed
+                        if rewrite_seed:
+                            hit["rewrite_direction"] = rewrite_seed
+                            source = "fix" if local_fix else "pattern rewrite/fix"
+                            repairs.append(
+                                f"pattern_findings[{idx}].chapter_hits[{hit_idx}].rewrite_direction mapped from {source}"
+                            )
 
                     rewrite_direction = self._augment_full_award_rewrite_direction(
                         hit.get("rewrite_direction", ""),

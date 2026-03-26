@@ -430,6 +430,125 @@ class ClaudeCliParsingTests(unittest.TestCase):
             self.assertTrue(preserved.is_file())
             self.assertEqual(json.loads(preserved.read_text(encoding="utf-8")), legacy_review)
 
+    def test_load_repaired_full_award_review_maps_legacy_verdict_and_grouped_pattern_shape(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_full_award_legacy_grouped_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1,
+                    chapter_engine="discovery",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                ),
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_02",
+                    chapter_number=2,
+                    projected_min_words=1,
+                    chapter_engine="discovery",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                ),
+            ]
+
+            run_dir = runner.cfg.run_dir
+            (run_dir / "reviews" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            legacy_review = {
+                "cycle": 1,
+                "verdict": "CONDITIONAL_PASS",
+                "summary": "Legacy grouped review output.",
+                "findings": [
+                    {
+                        "id": "LEGACY_F1",
+                        "severity": "medium",
+                        "chapter_id": "ch1",
+                        "problem": "The chapter overexplains its turn.",
+                        "evidence": [
+                            {
+                                "location": "snapshots/cycle_01/FINAL_NOVEL.md:12",
+                                "description": "The turn lands here.",
+                            }
+                        ],
+                        "fix": "Cut the explanatory tail and land on the action.",
+                    }
+                ],
+                "pattern_findings": [
+                    {
+                        "id": "LEGACY_PATTERN",
+                        "severity": "medium",
+                        "global_problem": "A repeated pattern keeps flattening pressure.",
+                        "chapter_ids": ["ch1", "chapter_02"],
+                        "fix": "Keep the strongest instance and vary the weaker repetitions.",
+                        "chapter_hits": [
+                            {
+                                "chapter_id": "ch1",
+                                "evidence": ["snapshots/cycle_01/FINAL_NOVEL.md:12"],
+                                "local_problem": "Chapter 1 explains the pattern too bluntly.",
+                            },
+                            {
+                                "chapter_id": "chapter_02",
+                                "evidence": ["snapshots/cycle_01/FINAL_NOVEL.md:33"],
+                                "local_note": "Chapter 2 restates the same pattern beat.",
+                            },
+                        ],
+                    }
+                ],
+            }
+            rel = "reviews/cycle_01/full_award.review.json"
+            (run_dir / rel).write_text(json.dumps(legacy_review) + "\n", encoding="utf-8")
+
+            repaired = runner._load_repaired_full_award_review(
+                rel,
+                1,
+                {"chapter_01", "chapter_02"},
+                "snapshots/cycle_01/FINAL_NOVEL.md",
+            )
+            runner._validate_full_award_review_json(
+                repaired,
+                1,
+                {"chapter_01", "chapter_02"},
+                rel,
+                "snapshots/cycle_01/FINAL_NOVEL.md",
+            )
+
+            self.assertEqual(repaired["verdict"], "FAIL")
+            self.assertEqual(repaired["findings"][0]["finding_id"], "LEGACY_F1")
+            self.assertEqual(repaired["findings"][0]["chapter_id"], "chapter_01")
+            self.assertIn(
+                "Revise snapshots/cycle_01/FINAL_NOVEL.md:12",
+                repaired["findings"][0]["rewrite_direction"],
+            )
+            pattern = repaired["pattern_findings"][0]
+            self.assertEqual(pattern["pattern_id"], "LEGACY_PATTERN")
+            self.assertEqual(pattern["affected_chapters"], ["chapter_01", "chapter_02"])
+            self.assertEqual(
+                pattern["chapter_hits"][0]["problem"],
+                "Chapter 1 explains the pattern too bluntly.",
+            )
+            self.assertEqual(
+                pattern["chapter_hits"][1]["problem"],
+                "Chapter 2 restates the same pattern beat.",
+            )
+            self.assertIn(
+                "Keep the strongest instance and vary the weaker repetitions.",
+                pattern["chapter_hits"][0]["rewrite_direction"],
+            )
+            self.assertIn(
+                "Revise snapshots/cycle_01/FINAL_NOVEL.md:33",
+                pattern["chapter_hits"][1]["rewrite_direction"],
+            )
+
     def test_run_full_award_review_stage_repairs_legacy_output_instead_of_fallback(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_full_award_stage_repair_", dir="/tmp") as tmp:
             runner = make_runner(Path(tmp))
@@ -595,6 +714,204 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 (
                     run_dir / "reviews" / "cycle_01" / "full_award.review.invalid.original.json"
                 ).is_file()
+            )
+
+    def test_run_full_award_review_stage_maps_near_pass_legacy_shape_without_retry(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_full_award_no_retry_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1,
+                    chapter_engine="discovery",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                ),
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_02",
+                    chapter_number=2,
+                    projected_min_words=1,
+                    chapter_engine="discovery",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                ),
+            ]
+
+            run_dir = runner.cfg.run_dir
+            (run_dir / "snapshots" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            (run_dir / "context" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            (run_dir / "outline").mkdir(parents=True, exist_ok=True)
+            (run_dir / "config" / "prompts").mkdir(parents=True, exist_ok=True)
+            (run_dir / "config").mkdir(parents=True, exist_ok=True)
+            (run_dir / "snapshots" / "cycle_01" / "FINAL_NOVEL.md").write_text(
+                "# Title\n\n# Chapter 1\n\nBody.\n\n# Chapter 2\n\nBody.\n",
+                encoding="utf-8",
+            )
+            (run_dir / "context" / "cycle_01" / "global_cycle_context.json").write_text(
+                json.dumps({"chapter_spine": []}) + "\n",
+                encoding="utf-8",
+            )
+            (run_dir / "outline" / "style_bible.json").write_text(
+                json.dumps(
+                    {
+                        "character_voice_profiles": [
+                            {
+                                "character_id": "nick",
+                                "public_register": "guarded",
+                                "private_register": "angry",
+                                "syntax_signature": "plain",
+                                "lexical_signature": "visual",
+                                "forbidden_generic_lines": "none",
+                                "stress_tells": "tightens",
+                                "profanity_profile": "moderate",
+                                "contraction_level": "high",
+                                "interruption_habit": "rare",
+                                "self_correction_tendency": "light",
+                                "indirectness": "mixed",
+                                "repetition_tolerance": "some",
+                                "evasion_style": "narrows",
+                                "sentence_completion_style": "finishes",
+                            }
+                        ],
+                        "dialogue_rules": {
+                            "anti_transcript_cadence": True,
+                            "required_leverage_shifts_per_scene": 1,
+                            "max_consecutive_low_info_replies": 2,
+                            "idiolect_separation_required": True,
+                            "default_contraction_use": "high",
+                        },
+                        "prose_style_profile": {
+                            "narrative_tense": "past tense",
+                            "narrative_distance": "close",
+                            "rhythm_target": "mixed",
+                            "sensory_bias": ["visual"],
+                            "diction": "concrete",
+                            "forbidden_drift_patterns": ["generic phrasing"],
+                            "chapter_texture_variance": "vary rhythm",
+                        },
+                        "aesthetic_risk_policy": {
+                            "sanitization_disallowed": True,
+                            "dark_content_allowed_when_character_true": True,
+                            "profanity_allowed_when_scene_pressure_warrants": True,
+                            "euphemism_penalty": "high",
+                            "creative_risk_policy": "push toward specificity",
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (run_dir / "outline" / "continuity_sheet.json").write_text(
+                json.dumps(
+                    {
+                        "characters": [],
+                        "timeline": {
+                            "story_start": "spring",
+                            "estimated_span": "one month",
+                            "seasonal_track": [],
+                            "key_events": [],
+                        },
+                        "geography": {
+                            "primary_setting": "city",
+                            "key_locations": [],
+                            "distances": [],
+                        },
+                        "world_rules": [],
+                        "power_structure": [],
+                        "objects": [],
+                        "financial_state": {"debts": [], "income_sources": []},
+                        "knowledge_state": [],
+                        "environmental_constants": [],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (run_dir / "config" / "constitution.md").write_text(
+                "constitution placeholder\n",
+                encoding="utf-8",
+            )
+            (run_dir / "config" / "prompts" / "full_award_review_prompt.md").write_text(
+                (REPO_ROOT / "prompts" / "full_award_review_prompt.md").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+
+            legacy_review = {
+                "cycle": 1,
+                "verdict": "PASS WITH CONDITIONS",
+                "summary": "Near-pass legacy review from the model.",
+                "findings": [
+                    {
+                        "id": "LEGACY_F1",
+                        "severity": "HIGH",
+                        "chapter_id": "ch1",
+                        "problem": "The chapter re-explains its turn.",
+                        "evidence": ["snapshots/cycle_01/FINAL_NOVEL.md:4"],
+                        "fix": "Cut the repeated explanation and leave the turn on the page.",
+                    }
+                ],
+                "pattern_findings": [
+                    {
+                        "id": "LEGACY_PATTERN",
+                        "severity": "MEDIUM",
+                        "global_problem": "A repeated pattern is flattening the chapter exits.",
+                        "chapter_ids": ["chapter_01", "ch2"],
+                        "fix": "Keep the strongest exit beat and vary the other recurrence.",
+                        "chapter_hits": [
+                            {
+                                "chapter_id": "chapter_01",
+                                "evidence": ["snapshots/cycle_01/FINAL_NOVEL.md:4"],
+                                "local_note": "Chapter 1 spells out the same exit beat twice.",
+                            },
+                            {
+                                "chapter_id": "ch2",
+                                "evidence": ["snapshots/cycle_01/FINAL_NOVEL.md:8"],
+                                "local_problem": "Chapter 2 lands in the same explanatory register.",
+                            },
+                        ],
+                    }
+                ],
+            }
+
+            calls: list[str] = []
+
+            def fake_run_job(job: runner_module.JobSpec) -> None:
+                calls.append(job.job_id)
+                output = run_dir / "reviews" / "cycle_01" / "full_award.review.json"
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(json.dumps(legacy_review) + "\n", encoding="utf-8")
+
+            runner._run_job = fake_run_job
+
+            runner._run_full_award_review_stage(1)
+
+            self.assertEqual(calls, ["cycle_01_full_award_review"])
+            saved = json.loads(
+                (
+                    run_dir / "reviews" / "cycle_01" / "full_award.review.json"
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(saved["verdict"], "FAIL")
+            self.assertEqual(saved["findings"][0]["finding_id"], "LEGACY_F1")
+            self.assertEqual(saved["pattern_findings"][0]["pattern_id"], "LEGACY_PATTERN")
+            self.assertIn(
+                "Keep the strongest exit beat and vary the other recurrence.",
+                saved["pattern_findings"][0]["chapter_hits"][0]["rewrite_direction"],
+            )
+            self.assertNotEqual(
+                saved["findings"][0]["finding_id"],
+                "fallback_full_award_contract",
             )
 
     def test_run_full_award_review_stage_accepts_low_severity_without_retry(self) -> None:
