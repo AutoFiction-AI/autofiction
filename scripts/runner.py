@@ -852,139 +852,50 @@ class NovelPipelineRunner:
             )
             self._write_cycle_status(cycle, cycle_status)
 
-            if gate["decision"] == "PASS":
-                self._update_cycle_stage_status(
-                    cycle_status,
-                    "build_revision_packets",
-                    "skipped",
-                    reason="gate_passed_no_revision_needed",
-                )
-                self._update_cycle_stage_status(
-                    cycle_status,
-                    "revision",
-                    "skipped",
-                    reason="gate_passed_no_revision_needed",
-                )
-                self._update_cycle_stage_status(
-                    cycle_status,
-                    "seam_polish",
-                    "skipped",
-                    reason="gate_passed_no_revision_needed",
-                )
-                self._log(f"cycle={cpad} stage=assemble_post_revision_snapshot")
-                post_snapshot_reused = self._assemble_post_revision_snapshot(cycle)
-                self._update_cycle_stage_status(
-                    cycle_status,
-                    "assemble_post_revision_snapshot",
-                    "reused" if post_snapshot_reused else "complete",
-                    outputs=[
-                        f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md",
-                    ],
-                )
-                self._write_cycle_status(cycle, cycle_status)
-                self._log(f"cycle={cpad} stage=continuity_reconciliation")
-                continuity_reused = self._run_continuity_reconciliation(cycle)
-                self._update_cycle_stage_status(
-                    cycle_status,
-                    "continuity_reconciliation",
-                    "reused" if continuity_reused else "complete",
-                )
-                self._write_cycle_status(cycle, cycle_status)
-                success_cycle = cycle
-                continue
-
-            if gate["reason"] == "min_cycles_not_reached_but_current_quality_passes":
-                self._log(
-                    f"cycle={cpad} skipping revision because min_cycles={self.cfg.min_cycles} not reached"
-                )
-                self._update_cycle_stage_status(
-                    cycle_status,
-                    "build_revision_packets",
-                    "skipped",
-                    reason="min_cycles_guard",
-                )
-                self._update_cycle_stage_status(
-                    cycle_status,
-                    "revision",
-                    "skipped",
-                    reason="min_cycles_guard",
-                )
-                self._update_cycle_stage_status(
-                    cycle_status,
-                    "seam_polish",
-                    "skipped",
-                    reason="min_cycles_guard",
-                )
-                self._log(f"cycle={cpad} stage=assemble_post_revision_snapshot")
-                post_snapshot_reused = self._assemble_post_revision_snapshot(cycle)
-                self._update_cycle_stage_status(
-                    cycle_status,
-                    "assemble_post_revision_snapshot",
-                    "reused" if post_snapshot_reused else "complete",
-                    outputs=[
-                        f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md",
-                    ],
-                )
-                self._write_cycle_status(cycle, cycle_status)
-                self._log(f"cycle={cpad} stage=continuity_reconciliation")
-                continuity_reused = self._run_continuity_reconciliation(cycle)
-                self._update_cycle_stage_status(
-                    cycle_status,
-                    "continuity_reconciliation",
-                    "reused" if continuity_reused else "complete",
-                )
-                self._write_cycle_status(cycle, cycle_status)
-                success_cycle = cycle
-                continue
-            if gate["reason"] == "cross_chapter_audit_failed":
-                self._log(
-                    f"cycle={cpad} skipping revision because cross-chapter audit failed and produced no actionable chapter work"
-                )
-                self._update_cycle_stage_status(
-                    cycle_status,
-                    "build_revision_packets",
-                    "skipped",
-                    reason="cross_chapter_audit_failed",
-                )
-                self._update_cycle_stage_status(
-                    cycle_status,
-                    "revision",
-                    "skipped",
-                    reason="cross_chapter_audit_failed",
-                )
-                self._update_cycle_stage_status(
-                    cycle_status,
-                    "seam_polish",
-                    "skipped",
-                    reason="cross_chapter_audit_failed",
-                )
-                self._log(f"cycle={cpad} stage=assemble_post_revision_snapshot")
-                post_snapshot_reused = self._assemble_post_revision_snapshot(cycle)
-                self._update_cycle_stage_status(
-                    cycle_status,
-                    "assemble_post_revision_snapshot",
-                    "reused" if post_snapshot_reused else "complete",
-                    outputs=[
-                        f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md",
-                    ],
-                )
-                self._write_cycle_status(cycle, cycle_status)
-                self._log(f"cycle={cpad} stage=continuity_reconciliation")
-                continuity_reused = self._run_continuity_reconciliation(cycle)
-                self._update_cycle_stage_status(
-                    cycle_status,
-                    "continuity_reconciliation",
-                    "reused" if continuity_reused else "complete",
-                )
-                self._write_cycle_status(cycle, cycle_status)
-                success_cycle = cycle
-                continue
-
             touched_chapters = sorted(aggregate["by_chapter"].keys())
             if not touched_chapters:
-                raise PipelineError(
-                    f"cycle={cpad} gate failed but no actionable per-chapter findings were produced"
+                self._log(
+                    f"cycle={cpad} skipping revision because aggregate produced no actionable chapter work"
                 )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "build_revision_packets",
+                    "skipped",
+                    reason="no_actionable_findings",
+                )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "revision",
+                    "skipped",
+                    reason="no_actionable_findings",
+                )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "seam_polish",
+                    "skipped",
+                    reason="no_actionable_findings",
+                )
+                self._log(f"cycle={cpad} stage=assemble_post_revision_snapshot")
+                post_snapshot_reused = self._assemble_post_revision_snapshot(cycle)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "assemble_post_revision_snapshot",
+                    "reused" if post_snapshot_reused else "complete",
+                    outputs=[
+                        f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md",
+                    ],
+                )
+                self._write_cycle_status(cycle, cycle_status)
+                self._log(f"cycle={cpad} stage=continuity_reconciliation")
+                continuity_reused = self._run_continuity_reconciliation(cycle)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "continuity_reconciliation",
+                    "reused" if continuity_reused else "complete",
+                )
+                self._write_cycle_status(cycle, cycle_status)
+                success_cycle = cycle
+                continue
 
             self._log(
                 f"cycle={cpad} stage=build_revision_packets chapters={len(touched_chapters)}"

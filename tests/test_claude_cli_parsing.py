@@ -4332,7 +4332,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
             self.assertEqual(payload["stages"]["revision"]["status"], "skipped")
             self.assertEqual(
                 payload["stages"]["revision"]["reason"],
-                "gate_passed_no_revision_needed",
+                "no_actionable_findings",
             )
             self.assertEqual(payload["advisory_gate"]["decision"], "PASS")
 
@@ -4445,9 +4445,141 @@ class ClaudeCliParsingTests(unittest.TestCase):
             )
             self.assertEqual(
                 cycle_one_status["stages"]["revision"]["reason"],
-                "gate_passed_no_revision_needed",
+                "no_actionable_findings",
             )
             self.assertEqual(cycle_two_status["cycle"], 2)
+
+    def test_run_revision_still_executes_when_advisory_gate_pass_has_actionable_findings(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_advisory_gate_actionable_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            aggregate = {
+                "summary": {
+                    "cycle": 1,
+                    "total_unresolved_medium_plus": 0,
+                    "by_severity": {"LOW": 1},
+                    "by_source": {"chapter_review": 1},
+                    "chapters_touched": ["chapter_01"],
+                    "chapter_review_failures": 0,
+                    "full_award_verdict": "PASS",
+                    "cross_chapter_audit_failed": False,
+                },
+                "all_findings": [
+                    {
+                        "finding_id": "chapter_01_low_001",
+                        "source": "chapter_review",
+                        "severity": "LOW",
+                        "chapter_id": "chapter_01",
+                        "evidence": "chapters/chapter_01.md:4",
+                        "problem": "The paragraph repeats a beat that can be tightened.",
+                        "rewrite_direction": "Cut the duplicate beat.",
+                        "acceptance_test": "The paragraph moves once through the beat.",
+                        "status": "UNRESOLVED",
+                        "cycle": 1,
+                    }
+                ],
+                "by_chapter": {
+                    "chapter_01": [
+                        {
+                            "finding_id": "chapter_01_low_001",
+                        }
+                    ]
+                },
+                "full_award_verdict": "PASS",
+                "chapter_review_failures": 0,
+                "cross_chapter_audit_failed": False,
+            }
+            gate = {
+                "cycle": 1,
+                "full_award_verdict": "PASS",
+                "unresolved_medium_plus_count": 0,
+                "chapter_review_failures": 0,
+                "cross_chapter_audit_failed": False,
+                "decision": "PASS",
+                "reason": "all_unresolved_medium_plus_closed_and_full_award_pass",
+            }
+
+            with mock.patch.object(runner, "_prepare_run_dir"), mock.patch.object(
+                runner, "_resolve_premise"
+            ), mock.patch.object(runner, "_run_outline_stage"), mock.patch.object(
+                runner, "_run_draft_stage"
+            ), mock.patch.object(
+                runner, "_assemble_snapshot", return_value=False
+            ), mock.patch.object(
+                runner, "_build_cycle_context_packs", return_value=False
+            ), mock.patch.object(
+                runner,
+                "_run_chapter_review_stage",
+                return_value={
+                    "status": "complete",
+                    "chapter_count": 18,
+                    "units": {},
+                },
+            ), mock.patch.object(
+                runner,
+                "_run_parallel_full_book_review_stages",
+                return_value={
+                    "full_award_review": False,
+                    "cross_chapter_audit": False,
+                    "local_window_audit": {
+                        "status": "complete",
+                        "units": {
+                            "window_01": {
+                                "status": "complete",
+                                "validated": True,
+                                "fresh": True,
+                            }
+                        },
+                    },
+                },
+            ), mock.patch.object(
+                runner, "_aggregate_findings", return_value=aggregate
+            ), mock.patch.object(
+                runner, "_write_gate", return_value=gate
+            ), mock.patch.object(
+                runner, "_build_revision_packets"
+            ) as build_packets, mock.patch.object(
+                runner,
+                "_run_revision_stage",
+                return_value={
+                    "status": "complete",
+                    "chapter_count": 1,
+                    "units": {},
+                },
+            ) as run_revision, mock.patch.object(
+                runner,
+                "_run_seam_polish_stage",
+                return_value={
+                    "status": "complete",
+                    "chapter_count": 1,
+                    "units": {},
+                },
+            ), mock.patch.object(
+                runner, "_assemble_post_revision_snapshot", return_value=False
+            ), mock.patch.object(
+                runner, "_run_continuity_reconciliation", return_value=False
+            ), mock.patch.object(
+                runner, "_write_final_report"
+            ), mock.patch.object(
+                runner, "_print_cost_summary"
+            ):
+                self.assertEqual(runner.run(), 0)
+
+            build_packets.assert_called_once_with(1, aggregate["by_chapter"])
+            run_revision.assert_called_once_with(1, ["chapter_01"])
+
+            payload = json.loads(
+                (runner.cfg.run_dir / "status" / "cycle_01" / "cycle_status.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(payload["advisory_gate"]["decision"], "PASS")
+            self.assertEqual(
+                payload["stages"]["build_revision_packets"]["status"],
+                "complete",
+            )
+            self.assertEqual(payload["stages"]["revision"]["status"], "complete")
 
     def test_run_returns_success_when_max_cycles_reached_without_quality_pass(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_operational_success_", dir="/tmp") as tmp:
