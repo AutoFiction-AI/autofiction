@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import sys
@@ -1262,6 +1263,626 @@ class ClaudeCliParsingTests(unittest.TestCase):
             self.assertTrue(preserved.is_file())
             self.assertEqual(json.loads(preserved.read_text(encoding="utf-8")), legacy)
 
+    def test_compute_windows_uses_overlap_and_keeps_tail_window(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_local_window_layout_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            chapter_ids = [f"chapter_{idx:02d}" for idx in range(1, 19)]
+
+            windows = runner._compute_windows(chapter_ids, 4, 2)
+
+            self.assertEqual(len(windows), 8)
+            self.assertEqual(
+                windows[0],
+                ["chapter_01", "chapter_02", "chapter_03", "chapter_04"],
+            )
+            self.assertEqual(
+                windows[1],
+                ["chapter_03", "chapter_04", "chapter_05", "chapter_06"],
+            )
+            self.assertEqual(
+                windows[-1],
+                ["chapter_15", "chapter_16", "chapter_17", "chapter_18"],
+            )
+            self.assertEqual(
+                runner._compute_windows(chapter_ids[:5], 4, 2),
+                [
+                    ["chapter_01", "chapter_02", "chapter_03", "chapter_04"],
+                    ["chapter_03", "chapter_04", "chapter_05"],
+                ],
+            )
+
+    def test_build_chapter_line_index_tracks_final_novel_line_ranges(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_chapter_line_index_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1,
+                    chapter_engine="engine",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                ),
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_02",
+                    chapter_number=2,
+                    projected_min_words=1,
+                    chapter_engine="engine",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                ),
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_03",
+                    chapter_number=3,
+                    projected_min_words=1,
+                    chapter_engine="engine",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                ),
+            ]
+
+            compiled_novel = runner.cfg.run_dir / "snapshots" / "cycle_01" / "FINAL_NOVEL.md"
+            compiled_novel.parent.mkdir(parents=True, exist_ok=True)
+            compiled_novel.write_text(
+                "# Title\n\n# Chapter 1\n\nOne.\n\n# Chapter 2\n\nTwo.\nThree.\n\n# Chapter 3\n\nFour.\n",
+                encoding="utf-8",
+            )
+
+            index = runner._build_chapter_line_index(compiled_novel)
+
+            self.assertEqual(
+                index,
+                {
+                    "chapter_01": {"start_line": 3, "end_line": 6},
+                    "chapter_02": {"start_line": 7, "end_line": 11},
+                    "chapter_03": {"start_line": 12, "end_line": 14},
+                },
+            )
+
+    def test_load_repaired_local_window_audit_normalizes_shape_and_preserves_original(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_local_window_repair_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1,
+                    chapter_engine="engine",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                ),
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_02",
+                    chapter_number=2,
+                    projected_min_words=1,
+                    chapter_engine="engine",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                ),
+            ]
+
+            run_dir = runner.cfg.run_dir
+            (run_dir / "reviews" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            rel = "reviews/cycle_01/local_window_02.json"
+            legacy = {
+                "cycle": "01",
+                "window": "2",
+                "chapters": ["ch1", "ch2"],
+                "findings": [
+                    {
+                        "category": "coherence",
+                        "subcategory": "",
+                        "severity": "high",
+                        "chapter_id": "ch2",
+                        "evidence": ["snapshots/cycle_01/FINAL_NOVEL.md:12"],
+                        "counterpart_evidence": ["snapshots/cycle_01/FINAL_NOVEL.md:6"],
+                        "description": "Facts shift across the handoff.",
+                        "revision_directive": (
+                            "Revise snapshots/cycle_01/FINAL_NOVEL.md:10-14 to match the earlier account."
+                        ),
+                        "acceptance_test": (
+                            "Pass if snapshots/cycle_01/FINAL_NOVEL.md:10-14 matches snapshots/cycle_01/FINAL_NOVEL.md:6."
+                        ),
+                        "boundary_span": "chapter_01/chapter_02",
+                    }
+                ],
+            }
+            (run_dir / rel).write_text(json.dumps(legacy) + "\n", encoding="utf-8")
+
+            repaired = runner._load_repaired_local_window_audit(
+                rel,
+                1,
+                {"chapter_01", "chapter_02"},
+                "snapshots/cycle_01/FINAL_NOVEL.md",
+            )
+
+            finding = repaired["findings"][0]
+            self.assertEqual(repaired["cycle"], 1)
+            self.assertEqual(repaired["window_id"], "window_02")
+            self.assertEqual(repaired["chapters_reviewed"], ["chapter_01", "chapter_02"])
+            self.assertEqual(finding["finding_id"], "window_02_001")
+            self.assertEqual(finding["category"], "factual_coherence")
+            self.assertEqual(finding["subcategory"], "unspecified")
+            self.assertEqual(finding["severity"], "HIGH")
+            self.assertEqual(finding["chapter_id"], "chapter_02")
+            self.assertEqual(finding["problem"], "Facts shift across the handoff.")
+            self.assertEqual(finding["pass_hint"], "p1_structural_craft")
+            self.assertEqual(
+                finding["related_chapter_ids"],
+                ["chapter_01", "chapter_02"],
+            )
+            self.assertTrue(finding["fix_owner_reason"].strip())
+            self.assertTrue(repaired["summary"].strip())
+            preserved = (
+                run_dir
+                / "reviews"
+                / "cycle_01"
+                / "local_window_02.invalid.original.json"
+            )
+            self.assertTrue(preserved.is_file())
+            self.assertEqual(json.loads(preserved.read_text(encoding="utf-8")), legacy)
+
+    def test_validate_local_window_audit_enforces_category_specific_fields(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_local_window_validate_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            chapter_ids = {"chapter_01", "chapter_02"}
+            base_payload = {
+                "cycle": 1,
+                "window_id": "window_01",
+                "chapters_reviewed": ["chapter_01", "chapter_02"],
+                "summary": "A boundary problem weakens the handoff.",
+                "findings": [
+                    {
+                        "finding_id": "LW01-001",
+                        "category": "factual_coherence",
+                        "subcategory": "action_attribution",
+                        "severity": "HIGH",
+                        "chapter_id": "chapter_02",
+                        "related_chapter_ids": ["chapter_01"],
+                        "boundary_span": "chapter_01/chapter_02",
+                        "counterpart_evidence": "snapshots/cycle_01/FINAL_NOVEL.md:6",
+                        "pass_hint": "p1_structural_craft",
+                        "evidence": "snapshots/cycle_01/FINAL_NOVEL.md:12",
+                        "problem": "Facts shift across the handoff.",
+                        "rewrite_direction": "Make the later chapter match the earlier fact.",
+                        "acceptance_test": "The same physical fact appears in both chapters.",
+                        "fix_owner_reason": "The later chapter should conform.",
+                    }
+                ],
+            }
+
+            missing_counterpart = json.loads(json.dumps(base_payload))
+            del missing_counterpart["findings"][0]["counterpart_evidence"]
+            with self.assertRaisesRegex(
+                runner_module.PipelineError,
+                "requires counterpart_evidence",
+            ):
+                runner._validate_local_window_audit_json(
+                    missing_counterpart,
+                    1,
+                    chapter_ids,
+                    "reviews/cycle_01/local_window_01.json",
+                    "snapshots/cycle_01/FINAL_NOVEL.md",
+                )
+
+            missing_related = json.loads(json.dumps(base_payload))
+            missing_related["findings"][0]["category"] = "redundant_scene_functions"
+            del missing_related["findings"][0]["related_chapter_ids"]
+            del missing_related["findings"][0]["boundary_span"]
+            with self.assertRaisesRegex(
+                runner_module.PipelineError,
+                "requires related_chapter_ids",
+            ):
+                runner._validate_local_window_audit_json(
+                    missing_related,
+                    1,
+                    chapter_ids,
+                    "reviews/cycle_01/local_window_01.json",
+                    "snapshots/cycle_01/FINAL_NOVEL.md",
+                )
+
+    def test_materialize_output_alias_supports_local_window_review_outputs(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_local_window_alias_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            run_dir = runner.cfg.run_dir
+            (run_dir / "out").mkdir(parents=True, exist_ok=True)
+            (run_dir / "out" / "review.json").write_text(
+                '{"cycle": 1, "window_id": "window_02"}\n',
+                encoding="utf-8",
+            )
+
+            copied = runner._materialize_output_alias(
+                base_dir=run_dir,
+                required_rel="reviews/cycle_01/local_window_02.json",
+                stage="local_window_audit",
+                cycle=1,
+                chapter_id=None,
+            )
+
+            self.assertTrue(copied)
+            self.assertEqual(
+                (run_dir / "reviews" / "cycle_01" / "local_window_02.json").read_text(
+                    encoding="utf-8"
+                ),
+                '{"cycle": 1, "window_id": "window_02"}\n',
+            )
+            self.assertEqual(len(runner.validation_warnings), 1)
+            self.assertEqual(runner.validation_warnings[0]["action"], "copied_output_alias")
+
+    def test_local_window_unit_state_marks_artifact_stale_when_inputs_change(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_local_window_freshness_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1,
+                    chapter_engine="engine",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                ),
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_02",
+                    chapter_number=2,
+                    projected_min_words=1,
+                    chapter_engine="engine",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                ),
+            ]
+
+            run_dir = runner.cfg.run_dir
+            runner._prepare_run_dir()
+            (run_dir / "outline" / "style_bible.json").write_text("{}\n", encoding="utf-8")
+            (run_dir / "context" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            (run_dir / "context" / "cycle_01" / "continuity_sheet.json").write_text(
+                "{}\n",
+                encoding="utf-8",
+            )
+            (run_dir / "context" / "cycle_01" / "chapter_line_index.json").write_text(
+                json.dumps(
+                    {
+                        "chapter_01": {"start_line": 3, "end_line": 6},
+                        "chapter_02": {"start_line": 7, "end_line": 10},
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (run_dir / "outline" / "chapter_specs").mkdir(parents=True, exist_ok=True)
+            chapter_spec_rel = run_dir / "outline" / "chapter_specs" / "chapter_01.json"
+            chapter_spec_rel.write_text("{}\n", encoding="utf-8")
+            (run_dir / "outline" / "chapter_specs" / "chapter_02.json").write_text(
+                "{}\n",
+                encoding="utf-8",
+            )
+            (run_dir / "snapshots" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            (run_dir / "snapshots" / "cycle_01" / "FINAL_NOVEL.md").write_text(
+                "# Title\n\n# Chapter 1\n\nOne.\n\n# Chapter 2\n\nTwo.\n",
+                encoding="utf-8",
+            )
+
+            artifact_rel = "reviews/cycle_01/local_window_01.json"
+            artifact_path = run_dir / artifact_rel
+            artifact_path.parent.mkdir(parents=True, exist_ok=True)
+            artifact_path.write_text(
+                json.dumps(
+                    {
+                        "cycle": 1,
+                        "window_id": "window_01",
+                        "chapters_reviewed": ["chapter_01", "chapter_02"],
+                        "summary": "The window reads cleanly.",
+                        "findings": [
+                            {
+                                "finding_id": "LW01-001",
+                                "category": "reading_momentum",
+                                "subcategory": "pressure_gain",
+                                "severity": "MEDIUM",
+                                "chapter_id": "chapter_02",
+                                "pass_hint": "p1_structural_craft",
+                                "evidence": "snapshots/cycle_01/FINAL_NOVEL.md:8",
+                                "problem": "The handoff needs sharper pressure.",
+                                "rewrite_direction": "Sharpen the new pressure at the chapter turn.",
+                                "acceptance_test": "The next chapter opens with materially higher pressure.",
+                                "fix_owner_reason": "The later chapter owns the handoff.",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            state = runner._local_window_audit_unit_state(
+                1,
+                "window_01",
+                ["chapter_01", "chapter_02"],
+            )
+            self.assertEqual(state["status"], "reused")
+            self.assertTrue(state["fresh"])
+
+            future_mtime = artifact_path.stat().st_mtime + 5
+            os.utime(chapter_spec_rel, (future_mtime, future_mtime))
+
+            stale_state = runner._local_window_audit_unit_state(
+                1,
+                "window_01",
+                ["chapter_01", "chapter_02"],
+            )
+            self.assertEqual(stale_state["status"], "stale")
+            self.assertEqual(stale_state["reason"], "inputs_newer_than_output")
+
+    def test_build_local_window_audit_job_includes_expected_inputs(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_local_window_job_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id=f"chapter_{idx:02d}",
+                    chapter_number=idx,
+                    projected_min_words=1,
+                    chapter_engine="engine",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                )
+                for idx in range(1, 5)
+            ]
+
+            runner._prepare_run_dir()
+            run_dir = runner.cfg.run_dir
+            (run_dir / "outline" / "continuity_sheet.json").write_text("{}\n", encoding="utf-8")
+
+            job = runner._build_local_window_audit_job(
+                1,
+                ["chapter_01", "chapter_02", "chapter_03", "chapter_04"],
+                {},
+            )
+
+            self.assertIn("outline/style_bible.json", job.allowed_inputs)
+            self.assertIn("context/cycle_01/chapter_line_index.json", job.allowed_inputs)
+            self.assertIn("outline/chapter_specs/chapter_01.json", job.allowed_inputs)
+            self.assertIn("config/prompts/local_window_audit_prompt.md", job.allowed_inputs)
+            self.assertEqual(job.stage_group, "cross_chapter_audit")
+            self.assertIn("window_01", job.prompt_text)
+            self.assertIn("context/cycle_01/chapter_line_index.json", job.prompt_text)
+
+    def test_run_local_window_audit_stage_reuses_fresh_windows_and_builds_missing_ones(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_local_window_stage_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id=f"chapter_{idx:02d}",
+                    chapter_number=idx,
+                    projected_min_words=1,
+                    chapter_engine="engine",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                )
+                for idx in range(1, 7)
+            ]
+
+            runner._prepare_run_dir()
+            run_dir = runner.cfg.run_dir
+            (run_dir / "outline" / "style_bible.json").write_text("{}\n", encoding="utf-8")
+            (run_dir / "outline" / "continuity_sheet.json").write_text("{}\n", encoding="utf-8")
+            runner._ensure_cycle_continuity_snapshot(1)
+            (run_dir / "outline" / "chapter_specs").mkdir(parents=True, exist_ok=True)
+            for idx in range(1, 7):
+                (run_dir / "outline" / "chapter_specs" / f"chapter_{idx:02d}.json").write_text(
+                    "{}\n",
+                    encoding="utf-8",
+                )
+
+            final_novel = run_dir / "snapshots" / "cycle_01" / "FINAL_NOVEL.md"
+            final_novel.parent.mkdir(parents=True, exist_ok=True)
+            final_novel.write_text(
+                "# Title\n\n"
+                "# Chapter 1\n\nOne.\n\n"
+                "# Chapter 2\n\nTwo.\n\n"
+                "# Chapter 3\n\nThree.\n\n"
+                "# Chapter 4\n\nFour.\n\n"
+                "# Chapter 5\n\nFive.\n\n"
+                "# Chapter 6\n\nSix.\n",
+                encoding="utf-8",
+            )
+            runner._write_json(
+                runner._chapter_line_index_rel(1),
+                runner._build_chapter_line_index(final_novel),
+            )
+
+            existing_rel = runner._local_window_audit_rel(1, "window_01")
+            (run_dir / existing_rel).parent.mkdir(parents=True, exist_ok=True)
+            (run_dir / existing_rel).write_text(
+                json.dumps(
+                    {
+                        "cycle": 1,
+                        "window_id": "window_01",
+                        "chapters_reviewed": [
+                            "chapter_01",
+                            "chapter_02",
+                            "chapter_03",
+                            "chapter_04",
+                        ],
+                        "summary": "Existing window artifact.",
+                        "findings": [],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            summary = runner._run_local_window_audit_stage(1)
+
+            self.assertEqual(summary["status"], "complete")
+            self.assertEqual(summary["units"]["window_01"]["status"], "reused")
+            self.assertEqual(summary["units"]["window_02"]["status"], "complete")
+            self.assertTrue(
+                (run_dir / runner._local_window_audit_rel(1, "window_02")).is_file()
+            )
+
+    def test_aggregate_findings_collects_local_window_findings(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_local_window_aggregate_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id=f"chapter_{idx:02d}",
+                    chapter_number=idx,
+                    projected_min_words=1,
+                    chapter_engine="engine",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                )
+                for idx in range(1, 5)
+            ]
+
+            run_dir = runner.cfg.run_dir
+            (run_dir / "reviews" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            (run_dir / "snapshots" / "cycle_01" / "chapters").mkdir(parents=True, exist_ok=True)
+            for idx in range(1, 5):
+                chapter_id = f"chapter_{idx:02d}"
+                (run_dir / "snapshots" / "cycle_01" / "chapters" / f"{chapter_id}.md").write_text(
+                    f"# Chapter {idx}\n\nEnough words here for {chapter_id}.\n",
+                    encoding="utf-8",
+                )
+                (run_dir / "reviews" / "cycle_01" / f"{chapter_id}.review.json").write_text(
+                    json.dumps(
+                        {
+                            "chapter_id": chapter_id,
+                            "verdicts": {
+                                runner_module.PRIMARY_REVIEW_LENS: "PASS",
+                                "craft": "PASS",
+                                "dialogue": "PASS",
+                                "prose": "PASS",
+                            },
+                            "findings": [],
+                            "summary": "No chapter-local blockers.",
+                        }
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+
+            (run_dir / "snapshots" / "cycle_01" / "FINAL_NOVEL.md").write_text(
+                "# Title\n\n"
+                "# Chapter 1\n\nOne.\n\n"
+                "# Chapter 2\n\nTwo.\n\n"
+                "# Chapter 3\n\nThree.\n\n"
+                "# Chapter 4\n\nFour.\n",
+                encoding="utf-8",
+            )
+            (run_dir / "reviews" / "cycle_01" / "full_award.review.json").write_text(
+                json.dumps(
+                    {
+                        "cycle": 1,
+                        "verdict": "PASS",
+                        "summary": "No global blockers.",
+                        "findings": [],
+                        "pattern_findings": [],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (run_dir / "reviews" / "cycle_01" / "cross_chapter_audit.json").write_text(
+                json.dumps(
+                    {
+                        "cycle": 1,
+                        "summary": "No cross-chapter blockers.",
+                        "redundancy_findings": [],
+                        "consistency_findings": [],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (run_dir / "reviews" / "cycle_01" / "local_window_01.json").write_text(
+                json.dumps(
+                    {
+                        "cycle": 1,
+                        "window_id": "window_01",
+                        "chapters_reviewed": [
+                            "chapter_01",
+                            "chapter_02",
+                            "chapter_03",
+                            "chapter_04",
+                        ],
+                        "summary": "One boundary-local voice issue.",
+                        "findings": [
+                            {
+                                "finding_id": "LW01-001",
+                                "category": "boundary_local_voice_drift",
+                                "subcategory": "dialogue_register",
+                                "severity": "HIGH",
+                                "chapter_id": "chapter_03",
+                                "related_chapter_ids": ["chapter_02"],
+                                "boundary_span": "chapter_02/chapter_03",
+                                "pass_hint": "p2_dialogue_idiolect_cadence",
+                                "evidence": "snapshots/cycle_01/FINAL_NOVEL.md:12",
+                                "problem": "The dialogue register flips abruptly at the handoff.",
+                                "rewrite_direction": "Revise snapshots/cycle_01/FINAL_NOVEL.md:12-16 so Chapter 3 preserves the prior register while staying scene-pressured.",
+                                "acceptance_test": "The cited handoff now sounds like the same speakerly world rather than a reset into cleaner dialogue.",
+                                "fix_owner_reason": "The drift first appears in the later chapter.",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            aggregate = runner._aggregate_findings(1)
+
+            self.assertEqual(aggregate["summary"]["local_window_windows_expected"], 1)
+            self.assertEqual(aggregate["summary"]["local_window_windows_available"], 1)
+            self.assertEqual(aggregate["summary"]["by_source"]["local_window"], 1)
+            finding = aggregate["all_findings"][0]
+            self.assertEqual(finding["source"], "local_window")
+            self.assertEqual(
+                runner._assign_revision_pass_key(finding),
+                "p2_dialogue_idiolect_cadence",
+            )
+
     def test_aggregate_findings_dedupes_cross_chapter_and_full_award_overlap(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_cross_audit_dedupe_", dir="/tmp") as tmp:
             runner = make_runner(Path(tmp))
@@ -1728,6 +2349,16 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 return_value={
                     "full_award_review": True,
                     "cross_chapter_audit": True,
+                    "local_window_audit": {
+                        "status": "reused",
+                        "units": {
+                            "window_01": {
+                                "status": "reused",
+                                "validated": True,
+                                "fresh": True,
+                            }
+                        },
+                    },
                 },
             ), mock.patch.object(
                 runner, "_aggregate_findings", return_value=aggregate
@@ -1836,6 +2467,13 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
+            (run_dir / "chapters").mkdir(parents=True, exist_ok=True)
+            for spec in runner.chapter_specs:
+                (run_dir / "chapters" / f"{spec.chapter_id}.md").write_text(
+                    f"# Chapter {spec.chapter_number}\n\nBody for {spec.chapter_id}.\n",
+                    encoding="utf-8",
+                )
+            runner._assemble_snapshot(1)
             runner._build_cycle_context_packs(1)
 
             self.assertEqual(
@@ -1999,6 +2637,10 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 "s1\tchapter_01\t1\tobj\topp\tturn\tcost\tYES\n",
                 encoding="utf-8",
             )
+            (run_dir / "outline" / "spatial_layout.json").write_text(
+                json.dumps({"summary": "layout", "micro": None, "macro": None}) + "\n",
+                encoding="utf-8",
+            )
             (run_dir / "chapters" / "chapter_01.md").write_text(
                 "# Chapter 1\n\nToo short.\n",
                 encoding="utf-8",
@@ -2037,11 +2679,50 @@ class ClaudeCliParsingTests(unittest.TestCase):
             self.assertEqual(len(captured_job_groups), 2)
             self.assertEqual(captured_job_groups[0][0], "draft")
             self.assertEqual(captured_job_groups[1][0], "draft_expand")
+            draft_job = captured_job_groups[0][1][0]
             self.assertEqual(len(captured_job_groups[1][1]), 1)
             expand_job = captured_job_groups[1][1][0]
+            self.assertIn("outline/spatial_layout.json", draft_job.allowed_inputs)
             self.assertEqual(expand_job.stage, "chapter_expand")
             self.assertIn("outline/outline.md", expand_job.allowed_inputs)
             self.assertIn("outline/scene_plan.tsv", expand_job.allowed_inputs)
+            self.assertIn("outline/spatial_layout.json", expand_job.allowed_inputs)
+
+    def test_run_outline_stage_dry_run_produces_outline_review_revision_and_spatial_layout(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_outline_preflight_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+
+            runner._prepare_run_dir()
+            runner._resolve_premise()
+            runner._run_outline_stage()
+
+            run_dir = runner.cfg.run_dir
+            review_path = run_dir / "outline" / "outline_review_cycle_01.json"
+            revision_path = run_dir / "outline" / "outline_revision_cycle_01.json"
+            spatial_layout_path = run_dir / "outline" / "spatial_layout.json"
+
+            self.assertTrue(review_path.is_file())
+            self.assertTrue(revision_path.is_file())
+            self.assertTrue(spatial_layout_path.is_file())
+            self.assertTrue((run_dir / "outline" / "static_story_context.json").is_file())
+
+            revision_payload = json.loads(revision_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                revision_payload["review_file"], "outline/outline_review_cycle_01.json"
+            )
+
+            continuity_payload = json.loads(
+                (run_dir / "outline" / "continuity_sheet.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                continuity_payload["geography"]["spatial_layout_ref"],
+                "outline/spatial_layout.json",
+            )
+
+            cycle_status = runner._new_cycle_status(1)
+            self.assertEqual(cycle_status["stages"]["outline_review"]["status"], "complete")
+            self.assertEqual(cycle_status["stages"]["outline_revision"]["status"], "complete")
+            self.assertEqual(cycle_status["stages"]["spatial_layout"]["status"], "complete")
 
     def test_seam_polish_job_receives_outline_and_continuity_inputs(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_seam_inputs_", dir="/tmp") as tmp:
@@ -3247,6 +3928,109 @@ class ClaudeCliParsingTests(unittest.TestCase):
             with self.assertRaises(runner_module.PipelineError):
                 runner._normalize_finding(raw, 1, force_source="prose")
 
+    def test_load_repaired_full_award_review_normalizes_elevation_findings(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_elevation_repair_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1,
+                    chapter_engine="engine",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                )
+            ]
+
+            run_dir = runner.cfg.run_dir
+            (run_dir / "reviews" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            (run_dir / "snapshots" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            (run_dir / "snapshots" / "cycle_01" / "FINAL_NOVEL.md").write_text(
+                "# Title\n\n# Chapter 1\n\nalpha\nbeta\ngamma\n",
+                encoding="utf-8",
+            )
+            rel = "reviews/cycle_01/full_award.review.json"
+            (run_dir / rel).write_text(
+                json.dumps(
+                    {
+                        "cycle": 1,
+                        "verdict": "FAIL",
+                        "summary": "One elevation opportunity.",
+                        "findings": [
+                            {
+                                "finding_id": "E5_STATUS_FLIP",
+                                "source": "Elevation",
+                                "severity": "ELEVATION_HIGH",
+                                "chapter_id": "chapter_01",
+                                "pass_hint": "p2_dialogue_idiolect_cadence",
+                                "evidence": "snapshots/cycle_01/FINAL_NOVEL.md:5",
+                                "problem": "The scene never cashes in on a possible status reversal.",
+                                "rewrite_direction": "Revise snapshots/cycle_01/FINAL_NOVEL.md:5-6 so the power dynamic visibly flips mid-exchange.",
+                                "acceptance_test": "The cited exchange now contains a clear status reversal rather than a flat continuation.",
+                            }
+                        ],
+                        "pattern_findings": [],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            repaired = runner._load_repaired_full_award_review(
+                rel,
+                1,
+                {"chapter_01"},
+                "snapshots/cycle_01/FINAL_NOVEL.md",
+            )
+
+            self.assertEqual(repaired["findings"][0]["source"], "elevation")
+            self.assertEqual(repaired["findings"][0]["severity"], "HIGH")
+
+    def test_normalize_finding_routes_elevation_by_pass_hint(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_elevation_route_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1,
+                    chapter_engine="engine",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                )
+            ]
+
+            finding = runner._normalize_finding(
+                {
+                    "finding_id": "E3_DIALOGUE_PRESSURE",
+                    "source": "elevation",
+                    "severity": "ELEVATION_MEDIUM",
+                    "chapter_id": "chapter_01",
+                    "pass_hint": "p2_dialogue_idiolect_cadence",
+                    "evidence": "snapshots/cycle_01/FINAL_NOVEL.md:4",
+                    "problem": "The exchange lacks competing desires in speech.",
+                    "rewrite_direction": "Revise snapshots/cycle_01/FINAL_NOVEL.md:4-6 so both speakers pursue different aims in the same conversation.",
+                    "acceptance_test": "The cited exchange now contains conflicting immediate agendas rather than cooperative exposition.",
+                },
+                1,
+            )
+
+            self.assertEqual(finding["source"], "elevation")
+            self.assertEqual(finding["severity"], "MEDIUM")
+            self.assertEqual(finding["pass_hint"], "p2_dialogue_idiolect_cadence")
+            self.assertEqual(
+                runner._assign_revision_pass_key(finding),
+                "p2_dialogue_idiolect_cadence",
+            )
+
     def test_revision_packet_enriches_full_book_citations_with_locator_excerpts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_locator_excerpt_", dir="/tmp") as tmp:
             runner = make_runner(Path(tmp))
@@ -3503,6 +4287,16 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 return_value={
                     "full_award_review": False,
                     "cross_chapter_audit": False,
+                    "local_window_audit": {
+                        "status": "complete",
+                        "units": {
+                            "window_01": {
+                                "status": "complete",
+                                "validated": True,
+                                "fresh": True,
+                            }
+                        },
+                    },
                 },
             ), mock.patch.object(
                 runner, "_aggregate_findings", return_value=aggregate
@@ -3526,8 +4320,14 @@ class ClaudeCliParsingTests(unittest.TestCase):
             )
             self.assertEqual(payload["cycle"], 1)
             self.assertEqual(payload["run_mode"], "fresh")
+            self.assertFalse(payload["completion_policy"]["terminate_on_quality_pass"])
             self.assertEqual(payload["stages"]["assemble_snapshot"]["status"], "complete")
             self.assertEqual(payload["stages"]["chapter_review"]["status"], "complete")
+            self.assertEqual(payload["stages"]["local_window_audit"]["status"], "complete")
+            self.assertEqual(
+                payload["stages"]["local_window_audit"]["units"]["window_01"]["status"],
+                "complete",
+            )
             self.assertEqual(payload["stages"]["aggregate_findings"]["status"], "complete")
             self.assertEqual(payload["stages"]["revision"]["status"], "skipped")
             self.assertEqual(
@@ -3535,6 +4335,238 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 "gate_passed_no_revision_needed",
             )
             self.assertEqual(payload["advisory_gate"]["decision"], "PASS")
+
+    def test_run_continues_after_advisory_gate_pass_until_max_cycles(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_advisory_gate_pass_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.cfg = dataclasses.replace(runner.cfg, max_cycles=2)
+            aggregate = {
+                "summary": {
+                    "cycle": 1,
+                    "total_unresolved_medium_plus": 0,
+                    "by_severity": {},
+                    "by_source": {},
+                    "chapters_touched": [],
+                    "chapter_review_failures": 0,
+                    "full_award_verdict": "PASS",
+                    "cross_chapter_audit_failed": False,
+                },
+                "all_findings": [],
+                "by_chapter": {},
+                "full_award_verdict": "PASS",
+                "chapter_review_failures": 0,
+                "cross_chapter_audit_failed": False,
+            }
+
+            def gate_for_cycle(cycle: int, _aggregate: dict[str, object]) -> dict[str, object]:
+                return {
+                    "cycle": cycle,
+                    "full_award_verdict": "PASS",
+                    "unresolved_medium_plus_count": 0,
+                    "chapter_review_failures": 0,
+                    "cross_chapter_audit_failed": False,
+                    "decision": "PASS",
+                    "reason": "all_unresolved_medium_plus_closed_and_full_award_pass",
+                }
+
+            with mock.patch.object(runner, "_prepare_run_dir"), mock.patch.object(
+                runner, "_resolve_premise"
+            ), mock.patch.object(runner, "_run_outline_stage"), mock.patch.object(
+                runner, "_run_draft_stage"
+            ), mock.patch.object(
+                runner, "_assemble_snapshot", return_value=False
+            ) as assemble_snapshot, mock.patch.object(
+                runner, "_build_cycle_context_packs", return_value=False
+            ), mock.patch.object(
+                runner,
+                "_run_chapter_review_stage",
+                return_value={
+                    "status": "complete",
+                    "chapter_count": 18,
+                    "units": {},
+                },
+            ), mock.patch.object(
+                runner,
+                "_run_parallel_full_book_review_stages",
+                return_value={
+                    "full_award_review": False,
+                    "cross_chapter_audit": False,
+                    "local_window_audit": {
+                        "status": "complete",
+                        "units": {
+                            "window_01": {
+                                "status": "complete",
+                                "validated": True,
+                                "fresh": True,
+                            }
+                        },
+                    },
+                },
+            ), mock.patch.object(
+                runner, "_aggregate_findings", return_value=aggregate
+            ), mock.patch.object(
+                runner, "_write_gate", side_effect=gate_for_cycle
+            ) as write_gate, mock.patch.object(
+                runner, "_build_revision_packets"
+            ) as build_packets, mock.patch.object(
+                runner, "_run_revision_stage"
+            ) as run_revision, mock.patch.object(
+                runner, "_run_seam_polish_stage"
+            ), mock.patch.object(
+                runner, "_assemble_post_revision_snapshot", return_value=False
+            ), mock.patch.object(
+                runner, "_run_continuity_reconciliation", return_value=False
+            ), mock.patch.object(
+                runner, "_write_final_report"
+            ) as write_final_report, mock.patch.object(
+                runner, "_print_cost_summary"
+            ):
+                self.assertEqual(runner.run(), 0)
+
+            self.assertEqual(assemble_snapshot.call_count, 2)
+            self.assertEqual(write_gate.call_count, 2)
+            build_packets.assert_not_called()
+            run_revision.assert_not_called()
+            self.assertEqual(write_final_report.call_args.args[0], 2)
+            self.assertEqual(len(write_final_report.call_args.args[1]), 2)
+
+            cycle_one_status = json.loads(
+                (runner.cfg.run_dir / "status" / "cycle_01" / "cycle_status.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            cycle_two_status = json.loads(
+                (runner.cfg.run_dir / "status" / "cycle_02" / "cycle_status.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertFalse(
+                cycle_one_status["completion_policy"]["terminate_on_quality_pass"]
+            )
+            self.assertEqual(
+                cycle_one_status["stages"]["revision"]["reason"],
+                "gate_passed_no_revision_needed",
+            )
+            self.assertEqual(cycle_two_status["cycle"], 2)
+
+    def test_run_returns_success_when_max_cycles_reached_without_quality_pass(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_operational_success_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            aggregate = {
+                "summary": {
+                    "cycle": 1,
+                    "total_unresolved_medium_plus": 1,
+                    "by_severity": {"HIGH": 1},
+                    "by_source": {"award_global": 1},
+                    "chapters_touched": ["chapter_01"],
+                    "chapter_review_failures": 0,
+                    "full_award_verdict": "FAIL",
+                    "cross_chapter_audit_failed": False,
+                },
+                "all_findings": [
+                    {
+                        "finding_id": "award_001",
+                        "source": "award_global",
+                        "severity": "HIGH",
+                        "chapter_id": "chapter_01",
+                        "evidence": "snapshots/cycle_01/FINAL_NOVEL.md:4",
+                        "problem": "The chapter still has a blocker.",
+                        "rewrite_direction": "Revise the blocker.",
+                        "acceptance_test": "The blocker is resolved.",
+                        "status": "UNRESOLVED",
+                        "cycle": 1,
+                    }
+                ],
+                "by_chapter": {
+                    "chapter_01": [
+                        {
+                            "finding_id": "award_001",
+                        }
+                    ]
+                },
+                "full_award_verdict": "FAIL",
+                "chapter_review_failures": 0,
+                "cross_chapter_audit_failed": False,
+            }
+            gate = {
+                "cycle": 1,
+                "full_award_verdict": "FAIL",
+                "unresolved_medium_plus_count": 1,
+                "chapter_review_failures": 0,
+                "cross_chapter_audit_failed": False,
+                "decision": "FAIL",
+                "reason": "unresolved_medium_plus_or_review_failures_or_full_award_fail",
+            }
+
+            with mock.patch.object(runner, "_prepare_run_dir"), mock.patch.object(
+                runner, "_resolve_premise"
+            ), mock.patch.object(runner, "_run_outline_stage"), mock.patch.object(
+                runner, "_run_draft_stage"
+            ), mock.patch.object(
+                runner, "_assemble_snapshot", return_value=False
+            ), mock.patch.object(
+                runner, "_build_cycle_context_packs", return_value=False
+            ), mock.patch.object(
+                runner,
+                "_run_chapter_review_stage",
+                return_value={
+                    "status": "complete",
+                    "chapter_count": 18,
+                    "units": {},
+                },
+            ), mock.patch.object(
+                runner,
+                "_run_parallel_full_book_review_stages",
+                return_value={
+                    "full_award_review": False,
+                    "cross_chapter_audit": False,
+                    "local_window_audit": {
+                        "status": "complete",
+                        "units": {
+                            "window_01": {
+                                "status": "complete",
+                                "validated": True,
+                                "fresh": True,
+                            }
+                        },
+                    },
+                },
+            ), mock.patch.object(
+                runner, "_aggregate_findings", return_value=aggregate
+            ), mock.patch.object(
+                runner, "_write_gate", return_value=gate
+            ), mock.patch.object(
+                runner, "_build_revision_packets"
+            ) as build_packets, mock.patch.object(
+                runner,
+                "_run_revision_stage",
+                return_value={
+                    "status": "complete",
+                    "chapter_count": 1,
+                    "units": {},
+                },
+            ) as run_revision, mock.patch.object(
+                runner,
+                "_run_seam_polish_stage",
+                return_value={
+                    "status": "complete",
+                    "chapter_count": 1,
+                    "units": {},
+                },
+            ), mock.patch.object(
+                runner, "_assemble_post_revision_snapshot", return_value=False
+            ), mock.patch.object(
+                runner, "_run_continuity_reconciliation", return_value=False
+            ), mock.patch.object(
+                runner, "_write_final_report"
+            ) as write_final_report, mock.patch.object(
+                runner, "_print_cost_summary"
+            ):
+                self.assertEqual(runner.run(), 0)
+
+            build_packets.assert_called_once()
+            run_revision.assert_called_once()
+            self.assertEqual(write_final_report.call_args.args[0], 1)
 
     def test_run_draft_stage_skips_expand_when_all_chapters_are_fresh_on_resume(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_draft_resume_skip_expand_", dir="/tmp") as tmp:
@@ -3563,6 +4595,10 @@ class ClaudeCliParsingTests(unittest.TestCase):
             )
             (run_dir / "outline" / "static_story_context.json").write_text(
                 "{}\n", encoding="utf-8"
+            )
+            (run_dir / "outline" / "spatial_layout.json").write_text(
+                json.dumps({"summary": "layout", "micro": None, "macro": None}) + "\n",
+                encoding="utf-8",
             )
             (run_dir / "outline" / "style_bible.json").write_text("{}\n", encoding="utf-8")
             (run_dir / "outline" / "continuity_sheet.json").write_text(
@@ -3629,6 +4665,58 @@ class ClaudeCliParsingTests(unittest.TestCase):
         cfg = runner_module.build_config(REPO_ROOT, args)
         self.assertTrue(cfg.skip_cross_chapter_audit)
         self.assertEqual(cfg.stage_profiles["cross_chapter_audit"].provider, "codex")
+
+    def test_build_config_supports_local_window_flags(self) -> None:
+        argv = [
+            "runner.py",
+            "--premise",
+            "A grifter inherits a bankrupt weather station.",
+            "--run-dir",
+            "/tmp/local_window_flags",
+            "--provider",
+            "codex",
+            "--skip-local-window-audit",
+            "--require-local-window-for-revision",
+        ]
+        with mock.patch.object(sys, "argv", argv):
+            args = runner_module.parse_args()
+        cfg = runner_module.build_config(REPO_ROOT, args)
+        self.assertTrue(cfg.skip_local_window_audit)
+        self.assertTrue(cfg.require_local_window_for_revision)
+
+    def test_build_config_supports_outline_review_flags(self) -> None:
+        argv = [
+            "runner.py",
+            "--premise",
+            "A grifter inherits a bankrupt weather station.",
+            "--run-dir",
+            "/tmp/outline_review_flags",
+            "--provider",
+            "codex",
+            "--outline-review-cycles",
+            "2",
+            "--skip-outline-review",
+        ]
+        with mock.patch.object(sys, "argv", argv):
+            args = runner_module.parse_args()
+        cfg = runner_module.build_config(REPO_ROOT, args)
+        self.assertEqual(cfg.outline_review_cycles, 2)
+        self.assertTrue(cfg.skip_outline_review)
+
+    def test_full_book_review_jobs_include_spatial_layout_input(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_full_book_layout_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner._prepare_run_dir()
+            run_dir = runner.cfg.run_dir
+            (run_dir / "outline" / "continuity_sheet.json").write_text("{}\n", encoding="utf-8")
+
+            full_award_job = runner._build_full_award_review_job(1)
+            cross_job = runner._build_cross_chapter_audit_job(1)
+
+            self.assertIn("outline/spatial_layout.json", full_award_job.allowed_inputs)
+            self.assertIn("outline/spatial_layout.json", cross_job.allowed_inputs)
+            self.assertIn("outline/spatial_layout.json", full_award_job.prompt_text)
+            self.assertIn("outline/spatial_layout.json", cross_job.prompt_text)
 
     def test_extracts_claude_result_and_last_message(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_claude_parse_", dir="/tmp") as tmp:

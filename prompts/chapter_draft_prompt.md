@@ -6,8 +6,9 @@ Inputs:
 3. Scene plan: `outline/scene_plan.tsv`
 4. Static story context pack: `outline/static_story_context.json`
 5. Style bible: `outline/style_bible.json`
-6. Continuity sheet: `{{CONTINUITY_SHEET_FILE}}`
-7. Constitution: `config/constitution.md`
+6. Spatial layout: `{{SPATIAL_LAYOUT_FILE}}`
+7. Continuity sheet: `{{CONTINUITY_SHEET_FILE}}`
+8. Constitution: `config/constitution.md`
 
 Task:
 1. Draft only this chapter.
@@ -26,6 +27,7 @@ Task:
 5. Apply character-specific dialogue voice and prose constraints from `outline/style_bible.json`. Use the narrative tense declared in `prose_style_profile.narrative_tense` — all chapters must use the same tense.
 5b. When a secondary character speaks or acts for the first time in this chapter, give them at least one detail that belongs only to them — not their plot function, their humanity. A habit, a worry, a piece of clothing, an opinion. Consult the `Supporting Character Pressure Map` in `outline/outline.md`, and if the chapter spec includes optional `secondary_character_beats`, honor them here. Characters who exist only to deliver information or serve as victims are craft failures.
 6. Follow `aesthetic_risk_policy` from `outline/style_bible.json` as a primary constraint, not an optional style preference. Match the register the style bible requests — do not drift toward a safer, cleaner, or more literary default when the style bible specifies something else.
+6b. Consult `{{SPATIAL_LAYOUT_FILE}}` for authoritative spatial facts. Do not invent floor assignments, adjacencies, room placement, route timings, distances, or directions that contradict it. If the layout marks both `micro` and `macro` as null, that means no heavy spatial scaffolding is required.
 7. Consult `{{CONTINUITY_SHEET_FILE}}` for established facts: character ages, physical descriptions, aliases, timeline, geography, objects, financial state, world rules, and knowledge state. Do not contradict any canonical fact in the sheet. If you introduce a new concrete detail not in the sheet (a specific amount of money, a date, an object, a physical description), ensure it is internally consistent with what the sheet establishes.
 8. Treat `lexical_signature` and `stress_tells` as occasional cues, not repeated mandatory tokens or beats.
 8b. Treat `interruption_habit`, `self_correction_tendency`, `indirectness`, `repetition_tolerance`, `evasion_style`, and `sentence_completion_style` as part of the character's living speech texture. Use them to make dialogue feel messier and more human when pressure warrants; do not over-regularize speech into clean literary exchange.

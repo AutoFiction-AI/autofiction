@@ -7,8 +7,9 @@ Inputs:
 4. Scene plan: `outline/scene_plan.tsv`
 5. Static story context pack: `outline/static_story_context.json`
 6. Style bible: `outline/style_bible.json`
-7. Continuity sheet: `{{CONTINUITY_SHEET_FILE}}`
-8. Constitution: `config/constitution.md`
+7. Spatial layout: `{{SPATIAL_LAYOUT_FILE}}`
+8. Continuity sheet: `{{CONTINUITY_SHEET_FILE}}`
+9. Constitution: `config/constitution.md`
 
 Task:
 1. Expand only `{{CHAPTER_INPUT_FILE}}` to meet `projected_min_words` target.
@@ -26,6 +27,7 @@ Task:
 3k. Do not use expansion to keep re-proving a condition, pressure, skill set, social role, or environment that the existing chapter already makes legible. If you revisit an established baseline, the added material must change its meaning, leverage, or consequence rather than re-establishing it through materially similar cues.
 4. Respect dialogue/prose style and `aesthetic_risk_policy` from style bible as non-negotiable constraints. Maintain the narrative tense declared in `prose_style_profile.narrative_tense` — do not shift tense during expansion.
 5. Use style-bible idiolect cues sparsely; do not pad by repeating lexical signatures or stress tells.
+5a. Consult `{{SPATIAL_LAYOUT_FILE}}` for authoritative spatial facts. Do not add new floor assignments, room adjacencies, travel times, distances, or directions that contradict it.
 5b. Consult `{{CONTINUITY_SHEET_FILE}}` for established facts. Do not contradict any canonical fact when expanding. If you introduce new concrete details (amounts, dates, objects, physical descriptions), ensure consistency with the sheet.
 6. If any `example_lines` exist in the style bible's character voice profiles, do NOT reproduce, paraphrase, or echo them. They are calibration-only reference material.
 

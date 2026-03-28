@@ -47,7 +47,16 @@
               "LOW",
               "MEDIUM",
               "HIGH",
-              "CRITICAL"
+              "CRITICAL",
+              "ELEVATION_MEDIUM",
+              "ELEVATION_HIGH"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "award_global",
+              "elevation"
             ]
           },
           "chapter_id": {
@@ -69,6 +78,14 @@
           "acceptance_test": {
             "type": "string",
             "minLength": 1
+          },
+          "pass_hint": {
+            "type": "string",
+            "enum": [
+              "p1_structural_craft",
+              "p2_dialogue_idiolect_cadence",
+              "p3_prose_copyedit"
+            ]
           }
         },
         "additionalProperties": true

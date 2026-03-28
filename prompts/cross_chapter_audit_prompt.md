@@ -5,7 +5,8 @@ Inputs:
 2. Continuity sheet: `{{CONTINUITY_SHEET_FILE}}`
 3. Style bible: `outline/style_bible.json`
 4. Novel outline: `outline/outline.md`
-5. Constitution: `config/constitution.md`
+5. Spatial layout: `{{SPATIAL_LAYOUT_FILE}}`
+6. Constitution: `config/constitution.md`
 
 Context isolation requirement:
 1. Do not read prior cycle reviews, revision reports, or gate files.
@@ -34,6 +35,9 @@ Task:
 1. Audit the full manuscript for two classes of defect only: redundancy and consistency.
 2. Focus exclusively on what is repeated that should not be and what contradicts itself across chapters.
 3. Every emitted finding must be mapped to the specific chapter that should be revised.
+3b. Boundary-local rhythm, handoff quality, and chapter-to-chapter momentum are primarily judged by the local window audit stage. Focus your attention on quantitative redundancy, factual consistency, and prose-tic density across the full manuscript.
+3c. Include spatial and geographic layout in your consistency checks. Use grep to find all mentions of key locations and verify that physical relationships are consistent across all chapters. This applies at both scales: micro-scale (rooms, floors, corridors, adjacency, visibility within a building or compound) and macro-scale (distance between settlements or landmarks, travel time, terrain, cardinal directions, relative positions). Spatial contradictions are HIGH findings. Chapters are drafted in parallel and spatial/geographic drift is expected and common.
+3d. Flag character-associated repetitive actions across the full manuscript. Use grep to find recurring physical details or gestures co-occurring with specific character names. When the same character is described with the same physical action in 3 or more chapters with the same dramatic function, flag as MEDIUM on the later chapters. The first instance may be kept; subsequent repetitions should be varied or removed.
 4. If a pattern affects multiple chapters, emit one finding per affected chapter rather than one shared omnibus finding.
 5. Prefer concrete, revision-driving findings over vague commentary.
 6. Be exhaustive within each check. Do not stop after finding the first few instances of a pattern — continue scanning the full manuscript for every affected chapter.
@@ -66,7 +70,7 @@ Checks 1-2 below define the CRITERIA for character re-introduction and setting r
 PART B — Consistency audit:
 1. Character details. Verify that named characters' physical descriptions, name spellings, ages, occupations, and key relationships remain consistent across chapters, using the continuity sheet as canonical where applicable.
 2. Timeline. Verify that dates, seasons, day-of-week references, time-of-day references, and duration claims are internally consistent.
-3. Geography and spatial continuity. Verify that locations, distances, travel times, and spatial relationships remain consistent.
+3. Geography and spatial continuity. Verify that locations, distances, travel times, and spatial relationships remain consistent. When `{{SPATIAL_LAYOUT_FILE}}` contains a non-null layout, treat it as the authoritative spatial ground truth for those facts.
 4. Objects and possessions. Track significant objects, documents, vehicles, clothing, tools, supplies, and other meaningful possessions across chapters. Flag appearances, disappearances, and property changes that contradict prior state.
 5. Financial and quantitative continuity. Track specific numbers such as money amounts, counts, measurements, and ages across chapters. Use tools to locate all relevant mentions when verifying a suspected contradiction.
 6. Knowledge state. Track what each character knows and when they learn it. Flag action taken on not-yet-acquired knowledge or failure to act on already-acquired knowledge when that failure reads like a continuity bug rather than a dramatic choice.
