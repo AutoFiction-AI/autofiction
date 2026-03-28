@@ -1512,66 +1512,16 @@ class ClaudeCliParsingTests(unittest.TestCase):
             self.assertEqual(gate["decision"], "FAIL")
             self.assertEqual(gate["reason"], "cross_chapter_audit_failed")
 
-    def test_load_existing_gate_is_stale_when_cross_chapter_audit_missing(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="snp_cross_audit_gate_stale_", dir="/tmp") as tmp:
+    def test_load_existing_cycle_status_returns_none_for_invalid_shape(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_cycle_status_invalid_", dir="/tmp") as tmp:
             runner = make_runner(Path(tmp))
-            runner.chapter_specs = [
-                runner_module.ChapterSpec(
-                    chapter_id="chapter_01",
-                    chapter_number=1,
-                    projected_min_words=1,
-                    chapter_engine="engine",
-                    pressure_source="pressure",
-                    state_shift="shift",
-                    texture_mode="hot",
-                    scene_count_target=2,
-                    scene_count_target_explicit=True,
-                    must_land_beats=["beat"],
-                )
-            ]
-            runner._prepare_run_dir()
-
-            run_dir = runner.cfg.run_dir
-            (run_dir / "reviews" / "cycle_01").mkdir(parents=True, exist_ok=True)
-            (run_dir / "gate" / "cycle_01").mkdir(parents=True, exist_ok=True)
-            (run_dir / "snapshots" / "cycle_01").mkdir(parents=True, exist_ok=True)
-            (run_dir / "input" / "premise.txt").write_text("Premise.\n", encoding="utf-8")
-            (run_dir / "outline" / "outline.md").write_text("# Outline\n", encoding="utf-8")
-            (run_dir / "outline" / "chapter_specs.jsonl").write_text("{}\n", encoding="utf-8")
-            (run_dir / "outline" / "scene_plan.tsv").write_text("chapter\tbeat\n", encoding="utf-8")
-            (run_dir / "outline" / "style_bible.json").write_text("{}\n", encoding="utf-8")
-            (run_dir / "snapshots" / "cycle_01" / "FINAL_NOVEL.md").write_text(
-                "# Chapter 1\n\nEnough words here.\n",
-                encoding="utf-8",
-            )
-            (run_dir / "chapters" / "chapter_01.md").write_text(
-                "# Chapter 1\n\nEnough words here.\n",
-                encoding="utf-8",
-            )
-            (run_dir / "reviews" / "cycle_01" / "chapter_01.review.json").write_text(
-                "{}\n",
-                encoding="utf-8",
-            )
-            (run_dir / "reviews" / "cycle_01" / "full_award.review.json").write_text(
-                "{}\n",
-                encoding="utf-8",
-            )
-            (run_dir / "gate" / "cycle_01" / "gate.json").write_text(
-                json.dumps(
-                    {
-                        "cycle": 1,
-                        "full_award_verdict": "PASS",
-                        "unresolved_medium_plus_count": 0,
-                        "chapter_review_failures": 0,
-                        "decision": "PASS",
-                        "reason": "all_unresolved_medium_plus_closed_and_full_award_pass",
-                    }
-                )
-                + "\n",
+            (runner.cfg.run_dir / "status" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            (runner.cfg.run_dir / "status" / "cycle_01" / "cycle_status.json").write_text(
+                json.dumps({"cycle": 1}) + "\n",
                 encoding="utf-8",
             )
 
-            self.assertIsNone(runner._load_existing_gate(1))
+            self.assertIsNone(runner._load_existing_cycle_status(1))
 
     def test_write_gate_counts_only_medium_plus_when_low_findings_present(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_gate_low_", dir="/tmp") as tmp:
@@ -1603,171 +1553,38 @@ class ClaudeCliParsingTests(unittest.TestCase):
             self.assertEqual(gate["decision"], "FAIL")
             self.assertEqual(gate["full_award_verdict"], "FAIL")
 
-    def test_load_existing_gate_is_stale_when_cross_chapter_audit_flag_missing(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="snp_cross_audit_gate_flag_", dir="/tmp") as tmp:
+    def test_resume_cycle_status_preserves_existing_units(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_cycle_status_resume_", dir="/tmp") as tmp:
             runner = make_runner(Path(tmp))
-            runner.chapter_specs = [
-                runner_module.ChapterSpec(
-                    chapter_id="chapter_01",
-                    chapter_number=1,
-                    projected_min_words=1,
-                    chapter_engine="engine",
-                    pressure_source="pressure",
-                    state_shift="shift",
-                    texture_mode="hot",
-                    scene_count_target=2,
-                    scene_count_target_explicit=True,
-                    must_land_beats=["beat"],
-                )
-            ]
-            runner._prepare_run_dir()
 
-            run_dir = runner.cfg.run_dir
-            (run_dir / "reviews" / "cycle_01").mkdir(parents=True, exist_ok=True)
-            (run_dir / "gate" / "cycle_01").mkdir(parents=True, exist_ok=True)
-            (run_dir / "snapshots" / "cycle_01").mkdir(parents=True, exist_ok=True)
-            (run_dir / "input" / "premise.txt").write_text("Premise.\n", encoding="utf-8")
-            (run_dir / "outline" / "outline.md").write_text("# Outline\n", encoding="utf-8")
-            (run_dir / "outline" / "chapter_specs.jsonl").write_text("{}\n", encoding="utf-8")
-            (run_dir / "outline" / "scene_plan.tsv").write_text("chapter\tbeat\n", encoding="utf-8")
-            (run_dir / "outline" / "style_bible.json").write_text("{}\n", encoding="utf-8")
-            (run_dir / "snapshots" / "cycle_01" / "FINAL_NOVEL.md").write_text(
-                "# Chapter 1\n\nEnough words here.\n",
-                encoding="utf-8",
-            )
-            (run_dir / "chapters" / "chapter_01.md").write_text(
-                "# Chapter 1\n\nEnough words here.\n",
-                encoding="utf-8",
-            )
-            (run_dir / "reviews" / "cycle_01" / "chapter_01.review.json").write_text(
-                "{}\n",
-                encoding="utf-8",
-            )
-            (run_dir / "reviews" / "cycle_01" / "full_award.review.json").write_text(
-                "{}\n",
-                encoding="utf-8",
-            )
-            (run_dir / "reviews" / "cycle_01" / "cross_chapter_audit.json").write_text(
-                json.dumps(runner._fallback_cross_chapter_audit_payload(1)) + "\n",
-                encoding="utf-8",
-            )
-            (run_dir / "gate" / "cycle_01" / "gate.json").write_text(
-                json.dumps(
-                    {
-                        "cycle": 1,
-                        "full_award_verdict": "PASS",
-                        "unresolved_medium_plus_count": 0,
-                        "chapter_review_failures": 0,
-                        "decision": "PASS",
-                        "reason": "all_unresolved_medium_plus_closed_and_full_award_pass",
-                    }
-                )
-                + "\n",
-                encoding="utf-8",
+            resumed = runner._resume_cycle_status(
+                1,
+                {
+                    "cycle": 1,
+                    "stages": {
+                        "chapter_review": {
+                            "status": "complete",
+                            "required": True,
+                            "units": {
+                                "chapter_01": {
+                                    "status": "reused",
+                                    "validated": True,
+                                    "fresh": True,
+                                }
+                            },
+                        }
+                    },
+                    "advisory_gate": {"decision": "FAIL"},
+                },
             )
 
-            self.assertIsNone(runner._load_existing_gate(1))
-
-    def test_load_existing_gate_ignores_newer_live_chapters_when_cycle_snapshot_is_fresh(
-        self,
-    ) -> None:
-        with tempfile.TemporaryDirectory(prefix="snp_gate_snapshot_resume_", dir="/tmp") as tmp:
-            runner = make_runner(Path(tmp))
-            runner.chapter_specs = [
-                runner_module.ChapterSpec(
-                    chapter_id="chapter_01",
-                    chapter_number=1,
-                    projected_min_words=1,
-                    chapter_engine="engine",
-                    pressure_source="pressure",
-                    state_shift="shift",
-                    texture_mode="hot",
-                    scene_count_target=2,
-                    scene_count_target_explicit=True,
-                    must_land_beats=["beat"],
-                )
-            ]
-            runner._prepare_run_dir()
-
-            run_dir = runner.cfg.run_dir
-            (run_dir / "reviews" / "cycle_01").mkdir(parents=True, exist_ok=True)
-            (run_dir / "gate" / "cycle_01").mkdir(parents=True, exist_ok=True)
-            (run_dir / "snapshots" / "cycle_01" / "chapters").mkdir(parents=True, exist_ok=True)
-            (run_dir / "input" / "premise.txt").write_text("Premise.\n", encoding="utf-8")
-            (run_dir / "outline" / "outline.md").write_text("# Outline\n", encoding="utf-8")
-            (run_dir / "outline" / "chapter_specs.jsonl").write_text("{}\n", encoding="utf-8")
-            (run_dir / "outline" / "scene_plan.tsv").write_text("chapter\tbeat\n", encoding="utf-8")
-            (run_dir / "outline" / "style_bible.json").write_text("{}\n", encoding="utf-8")
-            (run_dir / "snapshots" / "cycle_01" / "FINAL_NOVEL.md").write_text(
-                "# Chapter 1\n\nSnapshot text.\n",
-                encoding="utf-8",
+            self.assertEqual(resumed["run_mode"], "resume")
+            self.assertEqual(resumed["resume"]["source"], "cycle_status")
+            self.assertEqual(
+                resumed["stages"]["chapter_review"]["units"]["chapter_01"]["status"],
+                "reused",
             )
-            (run_dir / "snapshots" / "cycle_01" / "chapters" / "chapter_01.md").write_text(
-                "# Chapter 1\n\nSnapshot text.\n",
-                encoding="utf-8",
-            )
-            (run_dir / "chapters" / "chapter_01.md").write_text(
-                "# Chapter 1\n\nInitial live text.\n",
-                encoding="utf-8",
-            )
-            (run_dir / "reviews" / "cycle_01" / "chapter_01.review.json").write_text(
-                "{}\n",
-                encoding="utf-8",
-            )
-            (run_dir / "reviews" / "cycle_01" / "full_award.review.json").write_text(
-                "{}\n",
-                encoding="utf-8",
-            )
-            cross_audit = {
-                "cycle": 1,
-                "summary": "Repeated introduction issue.",
-                "redundancy_findings": [
-                    {
-                        "finding_id": "AUDIT_1",
-                        "category": "redundancy",
-                        "subcategory": "character_reintroduction",
-                        "severity": "MEDIUM",
-                        "chapter_id": "chapter_01",
-                        "evidence": "snapshots/cycle_01/FINAL_NOVEL.md:3",
-                        "problem": "Repeated setup.",
-                        "rewrite_direction": "Cut the repeated setup.",
-                        "acceptance_test": "The repeated setup is gone.",
-                    }
-                ],
-                "consistency_findings": [],
-            }
-            (run_dir / "reviews" / "cycle_01" / "cross_chapter_audit.json").write_text(
-                json.dumps(cross_audit) + "\n",
-                encoding="utf-8",
-            )
-            gate_payload = {
-                "cycle": 1,
-                "full_award_verdict": "FAIL",
-                "unresolved_medium_plus_count": 1,
-                "chapter_review_failures": 0,
-                "cross_chapter_audit_failed": False,
-                "decision": "FAIL",
-                "reason": "unresolved_medium_plus_or_review_failures_or_full_award_fail",
-            }
-            (run_dir / "gate" / "cycle_01" / "gate.json").write_text(
-                json.dumps(gate_payload) + "\n",
-                encoding="utf-8",
-            )
-
-            # Simulate a later cycle mutating the live working chapter after the
-            # gate was written. Resume should still trust the immutable cycle-01
-            # snapshot and review artifacts.
-            os.utime(run_dir / "gate" / "cycle_01" / "gate.json", None)
-            (run_dir / "chapters" / "chapter_01.md").write_text(
-                "# Chapter 1\n\nLater-cycle revised text.\n",
-                encoding="utf-8",
-            )
-
-            gate = runner._load_existing_gate(1)
-
-            self.assertIsNotNone(gate)
-            self.assertEqual(gate["cycle"], 1)
-            self.assertEqual(gate["decision"], "FAIL")
+            self.assertEqual(resumed["advisory_gate"]["decision"], "FAIL")
 
     def test_cross_chapter_audit_convergence_logging_does_not_rewrite_previous_audit(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_cross_audit_convergence_", dir="/tmp") as tmp:
@@ -1830,102 +1647,112 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 ).exists()
             )
 
-    def test_run_handles_resumed_cross_chapter_audit_failed_gate_without_crashing(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="snp_cross_audit_resume_gate_", dir="/tmp") as tmp:
+    def test_run_uses_existing_cycle_status_for_resume_mode(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_cycle_status_resume_run_", dir="/tmp") as tmp:
             runner = make_runner(Path(tmp))
+            aggregate = {
+                "summary": {
+                    "cycle": 1,
+                    "total_unresolved_medium_plus": 0,
+                    "by_severity": {},
+                    "by_source": {},
+                    "chapters_touched": [],
+                    "chapter_review_failures": 0,
+                    "full_award_verdict": "PASS",
+                    "cross_chapter_audit_failed": False,
+                },
+                "all_findings": [],
+                "by_chapter": {},
+                "full_award_verdict": "PASS",
+                "chapter_review_failures": 0,
+                "cross_chapter_audit_failed": False,
+            }
             gate = {
                 "cycle": 1,
                 "full_award_verdict": "PASS",
                 "unresolved_medium_plus_count": 0,
                 "chapter_review_failures": 0,
-                "cross_chapter_audit_failed": True,
-                "decision": "FAIL",
-                "reason": "cross_chapter_audit_failed",
-            }
-            with mock.patch.object(runner, "_prepare_run_dir"), mock.patch.object(
-                runner, "_resolve_premise"
-            ), mock.patch.object(runner, "_run_outline_stage"), mock.patch.object(
-                runner, "_run_draft_stage"
-            ), mock.patch.object(
-                runner, "_load_existing_gate", return_value=gate
-            ), mock.patch.object(
-                runner, "_ensure_resumed_cycle_post_revision_outputs"
-            ), mock.patch.object(
-                runner, "_write_final_report"
-            ), mock.patch.object(
-                runner, "_print_cost_summary"
-            ):
-                self.assertEqual(runner.run(), 1)
-
-    def test_run_skips_post_revision_refresh_when_resumed_cycle_outputs_are_complete(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="snp_resume_complete_cycle_", dir="/tmp") as tmp:
-            runner = make_runner(Path(tmp))
-            gate = {
-                "cycle": 1,
-                "full_award_verdict": "FAIL",
-                "unresolved_medium_plus_count": 2,
-                "chapter_review_failures": 0,
                 "cross_chapter_audit_failed": False,
-                "decision": "FAIL",
-                "reason": "unresolved_medium_plus_or_review_failures_or_full_award_fail",
+                "decision": "PASS",
+                "reason": "all_unresolved_medium_plus_closed_and_full_award_pass",
             }
-            with mock.patch.object(runner, "_prepare_run_dir"), mock.patch.object(
-                runner, "_resolve_premise"
-            ), mock.patch.object(runner, "_run_outline_stage"), mock.patch.object(
-                runner, "_run_draft_stage"
-            ), mock.patch.object(
-                runner, "_load_existing_gate", return_value=gate
-            ), mock.patch.object(
-                runner, "_cycle_revisions_complete", return_value=True
-            ), mock.patch.object(
-                runner, "_cycle_post_revision_outputs_complete", return_value=True
-            ), mock.patch.object(
-                runner, "_assemble_post_revision_snapshot"
-            ) as assemble_mock, mock.patch.object(
-                runner, "_run_continuity_reconciliation"
-            ) as reconcile_mock, mock.patch.object(
-                runner, "_write_final_report"
-            ), mock.patch.object(
-                runner, "_print_cost_summary"
-            ):
-                self.assertEqual(runner.run(), 1)
-                assemble_mock.assert_not_called()
-                reconcile_mock.assert_not_called()
+            (runner.cfg.run_dir / "status" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            (runner.cfg.run_dir / "status" / "cycle_01" / "cycle_status.json").write_text(
+                json.dumps(
+                    {
+                        "cycle": 1,
+                        "stages": {
+                            "chapter_review": {
+                                "status": "complete",
+                                "required": True,
+                                "units": {
+                                    "chapter_01": {
+                                        "status": "reused",
+                                        "validated": True,
+                                        "fresh": True,
+                                    }
+                                },
+                            }
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
 
-    def test_run_rebuilds_post_revision_refresh_when_resumed_cycle_outputs_are_missing(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="snp_resume_incomplete_cycle_", dir="/tmp") as tmp:
-            runner = make_runner(Path(tmp))
-            gate = {
-                "cycle": 1,
-                "full_award_verdict": "FAIL",
-                "unresolved_medium_plus_count": 2,
-                "chapter_review_failures": 0,
-                "cross_chapter_audit_failed": False,
-                "decision": "FAIL",
-                "reason": "unresolved_medium_plus_or_review_failures_or_full_award_fail",
-            }
             with mock.patch.object(runner, "_prepare_run_dir"), mock.patch.object(
                 runner, "_resolve_premise"
             ), mock.patch.object(runner, "_run_outline_stage"), mock.patch.object(
                 runner, "_run_draft_stage"
             ), mock.patch.object(
-                runner, "_load_existing_gate", return_value=gate
+                runner, "_assemble_snapshot", return_value=True
             ), mock.patch.object(
-                runner, "_cycle_revisions_complete", return_value=True
+                runner, "_build_cycle_context_packs", return_value=True
             ), mock.patch.object(
-                runner, "_cycle_post_revision_outputs_complete", return_value=False
+                runner,
+                "_run_chapter_review_stage",
+                return_value={
+                    "status": "reused",
+                    "chapter_count": 1,
+                    "units": {
+                        "chapter_01": {
+                            "status": "reused",
+                            "validated": True,
+                            "fresh": True,
+                        }
+                    },
+                },
             ), mock.patch.object(
-                runner, "_assemble_post_revision_snapshot"
-            ) as assemble_mock, mock.patch.object(
-                runner, "_run_continuity_reconciliation"
-            ) as reconcile_mock, mock.patch.object(
+                runner,
+                "_run_parallel_full_book_review_stages",
+                return_value={
+                    "full_award_review": True,
+                    "cross_chapter_audit": True,
+                },
+            ), mock.patch.object(
+                runner, "_aggregate_findings", return_value=aggregate
+            ), mock.patch.object(
+                runner, "_write_gate", return_value=gate
+            ), mock.patch.object(
+                runner, "_assemble_post_revision_snapshot", return_value=True
+            ), mock.patch.object(
+                runner, "_run_continuity_reconciliation", return_value=True
+            ), mock.patch.object(
                 runner, "_write_final_report"
             ), mock.patch.object(
                 runner, "_print_cost_summary"
             ):
-                self.assertEqual(runner.run(), 1)
-                assemble_mock.assert_called_once_with(1)
-                reconcile_mock.assert_called_once_with(1)
+                self.assertEqual(runner.run(), 0)
+
+            payload = json.loads(
+                (runner.cfg.run_dir / "status" / "cycle_01" / "cycle_status.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(payload["run_mode"], "resume")
+            self.assertEqual(payload["resume"]["source"], "cycle_status")
+            self.assertEqual(payload["stages"]["assemble_snapshot"]["status"], "reused")
+            self.assertEqual(payload["stages"]["chapter_review"]["status"], "reused")
 
 
     def test_chapter_specs_preserve_secondary_character_beats_through_runner_outputs(self) -> None:
@@ -2076,6 +1903,69 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 ["Let the desk clerk's private panic leak through her efficiency."],
             )
             self.assertEqual(boundary_context["open_hooks_to_carry"], ["beat 1"])
+
+    def test_chapter_review_stage_reports_reused_units(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_review_units_reused_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner._prepare_run_dir()
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1,
+                    chapter_engine="engine",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                )
+            ]
+
+            run_dir = runner.cfg.run_dir
+            (run_dir / "outline" / "style_bible.json").write_text("{}\n", encoding="utf-8")
+            (run_dir / "outline" / "continuity_sheet.json").write_text("{}\n", encoding="utf-8")
+            runner._ensure_cycle_continuity_snapshot(1)
+            (run_dir / "snapshots" / "cycle_01" / "chapters").mkdir(parents=True, exist_ok=True)
+            (run_dir / "context" / "cycle_01" / "boundary").mkdir(parents=True, exist_ok=True)
+            (run_dir / "reviews" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            (run_dir / "snapshots" / "cycle_01" / "chapters" / "chapter_01.md").write_text(
+                "# Chapter 1\n\nFresh snapshot text.\n",
+                encoding="utf-8",
+            )
+            (run_dir / "context" / "cycle_01" / "global_cycle_context.json").write_text(
+                "{}\n",
+                encoding="utf-8",
+            )
+            (run_dir / "context" / "cycle_01" / "boundary" / "chapter_01.boundary.json").write_text(
+                "{}\n",
+                encoding="utf-8",
+            )
+            (run_dir / "reviews" / "cycle_01" / "chapter_01.review.json").write_text(
+                json.dumps(
+                    {
+                        "chapter_id": "chapter_01",
+                        "verdicts": {
+                            runner_module.PRIMARY_REVIEW_LENS: "PASS",
+                            "craft": "PASS",
+                            "dialogue": "PASS",
+                            "prose": "PASS",
+                        },
+                        "findings": [],
+                        "summary": "No chapter-local blockers.",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(runner, "_run_jobs_parallel") as jobs_mock:
+                summary = runner._run_chapter_review_stage(1)
+
+            jobs_mock.assert_not_called()
+            self.assertEqual(summary["status"], "reused")
+            self.assertEqual(summary["units"]["chapter_01"]["status"], "reused")
 
     def test_chapter_expand_job_receives_outline_and_scene_plan_inputs(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_expand_inputs_", dir="/tmp") as tmp:
@@ -2872,6 +2762,87 @@ class ClaudeCliParsingTests(unittest.TestCase):
             preserved = run_dir / runner._preserved_invalid_artifact_rel(p1_report_rel)
             self.assertTrue(preserved.is_file())
 
+    def test_run_revision_stage_reports_reused_units(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_revision_units_reused_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner._prepare_run_dir()
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1,
+                    chapter_engine="engine",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                )
+            ]
+
+            run_dir = runner.cfg.run_dir
+            (run_dir / "outline" / "continuity_sheet.json").write_text(
+                json.dumps({"timeline": []}) + "\n",
+                encoding="utf-8",
+            )
+            runner._ensure_cycle_continuity_snapshot(1)
+            (run_dir / "chapters" / "chapter_01.md").write_text(
+                "# Chapter 1\n\nStable chapter text.\n",
+                encoding="utf-8",
+            )
+
+            for pass_def in runner_module.REVISION_PASS_DEFS:
+                packet_path = run_dir / runner._revision_pass_packet_rel(
+                    1, "chapter_01", pass_def["key"]
+                )
+                packet_path.parent.mkdir(parents=True, exist_ok=True)
+                packet_path.write_text(
+                    json.dumps(
+                        {
+                            "chapter_id": "chapter_01",
+                            "findings": [],
+                            "revision_pass": {
+                                "key": pass_def["key"],
+                                "label": pass_def["label"],
+                                "focus": pass_def["focus"],
+                            },
+                        }
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                report_path = run_dir / runner._revision_pass_report_rel(
+                    1, "chapter_01", pass_def["key"]
+                )
+                report_path.parent.mkdir(parents=True, exist_ok=True)
+                report_path.write_text(
+                    json.dumps(
+                        {
+                            "chapter_id": "chapter_01",
+                            "finding_results": [],
+                            "summary": f"{pass_def['label']} already complete.",
+                        }
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+
+            (run_dir / runner._revision_packet_rel(1, "chapter_01")).write_text(
+                json.dumps({"chapter_id": "chapter_01", "findings": []}) + "\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(runner, "_run_jobs_parallel") as jobs_mock:
+                summary = runner._run_revision_stage(1, ["chapter_01"])
+
+            jobs_mock.assert_not_called()
+            self.assertEqual(summary["status"], "reused")
+            self.assertEqual(len(summary["units"]), len(runner_module.REVISION_PASS_DEFS))
+            self.assertTrue(
+                all(unit["status"] == "reused" for unit in summary["units"].values())
+            )
+
     def test_run_revision_stage_reruns_early_pass_when_live_chapter_was_reset(self) -> None:
         with tempfile.TemporaryDirectory(
             prefix="snp_revision_resume_reset_", dir="/tmp"
@@ -3515,23 +3486,32 @@ class ClaudeCliParsingTests(unittest.TestCase):
             ), mock.patch.object(runner, "_run_outline_stage"), mock.patch.object(
                 runner, "_run_draft_stage"
             ), mock.patch.object(
-                runner, "_load_existing_gate", return_value=None
+                runner, "_assemble_snapshot", return_value=False
             ), mock.patch.object(
-                runner, "_assemble_snapshot"
+                runner, "_build_cycle_context_packs", return_value=False
             ), mock.patch.object(
-                runner, "_build_cycle_context_packs"
+                runner,
+                "_run_chapter_review_stage",
+                return_value={
+                    "status": "complete",
+                    "chapter_count": 18,
+                    "units": {},
+                },
             ), mock.patch.object(
-                runner, "_run_chapter_review_stage"
-            ), mock.patch.object(
-                runner, "_run_parallel_full_book_review_stages"
+                runner,
+                "_run_parallel_full_book_review_stages",
+                return_value={
+                    "full_award_review": False,
+                    "cross_chapter_audit": False,
+                },
             ), mock.patch.object(
                 runner, "_aggregate_findings", return_value=aggregate
             ), mock.patch.object(
                 runner, "_write_gate", return_value=gate
             ), mock.patch.object(
-                runner, "_assemble_post_revision_snapshot"
+                runner, "_assemble_post_revision_snapshot", return_value=False
             ), mock.patch.object(
-                runner, "_run_continuity_reconciliation"
+                runner, "_run_continuity_reconciliation", return_value=False
             ), mock.patch.object(
                 runner, "_write_final_report"
             ), mock.patch.object(
@@ -3555,204 +3535,6 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 "gate_passed_no_revision_needed",
             )
             self.assertEqual(payload["advisory_gate"]["decision"], "PASS")
-
-    def test_cycle_revisions_complete_skips_seam_requirement_before_final_cycle(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="snp_cycle_complete_nonfinal_", dir="/tmp") as tmp:
-            runner = make_runner(Path(tmp))
-            runner.cfg = runner_module.RunnerConfig(
-                premise=runner.cfg.premise,
-                premise_mode=runner.cfg.premise_mode,
-                premise_brief=runner.cfg.premise_brief,
-                award_profile=runner.cfg.award_profile,
-                premise_seed=runner.cfg.premise_seed,
-                premise_reroll_max=runner.cfg.premise_reroll_max,
-                premise_candidate_count=runner.cfg.premise_candidate_count,
-                premise_generation_batch_size=runner.cfg.premise_generation_batch_size,
-                premise_min_unique_clusters=runner.cfg.premise_min_unique_clusters,
-                premise_shortlist_size=runner.cfg.premise_shortlist_size,
-                run_dir=runner.cfg.run_dir,
-                max_cycles=2,
-                min_cycles=2,
-                max_parallel_drafts=runner.cfg.max_parallel_drafts,
-                max_parallel_reviews=runner.cfg.max_parallel_reviews,
-                max_parallel_revisions=runner.cfg.max_parallel_revisions,
-                provider=runner.cfg.provider,
-                agent_bin=runner.cfg.agent_bin,
-                model=runner.cfg.model,
-                reasoning_effort=runner.cfg.reasoning_effort,
-                stage_profiles=runner.cfg.stage_profiles,
-                revision_pass_profiles=runner.cfg.revision_pass_profiles,
-                dry_run=runner.cfg.dry_run,
-                dry_run_chapter_count=runner.cfg.dry_run_chapter_count,
-                job_timeout_seconds=runner.cfg.job_timeout_seconds,
-                job_idle_timeout_seconds=runner.cfg.job_idle_timeout_seconds,
-                validation_mode=runner.cfg.validation_mode,
-            )
-            runner.chapter_specs = [
-                runner_module.ChapterSpec(
-                    chapter_id="chapter_01",
-                    chapter_number=1,
-                    projected_min_words=1000,
-                    chapter_engine="discovery",
-                    pressure_source="pressure",
-                    state_shift="shift",
-                    texture_mode="hot",
-                    scene_count_target=2,
-                    scene_count_target_explicit=True,
-                    must_land_beats=["beat"],
-                )
-            ]
-
-            run_dir = runner.cfg.run_dir
-            (run_dir / "findings" / "cycle_01").mkdir(parents=True, exist_ok=True)
-            (run_dir / "packets" / "cycle_01").mkdir(parents=True, exist_ok=True)
-            (run_dir / "revisions" / "cycle_01").mkdir(parents=True, exist_ok=True)
-            (run_dir / "chapters").mkdir(parents=True, exist_ok=True)
-
-            (run_dir / "findings" / "cycle_01" / "chapter_target_list.txt").write_text(
-                "chapter_01\n", encoding="utf-8"
-            )
-            (run_dir / "chapters" / "chapter_01.md").write_text(
-                "# Chapter 1\n\nBody text.\n", encoding="utf-8"
-            )
-            (run_dir / "packets" / "cycle_01" / "chapter_01.revision_packet.json").write_text(
-                json.dumps(
-                    {
-                        "chapter_id": "chapter_01",
-                        "findings": [
-                            {
-                                "finding_id": "f1",
-                                "severity": "MEDIUM",
-                                "chapter_id": "chapter_01",
-                                "problem": "problem",
-                                "rewrite_direction": "direction",
-                                "acceptance_test": "test",
-                            }
-                        ],
-                    }
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-            (run_dir / "revisions" / "cycle_01" / "chapter_01.revision_report.json").write_text(
-                json.dumps(
-                    {
-                        "chapter_id": "chapter_01",
-                        "finding_results": [
-                            {
-                                "finding_id": "f1",
-                                "status_after_revision": "FIXED",
-                                "evidence": "chapters/chapter_01.md:1",
-                                "notes": "done",
-                            }
-                        ],
-                        "summary": "ok",
-                    }
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-
-            self.assertTrue(runner._cycle_revisions_complete(1))
-
-    def test_cycle_revisions_complete_still_requires_seam_on_final_cycle(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="snp_cycle_complete_final_", dir="/tmp") as tmp:
-            runner = make_runner(Path(tmp))
-            runner.cfg = runner_module.RunnerConfig(
-                premise=runner.cfg.premise,
-                premise_mode=runner.cfg.premise_mode,
-                premise_brief=runner.cfg.premise_brief,
-                award_profile=runner.cfg.award_profile,
-                premise_seed=runner.cfg.premise_seed,
-                premise_reroll_max=runner.cfg.premise_reroll_max,
-                premise_candidate_count=runner.cfg.premise_candidate_count,
-                premise_generation_batch_size=runner.cfg.premise_generation_batch_size,
-                premise_min_unique_clusters=runner.cfg.premise_min_unique_clusters,
-                premise_shortlist_size=runner.cfg.premise_shortlist_size,
-                run_dir=runner.cfg.run_dir,
-                max_cycles=2,
-                min_cycles=2,
-                max_parallel_drafts=runner.cfg.max_parallel_drafts,
-                max_parallel_reviews=runner.cfg.max_parallel_reviews,
-                max_parallel_revisions=runner.cfg.max_parallel_revisions,
-                provider=runner.cfg.provider,
-                agent_bin=runner.cfg.agent_bin,
-                model=runner.cfg.model,
-                reasoning_effort=runner.cfg.reasoning_effort,
-                stage_profiles=runner.cfg.stage_profiles,
-                revision_pass_profiles=runner.cfg.revision_pass_profiles,
-                dry_run=runner.cfg.dry_run,
-                dry_run_chapter_count=runner.cfg.dry_run_chapter_count,
-                job_timeout_seconds=runner.cfg.job_timeout_seconds,
-                job_idle_timeout_seconds=runner.cfg.job_idle_timeout_seconds,
-                validation_mode=runner.cfg.validation_mode,
-            )
-            runner.chapter_specs = [
-                runner_module.ChapterSpec(
-                    chapter_id="chapter_01",
-                    chapter_number=1,
-                    projected_min_words=1000,
-                    chapter_engine="discovery",
-                    pressure_source="pressure",
-                    state_shift="shift",
-                    texture_mode="hot",
-                    scene_count_target=2,
-                    scene_count_target_explicit=True,
-                    must_land_beats=["beat"],
-                )
-            ]
-
-            run_dir = runner.cfg.run_dir
-            (run_dir / "findings" / "cycle_02").mkdir(parents=True, exist_ok=True)
-            (run_dir / "packets" / "cycle_02").mkdir(parents=True, exist_ok=True)
-            (run_dir / "revisions" / "cycle_02").mkdir(parents=True, exist_ok=True)
-            (run_dir / "chapters").mkdir(parents=True, exist_ok=True)
-
-            (run_dir / "findings" / "cycle_02" / "chapter_target_list.txt").write_text(
-                "chapter_01\n", encoding="utf-8"
-            )
-            (run_dir / "chapters" / "chapter_01.md").write_text(
-                "# Chapter 1\n\nBody text.\n", encoding="utf-8"
-            )
-            (run_dir / "packets" / "cycle_02" / "chapter_01.revision_packet.json").write_text(
-                json.dumps(
-                    {
-                        "chapter_id": "chapter_01",
-                        "findings": [
-                            {
-                                "finding_id": "f1",
-                                "severity": "MEDIUM",
-                                "chapter_id": "chapter_01",
-                                "problem": "problem",
-                                "rewrite_direction": "direction",
-                                "acceptance_test": "test",
-                            }
-                        ],
-                    }
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-            (run_dir / "revisions" / "cycle_02" / "chapter_01.revision_report.json").write_text(
-                json.dumps(
-                    {
-                        "chapter_id": "chapter_01",
-                        "finding_results": [
-                            {
-                                "finding_id": "f1",
-                                "status_after_revision": "FIXED",
-                                "evidence": "chapters/chapter_01.md:1",
-                                "notes": "done",
-                            }
-                        ],
-                        "summary": "ok",
-                    }
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-
-            self.assertFalse(runner._cycle_revisions_complete(2))
 
     def test_run_draft_stage_skips_expand_when_all_chapters_are_fresh_on_resume(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_draft_resume_skip_expand_", dir="/tmp") as tmp:
