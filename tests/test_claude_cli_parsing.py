@@ -3392,6 +3392,15 @@ class ClaudeCliParsingTests(unittest.TestCase):
             snapshot_final = (
                 run_dir / "snapshots" / "cycle_01" / "FINAL_NOVEL.post_revision.md"
             )
+            (run_dir / "status" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            (run_dir / "status" / "cycle_01" / "cycle_status.json").write_text(
+                json.dumps({"cycle": 1}) + "\n",
+                encoding="utf-8",
+            )
+            (run_dir / "status" / "cycle_01" / "quality_summary.json").write_text(
+                json.dumps({"cycle": 1}) + "\n",
+                encoding="utf-8",
+            )
             self.assertTrue(root_final.is_file())
             self.assertTrue(snapshot_final.is_file())
             self.assertEqual(
@@ -3411,11 +3420,141 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 final_report["final_novel_snapshot_file"],
                 "snapshots/cycle_01/FINAL_NOVEL.post_revision.md",
             )
+            self.assertEqual(
+                final_report["cycle_status_files"],
+                ["status/cycle_01/cycle_status.json"],
+            )
+            self.assertEqual(
+                final_report["quality_summary_files"],
+                ["status/cycle_01/quality_summary.json"],
+            )
             self.assertEqual(final_status["final_novel_file"], "FINAL_NOVEL.md")
             self.assertEqual(
                 final_status["final_novel_snapshot_file"],
                 "snapshots/cycle_01/FINAL_NOVEL.post_revision.md",
             )
+            self.assertEqual(
+                final_status["last_cycle_status_file"],
+                "status/cycle_01/cycle_status.json",
+            )
+            self.assertEqual(
+                final_status["last_quality_summary_file"],
+                "status/cycle_01/quality_summary.json",
+            )
+
+    def test_write_quality_summary_persists_advisory_cycle_summary(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_quality_summary_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            aggregate = {
+                "summary": {
+                    "cycle": 1,
+                    "total_unresolved_medium_plus": 3,
+                    "by_severity": {"HIGH": 2, "MEDIUM": 1},
+                    "by_source": {"award_global": 1, "cross_chapter": 2},
+                    "chapters_touched": ["chapter_01", "chapter_02"],
+                    "chapter_review_failures": 1,
+                    "full_award_verdict": "FAIL",
+                    "cross_chapter_audit_failed": False,
+                }
+            }
+            gate = {
+                "decision": "FAIL",
+                "reason": "unresolved_medium_plus_or_review_failures_or_full_award_fail",
+                "full_award_verdict": "FAIL",
+                "unresolved_medium_plus_count": 3,
+            }
+
+            runner._write_quality_summary(1, aggregate, gate)
+
+            payload = json.loads(
+                (runner.cfg.run_dir / "status" / "cycle_01" / "quality_summary.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(payload["cycle"], 1)
+            self.assertTrue(payload["advisory_only"])
+            self.assertEqual(payload["total_unresolved_medium_plus"], 3)
+            self.assertEqual(payload["advisory_gate"]["decision"], "FAIL")
+            self.assertEqual(
+                payload["advisory_gate"]["unresolved_medium_plus_count"],
+                3,
+            )
+
+    def test_run_writes_cycle_status_for_fresh_cycle(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_cycle_status_run_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            aggregate = {
+                "summary": {
+                    "cycle": 1,
+                    "total_unresolved_medium_plus": 0,
+                    "by_severity": {},
+                    "by_source": {},
+                    "chapters_touched": [],
+                    "chapter_review_failures": 0,
+                    "full_award_verdict": "PASS",
+                    "cross_chapter_audit_failed": False,
+                },
+                "all_findings": [],
+                "by_chapter": {},
+                "full_award_verdict": "PASS",
+                "chapter_review_failures": 0,
+                "cross_chapter_audit_failed": False,
+            }
+            gate = {
+                "cycle": 1,
+                "full_award_verdict": "PASS",
+                "unresolved_medium_plus_count": 0,
+                "chapter_review_failures": 0,
+                "cross_chapter_audit_failed": False,
+                "decision": "PASS",
+                "reason": "all_unresolved_medium_plus_closed_and_full_award_pass",
+            }
+
+            with mock.patch.object(runner, "_prepare_run_dir"), mock.patch.object(
+                runner, "_resolve_premise"
+            ), mock.patch.object(runner, "_run_outline_stage"), mock.patch.object(
+                runner, "_run_draft_stage"
+            ), mock.patch.object(
+                runner, "_load_existing_gate", return_value=None
+            ), mock.patch.object(
+                runner, "_assemble_snapshot"
+            ), mock.patch.object(
+                runner, "_build_cycle_context_packs"
+            ), mock.patch.object(
+                runner, "_run_chapter_review_stage"
+            ), mock.patch.object(
+                runner, "_run_parallel_full_book_review_stages"
+            ), mock.patch.object(
+                runner, "_aggregate_findings", return_value=aggregate
+            ), mock.patch.object(
+                runner, "_write_gate", return_value=gate
+            ), mock.patch.object(
+                runner, "_assemble_post_revision_snapshot"
+            ), mock.patch.object(
+                runner, "_run_continuity_reconciliation"
+            ), mock.patch.object(
+                runner, "_write_final_report"
+            ), mock.patch.object(
+                runner, "_print_cost_summary"
+            ):
+                self.assertEqual(runner.run(), 0)
+
+            payload = json.loads(
+                (runner.cfg.run_dir / "status" / "cycle_01" / "cycle_status.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(payload["cycle"], 1)
+            self.assertEqual(payload["run_mode"], "fresh")
+            self.assertEqual(payload["stages"]["assemble_snapshot"]["status"], "complete")
+            self.assertEqual(payload["stages"]["chapter_review"]["status"], "complete")
+            self.assertEqual(payload["stages"]["aggregate_findings"]["status"], "complete")
+            self.assertEqual(payload["stages"]["revision"]["status"], "skipped")
+            self.assertEqual(
+                payload["stages"]["revision"]["reason"],
+                "gate_passed_no_revision_needed",
+            )
+            self.assertEqual(payload["advisory_gate"]["decision"], "PASS")
 
     def test_cycle_revisions_complete_skips_seam_requirement_before_final_cycle(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_cycle_complete_nonfinal_", dir="/tmp") as tmp:

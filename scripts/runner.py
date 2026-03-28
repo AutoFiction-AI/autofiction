@@ -50,6 +50,19 @@ STAGE_GROUP_VALUES = (
     "cross_chapter_audit",
     "revision",
 )
+OBSERVABILITY_STAGE_KEYS = (
+    "assemble_snapshot",
+    "build_cycle_context_packs",
+    "chapter_review",
+    "full_award_review",
+    "cross_chapter_audit",
+    "aggregate_findings",
+    "build_revision_packets",
+    "revision",
+    "seam_polish",
+    "assemble_post_revision_snapshot",
+    "continuity_reconciliation",
+)
 REVISION_DIALOGUE_PASS_KEY = "p2_dialogue_idiolect_cadence"
 PRIMARY_REVIEW_LENS = "award"
 PRIMARY_GLOBAL_FINDING_SOURCE = "award_global"
@@ -642,14 +655,40 @@ class NovelPipelineRunner:
 
         for cycle in range(1, self.cfg.max_cycles + 1):
             cpad = self._cpad(cycle)
+            cycle_status = self._new_cycle_status(cycle)
+            self._write_cycle_status(cycle, cycle_status)
             existing_gate = self._load_existing_gate(cycle)
             if existing_gate is not None:
+                cycle_status["run_mode"] = "resume_existing_gate"
+                cycle_status["advisory_gate"] = dict(existing_gate)
+                cycle_status["resume"] = {
+                    "source": "existing_gate",
+                    "decision": existing_gate["decision"],
+                    "reason": existing_gate["reason"],
+                }
+                self._write_cycle_status(cycle, cycle_status)
                 gate_records.append(existing_gate)
                 self._log(
                     f"cycle={cpad} stage=resume_existing_gate decision={existing_gate['decision']}"
                 )
                 if existing_gate["decision"] == "PASS":
                     self._ensure_resumed_cycle_post_revision_outputs(cycle)
+                    self._update_cycle_stage_status(
+                        cycle_status,
+                        "assemble_post_revision_snapshot",
+                        "reused",
+                        reason="resume_existing_gate_pass",
+                        outputs=[
+                            f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md",
+                        ],
+                    )
+                    self._update_cycle_stage_status(
+                        cycle_status,
+                        "continuity_reconciliation",
+                        "reused",
+                        reason="resume_existing_gate_pass",
+                    )
+                    self._write_cycle_status(cycle, cycle_status)
                     success_cycle = cycle
                     break
                 if existing_gate["reason"] == "min_cycles_not_reached_but_current_quality_passes":
@@ -657,12 +696,68 @@ class NovelPipelineRunner:
                         f"cycle={cpad} resume gate fail is min-cycles guard; no revision expected"
                     )
                     self._ensure_resumed_cycle_post_revision_outputs(cycle)
+                    self._update_cycle_stage_status(
+                        cycle_status,
+                        "build_revision_packets",
+                        "skipped",
+                        reason="resume_existing_gate_min_cycles_guard",
+                    )
+                    self._update_cycle_stage_status(
+                        cycle_status,
+                        "revision",
+                        "skipped",
+                        reason="resume_existing_gate_min_cycles_guard",
+                    )
+                    self._update_cycle_stage_status(
+                        cycle_status,
+                        "assemble_post_revision_snapshot",
+                        "reused",
+                        reason="resume_existing_gate_min_cycles_guard",
+                        outputs=[
+                            f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md",
+                        ],
+                    )
+                    self._update_cycle_stage_status(
+                        cycle_status,
+                        "continuity_reconciliation",
+                        "reused",
+                        reason="resume_existing_gate_min_cycles_guard",
+                    )
+                    self._write_cycle_status(cycle, cycle_status)
                     continue
                 if existing_gate.get("reason") == "cross_chapter_audit_failed":
                     self._log(
                         f"cycle={cpad} resume gate fail is cross-chapter audit failure; no revision possible this cycle"
                     )
                     self._ensure_resumed_cycle_post_revision_outputs(cycle)
+                    self._update_cycle_stage_status(
+                        cycle_status,
+                        "build_revision_packets",
+                        "skipped",
+                        reason="resume_existing_gate_cross_chapter_audit_failed",
+                    )
+                    self._update_cycle_stage_status(
+                        cycle_status,
+                        "revision",
+                        "skipped",
+                        reason="resume_existing_gate_cross_chapter_audit_failed",
+                    )
+                    self._update_cycle_stage_status(
+                        cycle_status,
+                        "assemble_post_revision_snapshot",
+                        "reused",
+                        reason="resume_existing_gate_cross_chapter_audit_failed",
+                        outputs=[
+                            f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md",
+                        ],
+                    )
+                    self._update_cycle_stage_status(
+                        cycle_status,
+                        "continuity_reconciliation",
+                        "reused",
+                        reason="resume_existing_gate_cross_chapter_audit_failed",
+                    )
+                    self._write_cycle_status(cycle, cycle_status)
                     continue
 
                 if self._cycle_revisions_complete(cycle):
@@ -670,12 +765,56 @@ class NovelPipelineRunner:
                         f"cycle={cpad} stage=resume_revision_check status=complete"
                     )
                     self._ensure_resumed_cycle_post_revision_outputs(cycle)
+                    self._update_cycle_stage_status(
+                        cycle_status,
+                        "revision",
+                        "reused",
+                        reason="resume_existing_gate_revision_complete",
+                        artifact_glob=f"revisions/cycle_{cpad}/*.revision_report.json",
+                    )
+                    if self._should_run_seam_polish(cycle):
+                        self._update_cycle_stage_status(
+                            cycle_status,
+                            "seam_polish",
+                            "reused",
+                            reason="resume_existing_gate_revision_complete",
+                            artifact_glob=f"seams/cycle_{cpad}/*.seam_report.json",
+                        )
+                    self._update_cycle_stage_status(
+                        cycle_status,
+                        "assemble_post_revision_snapshot",
+                        "reused",
+                        reason="resume_existing_gate_revision_complete",
+                        outputs=[
+                            f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md",
+                        ],
+                    )
+                    self._update_cycle_stage_status(
+                        cycle_status,
+                        "continuity_reconciliation",
+                        "reused",
+                        reason="resume_existing_gate_revision_complete",
+                    )
+                    self._write_cycle_status(cycle, cycle_status)
                     continue
 
                 self._log(
                     f"cycle={cpad} stage=resume_revision_check status=incomplete; resuming revisions"
                 )
                 aggregate = self._aggregate_findings(cycle)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "aggregate_findings",
+                    "reused",
+                    reason="resume_existing_gate_incomplete_revision",
+                    outputs=[
+                        f"findings/cycle_{cpad}/all_findings.jsonl",
+                        f"findings/cycle_{cpad}/summary.json",
+                    ],
+                    chapter_count=len(aggregate["by_chapter"]),
+                )
+                self._write_quality_summary(cycle, aggregate, existing_gate)
+                self._write_cycle_status(cycle, cycle_status)
                 touched_chapters = sorted(aggregate["by_chapter"].keys())
                 if not touched_chapters:
                     raise PipelineError(
@@ -686,58 +825,199 @@ class NovelPipelineRunner:
                     f"cycle={cpad} stage=build_revision_packets chapters={len(touched_chapters)}"
                 )
                 self._build_revision_packets(cycle, aggregate["by_chapter"])
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "build_revision_packets",
+                    "complete",
+                    artifact_glob=f"packets/cycle_{cpad}/*.revision_packet.json",
+                    chapter_count=len(touched_chapters),
+                )
+                self._write_cycle_status(cycle, cycle_status)
                 self._log(
                     f"cycle={cpad} stage=revise_chapters concurrency={self.cfg.max_parallel_revisions}"
                 )
                 self._run_revision_stage(cycle, touched_chapters)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "revision",
+                    "complete",
+                    artifact_glob=f"revisions/cycle_{cpad}/*.revision_report.json",
+                    chapter_count=len(touched_chapters),
+                )
+                self._write_cycle_status(cycle, cycle_status)
                 if self._should_run_seam_polish(cycle):
                     self._log(
                         f"cycle={cpad} stage=seam_polish concurrency={self.cfg.max_parallel_revisions}"
                     )
                     self._run_seam_polish_stage(cycle, touched_chapters)
+                    self._update_cycle_stage_status(
+                        cycle_status,
+                        "seam_polish",
+                        "complete",
+                        artifact_glob=f"seams/cycle_{cpad}/*.seam_report.json",
+                        chapter_count=len(touched_chapters),
+                    )
                 else:
                     self._log(
                         f"cycle={cpad} stage=seam_polish_skip reason=non_final_cycle"
                     )
+                    self._update_cycle_stage_status(
+                        cycle_status,
+                        "seam_polish",
+                        "skipped",
+                        reason="non_final_cycle",
+                    )
+                self._write_cycle_status(cycle, cycle_status)
                 self._log(f"cycle={cpad} stage=assemble_post_revision_snapshot")
                 self._assemble_post_revision_snapshot(cycle)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "assemble_post_revision_snapshot",
+                    "complete",
+                    outputs=[
+                        f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md",
+                    ],
+                )
+                self._write_cycle_status(cycle, cycle_status)
                 self._log(f"cycle={cpad} stage=continuity_reconciliation")
                 self._run_continuity_reconciliation(cycle)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "continuity_reconciliation",
+                    "complete",
+                )
+                self._write_cycle_status(cycle, cycle_status)
                 continue
 
             self._log(f"cycle={cpad} stage=assemble_snapshot")
             self._assemble_snapshot(cycle)
+            self._update_cycle_stage_status(
+                cycle_status,
+                "assemble_snapshot",
+                "complete",
+                outputs=[
+                    f"snapshots/cycle_{cpad}/FINAL_NOVEL.md",
+                ],
+            )
+            self._write_cycle_status(cycle, cycle_status)
             self._log(f"cycle={cpad} stage=build_cycle_context_packs")
             self._build_cycle_context_packs(cycle)
+            self._update_cycle_stage_status(
+                cycle_status,
+                "build_cycle_context_packs",
+                "complete",
+                artifact_glob=f"context/cycle_{cpad}/**/*.json",
+            )
+            self._write_cycle_status(cycle, cycle_status)
 
             self._log(
                 f"cycle={cpad} stage=review_chapters concurrency={self.cfg.max_parallel_reviews}"
             )
             self._run_chapter_review_stage(cycle)
+            self._update_cycle_stage_status(
+                cycle_status,
+                "chapter_review",
+                "complete",
+                artifact_glob=f"reviews/cycle_{cpad}/chapter_*.review.json",
+                chapter_count=len(self.chapter_specs),
+            )
+            self._write_cycle_status(cycle, cycle_status)
 
             if self.cfg.skip_cross_chapter_audit:
                 self._log(f"cycle={cpad} stage=full_award_review")
                 self._run_full_award_review_stage(cycle)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "full_award_review",
+                    "complete",
+                    outputs=[f"reviews/cycle_{cpad}/full_award.review.json"],
+                )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "cross_chapter_audit",
+                    "skipped",
+                    reason="config_skip_cross_chapter_audit",
+                )
             else:
                 self._log(
                     f"cycle={cpad} stage=full_book_reviews concurrency=2"
                 )
                 self._run_parallel_full_book_review_stages(cycle)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "full_award_review",
+                    "complete",
+                    outputs=[f"reviews/cycle_{cpad}/full_award.review.json"],
+                )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "cross_chapter_audit",
+                    "complete",
+                    outputs=[self._cross_chapter_audit_rel(cycle)],
+                )
+            self._write_cycle_status(cycle, cycle_status)
 
             self._log(f"cycle={cpad} stage=aggregate_findings")
             aggregate = self._aggregate_findings(cycle)
+            self._update_cycle_stage_status(
+                cycle_status,
+                "aggregate_findings",
+                "complete",
+                outputs=[
+                    f"findings/cycle_{cpad}/all_findings.jsonl",
+                    f"findings/cycle_{cpad}/summary.json",
+                ],
+                chapter_count=len(aggregate["by_chapter"]),
+            )
+            self._write_cycle_status(cycle, cycle_status)
 
             gate = self._write_gate(cycle, aggregate)
+            cycle_status["advisory_gate"] = dict(gate)
+            self._write_quality_summary(cycle, aggregate, gate)
             gate_records.append(gate)
             self._log(
                 f"cycle={cpad} gate={gate['decision']} unresolved_medium_plus={gate['unresolved_medium_plus_count']}"
             )
+            self._write_cycle_status(cycle, cycle_status)
 
             if gate["decision"] == "PASS":
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "build_revision_packets",
+                    "skipped",
+                    reason="gate_passed_no_revision_needed",
+                )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "revision",
+                    "skipped",
+                    reason="gate_passed_no_revision_needed",
+                )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "seam_polish",
+                    "skipped",
+                    reason="gate_passed_no_revision_needed",
+                )
                 self._log(f"cycle={cpad} stage=assemble_post_revision_snapshot")
                 self._assemble_post_revision_snapshot(cycle)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "assemble_post_revision_snapshot",
+                    "complete",
+                    outputs=[
+                        f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md",
+                    ],
+                )
+                self._write_cycle_status(cycle, cycle_status)
                 self._log(f"cycle={cpad} stage=continuity_reconciliation")
                 self._run_continuity_reconciliation(cycle)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "continuity_reconciliation",
+                    "complete",
+                )
+                self._write_cycle_status(cycle, cycle_status)
                 success_cycle = cycle
                 break
 
@@ -745,19 +1025,85 @@ class NovelPipelineRunner:
                 self._log(
                     f"cycle={cpad} skipping revision because min_cycles={self.cfg.min_cycles} not reached"
                 )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "build_revision_packets",
+                    "skipped",
+                    reason="min_cycles_guard",
+                )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "revision",
+                    "skipped",
+                    reason="min_cycles_guard",
+                )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "seam_polish",
+                    "skipped",
+                    reason="min_cycles_guard",
+                )
                 self._log(f"cycle={cpad} stage=assemble_post_revision_snapshot")
                 self._assemble_post_revision_snapshot(cycle)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "assemble_post_revision_snapshot",
+                    "complete",
+                    outputs=[
+                        f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md",
+                    ],
+                )
+                self._write_cycle_status(cycle, cycle_status)
                 self._log(f"cycle={cpad} stage=continuity_reconciliation")
                 self._run_continuity_reconciliation(cycle)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "continuity_reconciliation",
+                    "complete",
+                )
+                self._write_cycle_status(cycle, cycle_status)
                 continue
             if gate["reason"] == "cross_chapter_audit_failed":
                 self._log(
                     f"cycle={cpad} skipping revision because cross-chapter audit failed and produced no actionable chapter work"
                 )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "build_revision_packets",
+                    "skipped",
+                    reason="cross_chapter_audit_failed",
+                )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "revision",
+                    "skipped",
+                    reason="cross_chapter_audit_failed",
+                )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "seam_polish",
+                    "skipped",
+                    reason="cross_chapter_audit_failed",
+                )
                 self._log(f"cycle={cpad} stage=assemble_post_revision_snapshot")
                 self._assemble_post_revision_snapshot(cycle)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "assemble_post_revision_snapshot",
+                    "complete",
+                    outputs=[
+                        f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md",
+                    ],
+                )
+                self._write_cycle_status(cycle, cycle_status)
                 self._log(f"cycle={cpad} stage=continuity_reconciliation")
                 self._run_continuity_reconciliation(cycle)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "continuity_reconciliation",
+                    "complete",
+                )
+                self._write_cycle_status(cycle, cycle_status)
                 continue
 
             touched_chapters = sorted(aggregate["by_chapter"].keys())
@@ -770,24 +1116,69 @@ class NovelPipelineRunner:
                 f"cycle={cpad} stage=build_revision_packets chapters={len(touched_chapters)}"
             )
             self._build_revision_packets(cycle, aggregate["by_chapter"])
+            self._update_cycle_stage_status(
+                cycle_status,
+                "build_revision_packets",
+                "complete",
+                artifact_glob=f"packets/cycle_{cpad}/*.revision_packet.json",
+                chapter_count=len(touched_chapters),
+            )
+            self._write_cycle_status(cycle, cycle_status)
 
             self._log(
                 f"cycle={cpad} stage=revise_chapters concurrency={self.cfg.max_parallel_revisions}"
             )
             self._run_revision_stage(cycle, touched_chapters)
+            self._update_cycle_stage_status(
+                cycle_status,
+                "revision",
+                "complete",
+                artifact_glob=f"revisions/cycle_{cpad}/*.revision_report.json",
+                chapter_count=len(touched_chapters),
+            )
+            self._write_cycle_status(cycle, cycle_status)
             if self._should_run_seam_polish(cycle):
                 self._log(
                     f"cycle={cpad} stage=seam_polish concurrency={self.cfg.max_parallel_revisions}"
                 )
                 self._run_seam_polish_stage(cycle, touched_chapters)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "seam_polish",
+                    "complete",
+                    artifact_glob=f"seams/cycle_{cpad}/*.seam_report.json",
+                    chapter_count=len(touched_chapters),
+                )
             else:
                 self._log(
                     f"cycle={cpad} stage=seam_polish_skip reason=non_final_cycle"
                 )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "seam_polish",
+                    "skipped",
+                    reason="non_final_cycle",
+                )
+            self._write_cycle_status(cycle, cycle_status)
             self._log(f"cycle={cpad} stage=assemble_post_revision_snapshot")
             self._assemble_post_revision_snapshot(cycle)
+            self._update_cycle_stage_status(
+                cycle_status,
+                "assemble_post_revision_snapshot",
+                "complete",
+                outputs=[
+                    f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md",
+                ],
+            )
+            self._write_cycle_status(cycle, cycle_status)
             self._log(f"cycle={cpad} stage=continuity_reconciliation")
             self._run_continuity_reconciliation(cycle)
+            self._update_cycle_stage_status(
+                cycle_status,
+                "continuity_reconciliation",
+                "complete",
+            )
+            self._write_cycle_status(cycle, cycle_status)
 
         self._write_final_report(success_cycle, gate_records)
         self._print_cost_summary()
@@ -5105,6 +5496,100 @@ class NovelPipelineRunner:
                 self._normalize_finding(raw, cycle, force_source="length_guardrail")
             )
         return findings
+
+    def _cycle_status_rel(self, cycle: int) -> str:
+        return f"status/cycle_{self._cpad(cycle)}/cycle_status.json"
+
+    def _quality_summary_rel(self, cycle: int) -> str:
+        return f"status/cycle_{self._cpad(cycle)}/quality_summary.json"
+
+    def _new_cycle_status(self, cycle: int) -> dict[str, Any]:
+        stages: dict[str, dict[str, Any]] = {}
+        for stage_key in OBSERVABILITY_STAGE_KEYS:
+            required = True
+            status = "pending"
+            reason = None
+            if stage_key == "cross_chapter_audit" and self.cfg.skip_cross_chapter_audit:
+                required = False
+                status = "skipped"
+                reason = "config_skip_cross_chapter_audit"
+            elif stage_key == "seam_polish" and not self._should_run_seam_polish(cycle):
+                required = False
+                status = "skipped"
+                reason = "non_final_cycle"
+            entry: dict[str, Any] = {
+                "status": status,
+                "required": required,
+            }
+            if reason:
+                entry["reason"] = reason
+            stages[stage_key] = entry
+
+        return {
+            "cycle": cycle,
+            "max_cycles": self.cfg.max_cycles,
+            "min_cycles": self.cfg.min_cycles,
+            "run_mode": "fresh",
+            "completion_policy": {
+                "terminate_on_quality_pass": True,
+                "terminate_on_max_cycles": True,
+            },
+            "stages": stages,
+            "warnings_file": "reports/validation_warnings.json",
+            "updated_at_utc": self._utc_now(),
+        }
+
+    def _update_cycle_stage_status(
+        self,
+        cycle_status: dict[str, Any],
+        stage_key: str,
+        stage_status: str,
+        *,
+        reason: str | None = None,
+        outputs: list[str] | None = None,
+        artifact_glob: str | None = None,
+        chapter_count: int | None = None,
+    ) -> None:
+        stages = cycle_status.setdefault("stages", {})
+        entry = stages.setdefault(stage_key, {})
+        entry["status"] = stage_status
+        if reason:
+            entry["reason"] = reason
+        elif "reason" in entry and stage_status not in {"skipped", "failed"}:
+            entry.pop("reason", None)
+        if outputs is not None:
+            entry["outputs"] = outputs
+        if artifact_glob is not None:
+            entry["artifact_glob"] = artifact_glob
+        if chapter_count is not None:
+            entry["chapter_count"] = chapter_count
+        cycle_status["updated_at_utc"] = self._utc_now()
+
+    def _write_cycle_status(self, cycle: int, cycle_status: dict[str, Any]) -> None:
+        payload = copy.deepcopy(cycle_status)
+        payload["updated_at_utc"] = self._utc_now()
+        self._write_json(self._cycle_status_rel(cycle), payload)
+
+    def _write_quality_summary(
+        self,
+        cycle: int,
+        aggregate: dict[str, Any],
+        advisory_gate: dict[str, Any] | None = None,
+    ) -> None:
+        summary = dict(aggregate.get("summary", {}))
+        summary["cycle"] = cycle
+        summary["advisory_only"] = True
+        summary["validation_warning_count"] = len(self.validation_warnings)
+        if advisory_gate is not None:
+            summary["advisory_gate"] = {
+                "decision": advisory_gate.get("decision"),
+                "reason": advisory_gate.get("reason"),
+                "full_award_verdict": advisory_gate.get("full_award_verdict"),
+                "unresolved_medium_plus_count": advisory_gate.get(
+                    "unresolved_medium_plus_count"
+                ),
+            }
+        self._write_json(self._quality_summary_rel(cycle), summary)
 
     def _write_gate(self, cycle: int, aggregate: dict[str, Any]) -> dict[str, Any]:
         cpad = self._cpad(cycle)
@@ -9701,6 +10186,14 @@ class NovelPipelineRunner:
             else None
         )
         final_novel_file = "FINAL_NOVEL.md" if final_cycle is not None else None
+        cycle_status_files = sorted(
+            str(path.relative_to(self.run_dir))
+            for path in (self.run_dir / "status").glob("cycle_*/cycle_status.json")
+        )
+        quality_summary_files = sorted(
+            str(path.relative_to(self.run_dir))
+            for path in (self.run_dir / "status").glob("cycle_*/quality_summary.json")
+        )
         final_report = {
             "completed_at_utc": completed_at_utc,
             "status": status,
@@ -9713,6 +10206,8 @@ class NovelPipelineRunner:
                 "revision": self.cfg.max_parallel_revisions,
             },
             "gate_history": gate_records,
+            "cycle_status_files": cycle_status_files,
+            "quality_summary_files": quality_summary_files,
             "chapter_count": len(self.chapter_specs),
             "final_novel_file": final_novel_file,
             "final_novel_snapshot_file": final_novel_snapshot_file,
@@ -9735,6 +10230,10 @@ class NovelPipelineRunner:
             "validation_warning_count": warning_count,
             "completed_with_warnings": warning_count > 0,
             "last_gate": gate_records[-1] if gate_records else None,
+            "last_cycle_status_file": cycle_status_files[-1] if cycle_status_files else None,
+            "last_quality_summary_file": (
+                quality_summary_files[-1] if quality_summary_files else None
+            ),
             "run_dir": str(self.run_dir),
         }
         self._write_json(
