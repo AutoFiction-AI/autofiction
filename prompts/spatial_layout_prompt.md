@@ -28,7 +28,7 @@ Output requirements:
 4. If `macro` is present, include:
    - `world_name`
    - `locations` (array of objects with at least `name`)
-   - optional `routes`
+   - optional `routes` (array of objects; each route object must include `from` and `to`)
    - optional `cardinal_anchors`
 5. At least one of `micro` or `macro` may be null. Both may be null only when the summary clearly states why a dedicated spatial layout is not load-bearing for this premise.
 

@@ -107,7 +107,7 @@ Required output:
 4b. Use current field names only. For ordinary findings, use `problem`, not `description`. For pattern findings, use `global_problem`, not `description`.
 5. Each `findings[]` object must include:
 6. `finding_id`
-7. `severity` (`LOW|MEDIUM|HIGH|CRITICAL`)
+7. `severity` (`LOW|MEDIUM|HIGH|CRITICAL|ELEVATION_MEDIUM|ELEVATION_HIGH`)
 8. `chapter_id` (`chapter_XX`; never `ch16` or other shorthand)
 9. `evidence` (single string; if you cite multiple locations, flatten them into one string separated by semicolons, e.g. `{{FULL_NOVEL_FILE}}:12; {{FULL_NOVEL_FILE}}:18`)
 10. `problem`
@@ -116,7 +116,7 @@ Required output:
 13. Optional `pattern_findings` (array of objects) for recurring book-wide patterns that affect multiple chapters. Each object should include:
 13b. `pattern_findings` is required, not optional, when the same baseline-reorientation or reader-knowledge continuity failure materially affects 3 or more chapters. In that case, include one `chapter_hits[]` entry per affected chapter rather than summarizing the pattern only at book level.
 14. `pattern_id` (short stable identifier, e.g. `PROSE_AUTOCOMM`)
-15. `severity` (`LOW|MEDIUM|HIGH|CRITICAL`)
+15. `severity` (`LOW|MEDIUM|HIGH|CRITICAL|ELEVATION_MEDIUM|ELEVATION_HIGH`)
 16. `global_problem` (brief shared diagnosis for the whole pattern)
 17. `affected_chapters` (array of `chapter_XX` ids covering every materially affected chapter you are claiming)
 18. Optional `global_rewrite_principles` (shared cross-chapter correction principles)

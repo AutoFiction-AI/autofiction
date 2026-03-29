@@ -21,6 +21,26 @@ Task:
 2. Emit findings only when the evidence depends on reading these chapters as a cluster or at their boundaries.
 3. Every finding must include `fix_owner_reason`, `pass_hint`, and `related_chapter_ids`.
 4. All citations must use `{{FULL_NOVEL_FILE}}:<line>` format.
+
+Mandatory pre-scan — complete this BEFORE evaluating structural and momentum issues:
+
+Scan for description-level and continuity problems across the chapters in this window. These are among the most reader-visible problems in parallel-drafted novels and must not be deprioritized.
+
+Use category `pre_scan` with the appropriate subcategory:
+
+P1. `redundant_reintroduction`: a character's appearance, role, or backstory re-explained using the same or paraphrased information from an earlier chapter in the window.
+P2. `inconsistent_description`: a character's physical details, possessions, injuries, or status contradict an earlier chapter in the window. A setting's layout, atmosphere, or physical details contradict between chapters.
+P3. `chronology_gap`: a reader cannot tell how much time passed at a chapter boundary.
+P4. `presence_continuity`: a character present at the end of one chapter vanishes at the start of the next without explanation, or appears at a location without having traveled there.
+P5. `name_reference_shift`: the same character is referred to inconsistently across a chapter boundary without motivated context.
+P6. `repeated_information`: the same plot fact is explained to the reader in two adjacent chapters through different narrative means.
+P7. `pov_clarity`: in a multi-POV novel, a new chapter's POV is not clear within the first 2-3 sentences.
+P8. `dangling_thread`: a character promises, threatens, or commits to something at the end of one chapter and the adjacent chapter silently ignores it.
+P9. `tonal_mismatch`: the emotional register shifts so abruptly at a chapter boundary that the transition feels like two different novels spliced together.
+P10. `reader_confusion`: anything that would make a reader pause in unintentional confusion. Deliberate mystery and ambiguity are fine; accidental opacity is not.
+
+After the pre-scan, evaluate structural and momentum issues using these ten categories:
+
 5. Use these ten categories:
 5a. `factual_coherence`: action attribution across consecutive chapters, shared events across POV shifts, physical details carrying across boundaries, opening/closing coherence, and spatial or geographic contradictions across adjacent chapters.
 5b. `pacing_rhythm`: monotony, repeated chapter structures, or repeated openings across consecutive chapters.
@@ -51,7 +71,7 @@ Severity guidance:
 3. `MEDIUM`: qualitative drift that hurts the reading experience without breaking the story.
 
 Pass-hint defaults:
-1. `factual_coherence`, `pacing_rhythm`, `emotional_continuity`, `information_flow`, `redundant_scene_functions`, `repetitive_scene_dynamics`, `character_decision_coherence`, and `reading_momentum` default to `p1_structural_craft`.
+1. `pre_scan` (all subcategories), `factual_coherence`, `pacing_rhythm`, `emotional_continuity`, `information_flow`, `redundant_scene_functions`, `repetitive_scene_dynamics`, `character_decision_coherence`, and `reading_momentum` default to `p1_structural_craft`.
 2. `boundary_local_voice_drift` defaults to `p2_dialogue_idiolect_cadence`.
 3. `cross_chapter_prose_patterns` defaults to `p3_prose_copyedit`.
 4. Override the default only when the finding is primarily about dialogue register or prose-level wording.
@@ -78,8 +98,8 @@ Required output:
 11. `severity` (`MEDIUM|HIGH|CRITICAL`)
 12. `chapter_id`
 13. `related_chapter_ids`
-14. Optional `boundary_span`
-15. Optional `counterpart_evidence`
+14. `boundary_span` (required for `factual_coherence` and `boundary_local_voice_drift`; omit for other categories)
+15. `counterpart_evidence` (required for `factual_coherence`; omit for other categories)
 16. `pass_hint` (`p1_structural_craft|p2_dialogue_idiolect_cadence|p3_prose_copyedit`)
 17. `evidence`
 18. `problem`

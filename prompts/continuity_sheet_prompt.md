@@ -3,7 +3,8 @@ You are running CONTINUITY RECONCILIATION for cycle `{{CYCLE_PADDED}}`.
 Inputs:
 1. Full manuscript snapshot: `{{FULL_NOVEL_FILE}}`
 2. Current continuity sheet: `outline/continuity_sheet.json`
-3. Cycle story context pack: `{{GLOBAL_CYCLE_CONTEXT_FILE}}`
+3. Spatial layout: `{{SPATIAL_LAYOUT_FILE}}`
+4. Cycle story context pack: `{{GLOBAL_CYCLE_CONTEXT_FILE}}`
 
 Task:
 1. Read the full manuscript and compare every factual claim against the current continuity sheet.
@@ -23,6 +24,7 @@ Reconciliation rules:
 8. Keep the sheet compact. Each field should contain only what downstream drafters and revisers need for consistency. Omit subjective interpretation, thematic analysis, and prose-level guidance — those belong in the style bible.
 9. For `state_transitions`, only record changes that affect continuity: age changes, injuries gained or healed, objects acquired or lost, relationships formed or broken, knowledge gained. Do not track emotional arc — that is the chapter spec's job.
 10. For `knowledge_state`, only track information that characters could act on incorrectly if a drafter gets it wrong: secrets, lies, things learned in specific chapters that affect later behavior.
+11. Treat `{{SPATIAL_LAYOUT_FILE}}` as the authoritative source for spatial ground truth. The continuity sheet's geography section should point to that file instead of duplicating room-by-room, route-by-route, or distance-by-distance spatial facts. Only keep high-level location facts in the continuity sheet that downstream stages need for non-spatial continuity.
 
 Required outputs:
 1. `{{CONTINUITY_SHEET_OUTPUT_FILE}}` (overwrites existing sheet)
@@ -49,9 +51,10 @@ Must be a valid JSON object with these top-level keys (all required, but arrays/
    - `key_events` (array of objects with `event`, `timing`, and `chapter` fields)
 
 3. `geography` (object with):
+   - `spatial_layout_ref` (string: set to `{{SPATIAL_LAYOUT_FILE}}`)
    - `primary_setting` (string)
    - `key_locations` (array of objects with `name` and `details` fields)
-   - `distances` (array of strings: spatial relationships between key locations)
+   - `distances` (array of strings: only broad spatial relationships worth tracking outside `{{SPATIAL_LAYOUT_FILE}}`; otherwise keep empty)
 
 4. `world_rules` (array of strings: constraints on what is possible in this world — physics, magic systems, laws, social rules, technology level. Empty for realistic contemporary fiction.)
 
