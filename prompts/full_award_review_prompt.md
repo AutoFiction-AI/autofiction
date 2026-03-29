@@ -30,7 +30,7 @@ Task:
 3l. Output contract discipline: write the current schema exactly. `cycle` must be the unquoted integer `{{CYCLE_INT}}`, not a zero-padded or quoted string like `"{{CYCLE_PADDED}}"`. Every chapter reference must use `chapter_XX`, not shorthand forms like `ch16`. Use current field names such as `problem` and `global_problem`, not legacy aliases like `description`.
 3m. Cross-chapter redundancy and factual consistency are audited by a dedicated pass every cycle. Flag obvious cross-chapter issues such as double character introductions, contradicted facts, and near-verbatim repeated passages when you notice them, but do not pursue exhaustive cross-chapter counting or tracking at the expense of craft assessment. Your primary mandate is evaluating the manuscript's craft, structure, dialogue, and dramatic quality.
 3n. `LOW` findings are allowed but optional. Use them sparingly for real non-blocking polish issues worth preserving once the major blockers are fixed. Never let `LOW` findings crowd out `MEDIUM+` blockers or pad the review with minor notes.
-3o. Prose-tic counting and quantitative redundancy measurement are handled by dedicated audit stages. Your primary focus is twofold: (1) award-level craft judgment requiring full-novel context — character arcs, tonal trajectory, the ending, sanitization, thematic coherence, and reader-knowledge continuity across distant chapters; and (2) elevation findings — specific, grounded opportunities to take the novel from competent to exceptional. For elevation findings, use `source: elevation` and severity `ELEVATION_HIGH` or `ELEVATION_MEDIUM`. Every elevation finding must be grounded in specific line citations with a concrete rewrite direction, not generic workshop advice. Do not spend major attention on boundary-local or count-based issues owned more precisely by other stages.
+3o. Prose-tic counting and quantitative redundancy measurement are handled by dedicated audit stages. Your primary focus is twofold: (1) award-level craft judgment requiring full-novel context — character arcs, tonal trajectory, the ending, sanitization, thematic coherence, and reader-knowledge continuity across distant chapters; and (2) elevation findings — specific, grounded opportunities to take the novel from competent to exceptional. For ordinary full-book blockers, use `source: award_global`. For elevation findings, `source` must be `elevation` and `severity` must be `ELEVATION_HIGH` or `ELEVATION_MEDIUM`. `source` is always required for every finding. Do not encode elevation only in `severity`, and do not omit `source` on elevation findings. Every elevation finding must be grounded in specific line citations with a concrete rewrite direction, not generic workshop advice. Do not spend major attention on boundary-local or count-based issues owned more precisely by other stages.
 3p. Elevation findings should stay chapter-actionable. The revision agent for the mapped chapter must be able to execute the change without needing whole-scene restructuring elsewhere.
 4. Every finding must map to a specific chapter via `chapter_id` for actionable revision. Each chapter is revised independently by a separate agent that can only see and modify that chapter. Therefore: if a problem spans multiple chapters, emit a **separate finding for each affected chapter** with chapter-specific rewrite direction. Do not emit one finding covering multiple chapters — the revision agent for the mapped chapter has no ability to fix other chapters.
 4b. For recurring book-wide patterns that affect 3+ chapters, you may use optional `pattern_findings` to group the shared diagnosis once while still providing chapter-local revision targets. If you use `pattern_findings`, include every materially affected chapter in `affected_chapters`, and provide a concrete `chapter_hit` with local evidence, rewrite direction, and acceptance test for each chapter you want revised. If you are unsure about weaker chapters, do not overclaim scope: only list chapters you can support concretely.
@@ -107,12 +107,13 @@ Required output:
 4b. Use current field names only. For ordinary findings, use `problem`, not `description`. For pattern findings, use `global_problem`, not `description`.
 5. Each `findings[]` object must include:
 6. `finding_id`
-7. `severity` (`LOW|MEDIUM|HIGH|CRITICAL|ELEVATION_MEDIUM|ELEVATION_HIGH`)
-8. `chapter_id` (`chapter_XX`; never `ch16` or other shorthand)
-9. `evidence` (single string; if you cite multiple locations, flatten them into one string separated by semicolons, e.g. `{{FULL_NOVEL_FILE}}:12; {{FULL_NOVEL_FILE}}:18`)
-10. `problem`
-11. `rewrite_direction` (must include local target spans/lines in `{{FULL_NOVEL_FILE}}:<line>` form; strategy options allowed; percentage-only directives are forbidden unless scenes are explicitly named)
-12. `acceptance_test` (concrete and verifiable by reading the revised passage, with pass/fail criteria tied to specific lines/spans)
+7. `source` (`award_global|elevation`; always required. Do not omit it. Do not represent elevation solely via `severity`.)
+8. `severity` (`LOW|MEDIUM|HIGH|CRITICAL|ELEVATION_MEDIUM|ELEVATION_HIGH`)
+9. `chapter_id` (`chapter_XX`; never `ch16` or other shorthand)
+10. `evidence` (single string; if you cite multiple locations, flatten them into one string separated by semicolons, e.g. `{{FULL_NOVEL_FILE}}:12; {{FULL_NOVEL_FILE}}:18`)
+11. `problem`
+12. `rewrite_direction` (must include local target spans/lines in `{{FULL_NOVEL_FILE}}:<line>` form; strategy options allowed; percentage-only directives are forbidden unless scenes are explicitly named)
+13. `acceptance_test` (concrete and verifiable by reading the revised passage, with pass/fail criteria tied to specific lines/spans)
 13. Optional `pattern_findings` (array of objects) for recurring book-wide patterns that affect multiple chapters. Each object should include:
 13b. `pattern_findings` is required, not optional, when the same baseline-reorientation or reader-knowledge continuity failure materially affects 3 or more chapters. In that case, include one `chapter_hits[]` entry per affected chapter rather than summarizing the pattern only at book level.
 14. `pattern_id` (short stable identifier, e.g. `PROSE_AUTOCOMM`)
@@ -132,12 +133,27 @@ Valid shape example for one ordinary `findings[]` item:
 ```json
 {
   "finding_id": "CH07_OVEREXPLAINED_ENDING",
+  "source": "award_global",
   "severity": "MEDIUM",
   "chapter_id": "chapter_07",
   "evidence": "{{FULL_NOVEL_FILE}}:1402; {{FULL_NOVEL_FILE}}:1418",
   "problem": "After the scene's central turn lands on the page, the closing paragraphs restate the same realization in cleaner thematic language rather than creating new pressure.",
   "rewrite_direction": "Revise {{FULL_NOVEL_FILE}}:1402-1420. Cut or compress the explanatory closing material so the chapter ends on the already-earned action and image instead of paraphrasing its meaning.",
   "acceptance_test": "Pass if {{FULL_NOVEL_FILE}}:1402-1420 now ends on concrete scene consequence without abstract restatement of the same insight. Fail if the revised closing still paraphrases what the reader already understood from the prior beat."
+}
+```
+
+Valid shape example for one elevation `findings[]` item:
+```json
+{
+  "finding_id": "CH09_ELEVATION_NEGATIVE_SPACE",
+  "source": "elevation",
+  "severity": "ELEVATION_HIGH",
+  "chapter_id": "chapter_09",
+  "evidence": "{{FULL_NOVEL_FILE}}:1880; {{FULL_NOVEL_FILE}}:1896",
+  "problem": "The confrontation states the emotional conclusion directly instead of letting the silence and the missed response do the work.",
+  "rewrite_direction": "Revise {{FULL_NOVEL_FILE}}:1880-1898. Cut the explicit interpretive lines and let the beat land through the unspoken reaction, physical business, and the deferred answer.",
+  "acceptance_test": "Pass if the revised span creates sharper emotional aftershock through omission and reaction rather than explicit paraphrase. Fail if the scene still explains the feeling in direct thematic language."
 }
 ```
 
