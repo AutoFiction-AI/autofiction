@@ -5,7 +5,8 @@ Inputs:
 2. Continuity sheet: `{{CONTINUITY_SHEET_FILE}}`
 3. Style bible: `outline/style_bible.json`
 4. Novel outline: `outline/outline.md`
-5. Constitution: `config/constitution.md`
+5. Spatial layout: `{{SPATIAL_LAYOUT_FILE}}`
+6. Constitution: `config/constitution.md`
 
 Context isolation requirement:
 1. Do not read prior cycle reviews, revision reports, or gate files.
@@ -34,6 +35,9 @@ Task:
 1. Audit the full manuscript for two classes of defect only: redundancy and consistency.
 2. Focus exclusively on what is repeated that should not be and what contradicts itself across chapters.
 3. Every emitted finding must be mapped to the specific chapter that should be revised.
+3b. Boundary-local rhythm, handoff quality, and chapter-to-chapter momentum are primarily judged by the local window audit stage. Focus your attention on quantitative redundancy, factual consistency, and prose-tic density across the full manuscript.
+3c. Include spatial and geographic layout in your consistency checks. Use grep to find all mentions of key locations and verify that physical relationships are consistent across all chapters. This applies at both scales: micro-scale (rooms, floors, corridors, adjacency, visibility within a building or compound) and macro-scale (distance between settlements or landmarks, travel time, terrain, cardinal directions, relative positions). Spatial contradictions are HIGH findings. Chapters are drafted in parallel and spatial/geographic drift is expected and common.
+3d. Flag character-associated repetitive actions across the full manuscript. Use grep to find recurring physical details or gestures co-occurring with specific character names. When the same character is described with the same physical action in 3 or more chapters with the same dramatic function, flag as MEDIUM on the later chapters. The first instance may be kept; subsequent repetitions should be varied or removed.
 4. If a pattern affects multiple chapters, emit one finding per affected chapter rather than one shared omnibus finding.
 5. Prefer concrete, revision-driving findings over vague commentary.
 6. Be exhaustive within each check. Do not stop after finding the first few instances of a pattern — continue scanning the full manuscript for every affected chapter.
@@ -57,7 +61,11 @@ Checks 1-2 below define the CRITERIA for character re-introduction and setting r
 1. Character re-introductions. Flag any later chapter that re-describes a character's physical appearance, clothing style, build, distinguishing features, full name plus role, or self-identifying dialogue as if the reader has not already met them. The first full introduction is correct; later chapters should use only the minimum identifying detail needed. Social plausibility inside the scene does not excuse reader-facing redundancy: a line can be realistic for the characters to say and still be a re-introduction bug for the reader. Do not classify repeated descriptors as "intentional motifs," "deliberate evolution," "farewell rendering," or any other editorial rationalization — if the same physical trait appears in multiple chapter-entry passages, flag it and let the revision agent decide whether to keep or cut. Cite the original establishment location in `problem`.
 2. Setting re-descriptions. Flag any later chapter that inventories a previously established space from scratch rather than re-entering it through change, contrast, or the new local pressure. Treat recurring-space families broadly, not narrowly: workplace/campus/building/lobby/floor/office/conference-room variants, and home/apartment/room/kitchen variants, belong to the same-space family when they are serving the same orienting function for the reader unless the text clearly establishes a genuinely different location. Repeated orienting work counts even when the wording differs: if the later chapter again teaches exterior, entry, lobby, layout, floor, or room inventory rather than entering through what has changed, that is a re-description defect.
 3. Proof-of-baseline accumulation. Track how many times the manuscript independently proves the same character property or baseline condition: financial state, professional skill, occupation, physical condition, emotional disposition, institutional status, dependency, or constraint. Include repeated protagonist self-inventory and repeated middle-of-scene reminders, not just chapter openings. Flag later chapters when the same property has been proved more than three times without materially new information, leverage, or consequence. Also flag local-cluster redundancy regardless of the total count: if the same baseline is re-proved in adjacent chapters or in two of three nearby chapters without materially new leverage or consequence, that is a finding even if the manuscript-wide count is only two or three.
+3b. Conversation and confrontation redundancy. Track conversations where the same moral argument, emotional reckoning, revealed wound, or relational confrontation is restaged across chapters with similar dramatic weight. This is distinct from proof-of-baseline (which tracks factual properties being re-proved) — it targets scenes where the same emotional or moral ground is covered again through dialogue or confrontation, even when the wording is entirely different. To locate candidates, grep for recurring character pairs that appear together in dialogue-heavy passages across multiple chapters, then read the relevant scenes to compare their dramatic function. The test is functional redundancy: if a reader would experience the later scene as ground already covered — the same wound re-examined, the same accusation relitigated, the same confession replayed — without materially new evidence, changed power dynamics, or consequence that alters the reader's relationship to the wound, flag the LATER chapter. Mark as MEDIUM when the later scene adds some new context, witness, or consequence. Mark as HIGH when the emotional content substantially overlaps and the later scene does not change what the reader understands about the relationship. In the evidence, cite the earlier establishment scene so the revision agent knows what has already landed.
 4. Image and motif density. Count specific recurring nouns, sensory details, colors, sounds, smells, objects, and physical markers across the manuscript. Flag any specific image that appears more than 10 times unless it is explicitly functioning as a tracked motif or setup/payoff element in `outline/outline.md`. For images appearing 10-20 times, target keeping the strongest 4-6 instances. For images appearing 20+ times, target keeping at most 8-10. Emit one finding per affected chapter whose instance(s) should be cut, keeping the strongest retained locations implicit in `problem` and explicit where possible in `evidence`.
+4b. Count `"It wasn't X. It was Y"`, `"It was not X. It was Y"`, and `"Not X. Y."` constructions across the manuscript. Report the total as `not_x_y_count`. Threshold: 4 per book. Emit one finding per affected chapter where the pattern materially contributes to the overuse.
+4c. Count personification-of-abstraction constructions where an abstract noun is the grammatical subject performing a physical or human action. Report the total as `personified_abstraction_count`. Threshold: 8 per book. Emit one finding per affected chapter where the pattern materially contributes to the overuse.
+4d. Count sentences where the grammatical subject is an abstract noun from this list: loss, grief, silence, absence, pain, weight, truth, fear, relief, anger, shame, dread, hope, loneliness, exhaustion, meaning, distance, cost, power. Report the total as `abstract_noun_subject_count`. This is a recurrence signal, not a finding, and does not carry severity by itself.
 5. Em-dash and punctuation density. Count prose lines containing at least one em-dash (`—`). Compute density as em-dash-containing prose lines divided by total prose lines. If manuscript-wide density exceeds 10%, emit one finding for EVERY chapter whose own em-dash density materially exceeds 10%, not just the worst offenders. Chapters far above threshold may be HIGH; lesser but still noncompliant chapters may be MEDIUM. Each finding should give that chapter a concrete target that contributes to bringing manuscript-wide density below 8%.
 6. Sentence-opener monotony. Count sentences beginning with common pronouns such as `He`, `She`, `They`, `I`, and `It`. Compute density as pronoun-opener sentences divided by total sentences. If any single pronoun opener exceeds 7% of total sentences manuscript-wide, emit one finding for EVERY chapter whose local contribution materially exceeds 7% for that opener or otherwise makes that manuscript-wide pattern worse.
 7. Near-verbatim passages. Search for repeated multi-word sequences across chapter boundaries. A near-verbatim match is any passage of 10+ consecutive content words that appears in substantially the same form in more than one chapter, allowing minor inflection changes but not semantic rewording. This includes chapter-seam recaps and repeated scene-entry templates.
@@ -66,7 +74,7 @@ Checks 1-2 below define the CRITERIA for character re-introduction and setting r
 PART B — Consistency audit:
 1. Character details. Verify that named characters' physical descriptions, name spellings, ages, occupations, and key relationships remain consistent across chapters, using the continuity sheet as canonical where applicable.
 2. Timeline. Verify that dates, seasons, day-of-week references, time-of-day references, and duration claims are internally consistent.
-3. Geography and spatial continuity. Verify that locations, distances, travel times, and spatial relationships remain consistent.
+3. Geography and spatial continuity. Verify that locations, distances, travel times, and spatial relationships remain consistent. When `{{SPATIAL_LAYOUT_FILE}}` contains a non-null layout, treat it as the authoritative spatial ground truth for those facts.
 4. Objects and possessions. Track significant objects, documents, vehicles, clothing, tools, supplies, and other meaningful possessions across chapters. Flag appearances, disappearances, and property changes that contradict prior state.
 5. Financial and quantitative continuity. Track specific numbers such as money amounts, counts, measurements, and ages across chapters. Use tools to locate all relevant mentions when verifying a suspected contradiction.
 6. Knowledge state. Track what each character knows and when they learn it. Flag action taken on not-yet-acquired knowledge or failure to act on already-acquired knowledge when that failure reads like a continuity bug rather than a dramatic choice.
@@ -76,15 +84,19 @@ PART B — Consistency audit:
 Output requirements:
 1. Write exactly one JSON object to `{{CROSS_CHAPTER_AUDIT_FILE}}`.
 2. Use the current contract exactly. `cycle` must be the unquoted integer `{{CYCLE_INT}}`.
-3. Every finding must use `chapter_XX`, never shorthand.
-4. Use `rewrite_direction`, not legacy names like `revision_directive`.
-5. `evidence` must be a single string; flatten multiple citations into one semicolon-separated string.
+3. Always include `not_x_y_count`, `personified_abstraction_count`, and `abstract_noun_subject_count` as non-negative integers, even when they are zero.
+4. Every finding must use `chapter_XX`, never shorthand.
+5. Use `rewrite_direction`, not legacy names like `revision_directive`.
+6. `evidence` must be a single string; flatten multiple citations into one semicolon-separated string.
 
 `{{CROSS_CHAPTER_AUDIT_FILE}}` contract:
 1. `cycle` (int)
 2. `summary` (string)
-3. `redundancy_findings` (array)
-4. `consistency_findings` (array)
+3. `not_x_y_count` (int, >= 0)
+4. `personified_abstraction_count` (int, >= 0)
+5. `abstract_noun_subject_count` (int, >= 0)
+6. `redundancy_findings` (array)
+7. `consistency_findings` (array)
 
 Each finding object must include:
 1. `finding_id`

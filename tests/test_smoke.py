@@ -187,7 +187,7 @@ class SmokeTests(unittest.TestCase):
             self.assertEqual(review_manifest["provider"], "codex")
             self.assertEqual(revision_manifest["provider"], "codex")
 
-    def test_clean_resume_reuses_existing_gate(self) -> None:
+    def test_clean_resume_reuses_cycle_status_path(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_resume_", dir="/tmp") as tmp:
             run_dir = Path(tmp) / "run"
             first = run_pipeline(
@@ -215,7 +215,9 @@ class SmokeTests(unittest.TestCase):
                 "--dry-run",
             )
             self.assertEqual(second.returncode, 0, second.stderr or second.stdout)
-            self.assertIn("resume_existing_gate", second.stdout + second.stderr)
+            combined_log = second.stdout + second.stderr
+            self.assertIn("resume_source=cycle_status", combined_log)
+            self.assertIn("status=PASS success_cycle=01", combined_log)
 
     def test_tampered_generated_selection_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_tamper_", dir="/tmp") as tmp:

@@ -41,6 +41,13 @@ SEVERITY_VALUES = {"MEDIUM", "HIGH", "CRITICAL"}
 FULL_AWARD_SEVERITY_VALUES = {"LOW", *SEVERITY_VALUES}
 VALIDATION_MODES = {"strict", "balanced", "lenient"}
 PROVIDER_VALUES = {"codex", "claude"}
+SCENE_PLAN_HEADER_LEGACY = (
+    "scene_id\tchapter_id\tscene_order\tobjective\topposition\tturn\tconsequence_cost\ttension_peak"
+)
+SCENE_PLAN_HEADER_WITH_UNDERCURRENT = (
+    "scene_id\tchapter_id\tscene_order\tobjective\topposition\tturn\tconsequence_cost\ttension_peak\tundercurrent"
+)
+FOCALIZER_DIALOGUE_INTERIORITY_VALUES = {"high", "moderate", "low"}
 STAGE_GROUP_VALUES = (
     "premise",
     "outline",
@@ -49,6 +56,29 @@ STAGE_GROUP_VALUES = (
     "full_review",
     "cross_chapter_audit",
     "revision",
+)
+STAGE_PROVIDER_OVERRIDE_SPECS = {
+    "outline_revision": ("outline", "outline_revision_provider"),
+    "local_window_audit": ("cross_chapter_audit", "local_window_audit_provider"),
+    "llm_aggregator": ("revision", "aggregation_provider"),
+}
+OBSERVABILITY_STAGE_KEYS = (
+    "outline_review",
+    "outline_revision",
+    "spatial_layout",
+    "assemble_snapshot",
+    "build_cycle_context_packs",
+    "chapter_review",
+    "full_award_review",
+    "cross_chapter_audit",
+    "local_window_audit",
+    "aggregate_findings",
+    "build_revision_packets",
+    "llm_aggregator",
+    "materialize_aggregation_decisions",
+    "revision",
+    "assemble_post_revision_snapshot",
+    "continuity_reconciliation",
 )
 REVISION_DIALOGUE_PASS_KEY = "p2_dialogue_idiolect_cadence"
 PRIMARY_REVIEW_LENS = "award"
@@ -399,16 +429,29 @@ PREMISE_RISK_AXIS_DEFS: tuple[dict[str, str], ...] = (
     {"name": "moral_contamination_transgression", "label": "moral contamination and transgression"},
 )
 REVIEW_VALIDATION_RETRY_MAX = _env_non_negative_int("REVIEW_VALIDATION_RETRY_MAX", 0)
+OUTLINE_REVIEW_VALIDATION_RETRY_MAX = _env_non_negative_int(
+    "OUTLINE_REVIEW_VALIDATION_RETRY_MAX", 1
+)
 FULL_AWARD_VALIDATION_RETRY_MAX = _env_non_negative_int(
     "FULL_AWARD_VALIDATION_RETRY_MAX", 1
 )
 CROSS_CHAPTER_AUDIT_VALIDATION_RETRY_MAX = _env_non_negative_int(
     "CROSS_CHAPTER_AUDIT_VALIDATION_RETRY_MAX", 1
 )
+LOCAL_WINDOW_AUDIT_VALIDATION_RETRY_MAX = _env_non_negative_int(
+    "LOCAL_WINDOW_AUDIT_VALIDATION_RETRY_MAX", 0
+)
+SPATIAL_LAYOUT_VALIDATION_RETRY_MAX = _env_non_negative_int(
+    "SPATIAL_LAYOUT_VALIDATION_RETRY_MAX", 1
+)
+OUTLINE_REVISION_VALIDATION_RETRY_MAX = _env_non_negative_int(
+    "OUTLINE_REVISION_VALIDATION_RETRY_MAX", 1
+)
 REVISION_VALIDATION_RETRY_MAX = _env_non_negative_int(
     "REVISION_VALIDATION_RETRY_MAX", 1
 )
-SEAM_VALIDATION_RETRY_MAX = _env_non_negative_int("SEAM_VALIDATION_RETRY_MAX", 1)
+LOCAL_WINDOW_SIZE = 4
+LOCAL_WINDOW_OVERLAP = 2
 JOB_EXEC_RETRY_MAX = _env_non_negative_int("JOB_EXEC_RETRY_MAX", 0)
 JOB_EXEC_RETRY_BASE_SLEEP_SECONDS = _env_non_negative_int(
     "JOB_EXEC_RETRY_BASE_SLEEP_SECONDS", 2
@@ -453,6 +496,67 @@ REVISION_PASS_DEFS = (
         ),
     },
 )
+REVISION_PASS_KEYS = {row["key"] for row in REVISION_PASS_DEFS}
+AGGREGATION_PRIMARY_BUCKET_KEYS = (
+    "unchanged",
+    "merges",
+    "suppressions",
+    "unfixable",
+    "pass_reassignments",
+)
+AGGREGATION_DECISION_KEYS = (
+    "unchanged",
+    "merges",
+    "canonical_choices",
+    "consistency_directives",
+    "context_injections",
+    "suppressions",
+    "unfixable",
+    "pass_reassignments",
+)
+CROSS_CHAPTER_AUDIT_METRIC_KEYS = (
+    "not_x_y_count",
+    "personified_abstraction_count",
+    "abstract_noun_subject_count",
+)
+LOCAL_WINDOW_PASS_HINT_BY_CATEGORY = {
+    "pre_scan": "p1_structural_craft",
+    "factual_coherence": "p1_structural_craft",
+    "pacing_rhythm": "p1_structural_craft",
+    "emotional_continuity": "p1_structural_craft",
+    "information_flow": "p1_structural_craft",
+    "boundary_local_voice_drift": "p2_dialogue_idiolect_cadence",
+    "redundant_scene_functions": "p1_structural_craft",
+    "cross_chapter_prose_patterns": "p3_prose_copyedit",
+    "repetitive_scene_dynamics": "p1_structural_craft",
+    "character_decision_coherence": "p1_structural_craft",
+    "reading_momentum": "p1_structural_craft",
+}
+LOCAL_WINDOW_CATEGORY_ALIASES = {
+    "pre_scan": "pre_scan",
+    "pre_scan_findings": "pre_scan",
+    "prescan": "pre_scan",
+    "coherence": "factual_coherence",
+    "factual_coherence": "factual_coherence",
+    "pacing": "pacing_rhythm",
+    "pacing_rhythm": "pacing_rhythm",
+    "emotional_continuity": "emotional_continuity",
+    "emotion": "emotional_continuity",
+    "information_flow": "information_flow",
+    "info_flow": "information_flow",
+    "boundary_local_voice_drift": "boundary_local_voice_drift",
+    "voice_drift": "boundary_local_voice_drift",
+    "redundant_scene_functions": "redundant_scene_functions",
+    "scene_functions": "redundant_scene_functions",
+    "cross_chapter_prose_patterns": "cross_chapter_prose_patterns",
+    "prose_patterns": "cross_chapter_prose_patterns",
+    "repetitive_scene_dynamics": "repetitive_scene_dynamics",
+    "scene_dynamics": "repetitive_scene_dynamics",
+    "character_decision_coherence": "character_decision_coherence",
+    "decision_coherence": "character_decision_coherence",
+    "reading_momentum": "reading_momentum",
+    "momentum": "reading_momentum",
+}
 
 
 class PipelineError(RuntimeError):
@@ -489,6 +593,11 @@ class ChapterSpec:
     scene_count_target: int
     scene_count_target_explicit: bool
     must_land_beats: list[str]
+    opening_situation: str = ""
+    closing_state: str = ""
+    chronology_anchor: str = ""
+    entry_obligation: str = ""
+    exit_pressure: str = ""
     secondary_character_beats: list[str] = field(default_factory=list)
     setups_to_plant: list[dict[str, Any]] = field(default_factory=list)
     payoffs_to_land: list[dict[str, Any]] = field(default_factory=list)
@@ -560,7 +669,16 @@ class RunnerConfig:
     job_timeout_seconds: int
     job_idle_timeout_seconds: int
     validation_mode: str
+    outline_review_cycles: int = 1
+    final_cycle_global_only: bool = True
+    skip_outline_review: bool = False
     skip_cross_chapter_audit: bool = False
+    skip_local_window_audit: bool = False
+    require_local_window_for_revision: bool = False
+    local_window_size: int = LOCAL_WINDOW_SIZE
+    local_window_overlap: int = LOCAL_WINDOW_OVERLAP
+    add_cycles: int = 0
+    base_completed_cycles: int = 0
 
 
 class NovelPipelineRunner:
@@ -575,8 +693,13 @@ class NovelPipelineRunner:
         self.chapter_specs: list[ChapterSpec] = []
         self.style_bible: dict[str, Any] = {}
         self.novel_title: str = ""
+        self.spatial_layout: dict[str, Any] | None = None
         self.validation_warnings: list[dict[str, Any]] = []
         self._warning_lock = threading.Lock()
+        self._precycle_stage_entries: dict[str, dict[str, Any]] = {}
+
+    def _add_cycles_mode(self) -> bool:
+        return self.cfg.add_cycles > 0
 
     def _profile_for_stage_group(self, stage_group: str) -> ExecutionProfile:
         profile = self.cfg.stage_profiles.get(stage_group)
@@ -590,12 +713,18 @@ class NovelPipelineRunner:
         )
 
     def _profile_for_job(
-        self, stage_group: str, revision_pass_key: str | None = None
+        self,
+        stage: str,
+        stage_group: str,
+        revision_pass_key: str | None = None,
     ) -> ExecutionProfile:
         if stage_group == "revision" and revision_pass_key:
             revision_profile = self.cfg.revision_pass_profiles.get(revision_pass_key)
             if revision_profile is not None:
                 return revision_profile
+        stage_profile = self.cfg.stage_profiles.get(stage)
+        if stage_profile is not None:
+            return stage_profile
         return self._profile_for_stage_group(stage_group)
 
     def _make_job(
@@ -612,7 +741,7 @@ class NovelPipelineRunner:
         prompt_text: str,
         timeout_seconds: int | None = None,
     ) -> JobSpec:
-        profile = self._profile_for_job(stage_group, revision_pass_key)
+        profile = self._profile_for_job(stage, stage_group, revision_pass_key)
         return JobSpec(
             job_id=job_id,
             stage=stage,
@@ -639,160 +768,339 @@ class NovelPipelineRunner:
 
         gate_records: list[dict[str, Any]] = []
         success_cycle: int | None = None
+        start_cycle = self._starting_cycle()
+        if self.cfg.add_cycles:
+            self._log(
+                "add_cycles_resume "
+                f"base_completed={self._cpad(self.cfg.base_completed_cycles)} "
+                f"new_cycles={self.cfg.add_cycles} "
+                f"start_cycle={self._cpad(start_cycle)} "
+                f"target_cycle={self._cpad(self.cfg.max_cycles)}"
+            )
 
-        for cycle in range(1, self.cfg.max_cycles + 1):
+        for cycle in range(start_cycle, self.cfg.max_cycles + 1):
             cpad = self._cpad(cycle)
-            existing_gate = self._load_existing_gate(cycle)
-            if existing_gate is not None:
-                gate_records.append(existing_gate)
+            existing_cycle_status = self._load_existing_cycle_status(cycle)
+            if existing_cycle_status is None:
+                cycle_status = self._new_cycle_status(cycle)
+            else:
+                cycle_status = self._resume_cycle_status(cycle, existing_cycle_status)
                 self._log(
-                    f"cycle={cpad} stage=resume_existing_gate decision={existing_gate['decision']}"
+                    f"cycle={cpad} resume_source=cycle_status status_file={self._cycle_status_rel(cycle)}"
                 )
-                if existing_gate["decision"] == "PASS":
-                    self._ensure_resumed_cycle_post_revision_outputs(cycle)
-                    success_cycle = cycle
-                    break
-                if existing_gate["reason"] == "min_cycles_not_reached_but_current_quality_passes":
-                    self._log(
-                        f"cycle={cpad} resume gate fail is min-cycles guard; no revision expected"
-                    )
-                    self._ensure_resumed_cycle_post_revision_outputs(cycle)
-                    continue
-                if existing_gate.get("reason") == "cross_chapter_audit_failed":
-                    self._log(
-                        f"cycle={cpad} resume gate fail is cross-chapter audit failure; no revision possible this cycle"
-                    )
-                    self._ensure_resumed_cycle_post_revision_outputs(cycle)
-                    continue
-
-                if self._cycle_revisions_complete(cycle):
-                    self._log(
-                        f"cycle={cpad} stage=resume_revision_check status=complete"
-                    )
-                    self._ensure_resumed_cycle_post_revision_outputs(cycle)
-                    continue
-
-                self._log(
-                    f"cycle={cpad} stage=resume_revision_check status=incomplete; resuming revisions"
-                )
-                aggregate = self._aggregate_findings(cycle)
-                touched_chapters = sorted(aggregate["by_chapter"].keys())
-                if not touched_chapters:
-                    raise PipelineError(
-                        f"cycle={cpad} resume expected chapter targets but none were found"
-                    )
-
-                self._log(
-                    f"cycle={cpad} stage=build_revision_packets chapters={len(touched_chapters)}"
-                )
-                self._build_revision_packets(cycle, aggregate["by_chapter"])
-                self._log(
-                    f"cycle={cpad} stage=revise_chapters concurrency={self.cfg.max_parallel_revisions}"
-                )
-                self._run_revision_stage(cycle, touched_chapters)
-                if self._should_run_seam_polish(cycle):
-                    self._log(
-                        f"cycle={cpad} stage=seam_polish concurrency={self.cfg.max_parallel_revisions}"
-                    )
-                    self._run_seam_polish_stage(cycle, touched_chapters)
-                else:
-                    self._log(
-                        f"cycle={cpad} stage=seam_polish_skip reason=non_final_cycle"
-                    )
-                self._log(f"cycle={cpad} stage=assemble_post_revision_snapshot")
-                self._assemble_post_revision_snapshot(cycle)
-                self._log(f"cycle={cpad} stage=continuity_reconciliation")
-                self._run_continuity_reconciliation(cycle)
-                continue
+            self._write_cycle_status(cycle, cycle_status)
 
             self._log(f"cycle={cpad} stage=assemble_snapshot")
-            self._assemble_snapshot(cycle)
-            self._log(f"cycle={cpad} stage=build_cycle_context_packs")
-            self._build_cycle_context_packs(cycle)
-
-            self._log(
-                f"cycle={cpad} stage=review_chapters concurrency={self.cfg.max_parallel_reviews}"
+            snapshot_reused = self._assemble_snapshot(cycle)
+            self._update_cycle_stage_status(
+                cycle_status,
+                "assemble_snapshot",
+                "reused" if snapshot_reused else "complete",
+                outputs=[
+                    f"snapshots/cycle_{cpad}/FINAL_NOVEL.md",
+                ],
             )
-            self._run_chapter_review_stage(cycle)
+            self._write_cycle_status(cycle, cycle_status)
+            self._log(f"cycle={cpad} stage=build_cycle_context_packs")
+            context_reused = self._build_cycle_context_packs(cycle)
+            self._update_cycle_stage_status(
+                cycle_status,
+                "build_cycle_context_packs",
+                "reused" if context_reused else "complete",
+                artifact_glob=f"context/cycle_{cpad}/**/*.json",
+            )
+            self._write_cycle_status(cycle, cycle_status)
 
-            if self.cfg.skip_cross_chapter_audit:
-                self._log(f"cycle={cpad} stage=full_award_review")
-                self._run_full_award_review_stage(cycle)
+            if self._is_global_only_final_cycle(cycle):
+                self._log(
+                    f"cycle={cpad} stage=review_chapters_skip reason=final_cycle_global_only"
+                )
+                review_summary = {
+                    "status": "skipped",
+                    "reason": "final_cycle_global_only",
+                    "chapter_count": 0,
+                    "units": {},
+                }
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "chapter_review",
+                    "skipped",
+                    reason="final_cycle_global_only",
+                    chapter_count=0,
+                    units={},
+                )
             else:
                 self._log(
-                    f"cycle={cpad} stage=full_book_reviews concurrency=2"
+                    f"cycle={cpad} stage=review_chapters concurrency={self.cfg.max_parallel_reviews}"
                 )
-                self._run_parallel_full_book_review_stages(cycle)
+                review_summary = self._run_chapter_review_stage(cycle)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "chapter_review",
+                    review_summary["status"],
+                    reason=review_summary.get("reason"),
+                    artifact_glob=f"reviews/cycle_{cpad}/chapter_*.review.json",
+                    chapter_count=review_summary["chapter_count"],
+                    units=review_summary["units"],
+                )
+            self._write_cycle_status(cycle, cycle_status)
+
+            enabled_local_window = (
+                self._local_window_stage_enabled()
+                and not self.cfg.skip_local_window_audit
+            )
+            review_stage_count = 1
+            if not self.cfg.skip_cross_chapter_audit:
+                review_stage_count += 1
+            if enabled_local_window:
+                review_stage_count += 1
+            if review_stage_count == 1:
+                self._log(f"cycle={cpad} stage=full_award_review")
+            else:
+                self._log(
+                    f"cycle={cpad} stage=full_book_reviews concurrency={review_stage_count}"
+                )
+            review_stage_results = self._run_parallel_full_book_review_stages(cycle)
+            self._update_cycle_stage_status(
+                cycle_status,
+                "full_award_review",
+                (
+                    "reused"
+                    if bool(review_stage_results.get("full_award_review"))
+                    else "complete"
+                ),
+                outputs=[f"reviews/cycle_{cpad}/full_award.review.json"],
+            )
+            if self.cfg.skip_cross_chapter_audit:
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "cross_chapter_audit",
+                    "skipped",
+                    reason="config_skip_cross_chapter_audit",
+                )
+            else:
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "cross_chapter_audit",
+                    (
+                        "reused"
+                        if bool(review_stage_results.get("cross_chapter_audit"))
+                        else "complete"
+                    ),
+                    outputs=[self._cross_chapter_audit_rel(cycle)],
+                )
+            if self.cfg.skip_local_window_audit:
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "local_window_audit",
+                    "skipped",
+                    reason="config_skip_local_window_audit",
+                    units={},
+                )
+            elif not self._local_window_stage_enabled():
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "local_window_audit",
+                    "skipped",
+                    reason="stage_not_enabled",
+                    units={},
+                )
+            else:
+                local_window_summary = review_stage_results.get("local_window_audit")
+                if not isinstance(local_window_summary, dict):
+                    raise PipelineError(
+                        "parallel_full_book_review phase missing local-window stage result"
+                    )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "local_window_audit",
+                    str(local_window_summary.get("status", "failed")).strip() or "failed",
+                    reason=str(local_window_summary.get("reason", "")).strip() or None,
+                    artifact_glob=f"reviews/cycle_{cpad}/local_window_*.json",
+                    units=local_window_summary.get("units", {}),
+                )
+            self._write_cycle_status(cycle, cycle_status)
 
             self._log(f"cycle={cpad} stage=aggregate_findings")
             aggregate = self._aggregate_findings(cycle)
+            self._update_cycle_stage_status(
+                cycle_status,
+                "aggregate_findings",
+                "complete",
+                outputs=[
+                    f"findings/cycle_{cpad}/all_findings.jsonl",
+                    f"findings/cycle_{cpad}/summary.json",
+                ],
+                chapter_count=len(aggregate["by_chapter"]),
+            )
+            self._write_cycle_status(cycle, cycle_status)
 
             gate = self._write_gate(cycle, aggregate)
+            cycle_status["advisory_gate"] = dict(gate)
+            self._write_quality_summary(cycle, aggregate, gate, cycle_status=cycle_status)
             gate_records.append(gate)
             self._log(
                 f"cycle={cpad} gate={gate['decision']} unresolved_medium_plus={gate['unresolved_medium_plus_count']}"
             )
-
-            if gate["decision"] == "PASS":
-                self._log(f"cycle={cpad} stage=assemble_post_revision_snapshot")
-                self._assemble_post_revision_snapshot(cycle)
-                self._log(f"cycle={cpad} stage=continuity_reconciliation")
-                self._run_continuity_reconciliation(cycle)
-                success_cycle = cycle
-                break
-
-            if gate["reason"] == "min_cycles_not_reached_but_current_quality_passes":
-                self._log(
-                    f"cycle={cpad} skipping revision because min_cycles={self.cfg.min_cycles} not reached"
-                )
-                self._log(f"cycle={cpad} stage=assemble_post_revision_snapshot")
-                self._assemble_post_revision_snapshot(cycle)
-                self._log(f"cycle={cpad} stage=continuity_reconciliation")
-                self._run_continuity_reconciliation(cycle)
-                continue
-            if gate["reason"] == "cross_chapter_audit_failed":
-                self._log(
-                    f"cycle={cpad} skipping revision because cross-chapter audit failed and produced no actionable chapter work"
-                )
-                self._log(f"cycle={cpad} stage=assemble_post_revision_snapshot")
-                self._assemble_post_revision_snapshot(cycle)
-                self._log(f"cycle={cpad} stage=continuity_reconciliation")
-                self._run_continuity_reconciliation(cycle)
-                continue
+            self._write_cycle_status(cycle, cycle_status)
 
             touched_chapters = sorted(aggregate["by_chapter"].keys())
             if not touched_chapters:
-                raise PipelineError(
-                    f"cycle={cpad} gate failed but no actionable per-chapter findings were produced"
+                self._log(
+                    f"cycle={cpad} skipping revision because aggregate produced no actionable chapter work"
                 )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "build_revision_packets",
+                    "skipped",
+                    reason="no_actionable_findings",
+                )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "llm_aggregator",
+                    "skipped",
+                    reason="no_actionable_findings",
+                )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "materialize_aggregation_decisions",
+                    "skipped",
+                    reason="no_actionable_findings",
+                )
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "revision",
+                    "skipped",
+                    reason="no_actionable_findings",
+                )
+                self._log(f"cycle={cpad} stage=assemble_post_revision_snapshot")
+                post_snapshot_reused = self._assemble_post_revision_snapshot(cycle)
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "assemble_post_revision_snapshot",
+                    "reused" if post_snapshot_reused else "complete",
+                    outputs=[
+                        f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md",
+                    ],
+                )
+                self._write_cycle_status(cycle, cycle_status)
+                self._log(f"cycle={cpad} stage=continuity_reconciliation")
+                continuity_result = self._run_continuity_reconciliation(cycle)
+                continuity_status = "complete"
+                continuity_reason = None
+                if isinstance(continuity_result, dict):
+                    continuity_status = (
+                        str(continuity_result.get("status", "complete")).strip()
+                        or "complete"
+                    )
+                    continuity_reason = (
+                        str(continuity_result.get("reason", "")).strip() or None
+                    )
+                else:
+                    continuity_status = "reused" if continuity_result else "complete"
+                self._update_cycle_stage_status(
+                    cycle_status,
+                    "continuity_reconciliation",
+                    continuity_status,
+                    reason=continuity_reason,
+                )
+                self._write_cycle_status(cycle, cycle_status)
+                success_cycle = cycle
+                continue
 
             self._log(
                 f"cycle={cpad} stage=build_revision_packets chapters={len(touched_chapters)}"
             )
             self._build_revision_packets(cycle, aggregate["by_chapter"])
+            self._update_cycle_stage_status(
+                cycle_status,
+                "build_revision_packets",
+                "complete",
+                artifact_glob=f"packets/cycle_{cpad}/*.revision_packet.json",
+                chapter_count=len(touched_chapters),
+            )
+            self._write_cycle_status(cycle, cycle_status)
+
+            self._log(f"cycle={cpad} stage=llm_aggregator")
+            aggregator_summary = self._run_llm_aggregator_stage(cycle, touched_chapters)
+            self._update_cycle_stage_status(
+                cycle_status,
+                "llm_aggregator",
+                aggregator_summary["status"],
+                reason=aggregator_summary.get("reason"),
+                outputs=aggregator_summary.get("outputs"),
+                chapter_count=len(touched_chapters),
+            )
+            self._write_cycle_status(cycle, cycle_status)
+
+            self._log(f"cycle={cpad} stage=materialize_aggregation_decisions")
+            materialization_summary = self._materialize_aggregation_decisions_stage(
+                cycle,
+                touched_chapters,
+                aggregator_summary,
+            )
+            self._update_cycle_stage_status(
+                cycle_status,
+                "materialize_aggregation_decisions",
+                materialization_summary["status"],
+                reason=materialization_summary.get("reason"),
+                outputs=materialization_summary.get("outputs"),
+                artifact_glob=f"packets/cycle_{cpad}/*.revision_packet.json",
+                chapter_count=len(touched_chapters),
+            )
+            self._write_cycle_status(cycle, cycle_status)
 
             self._log(
                 f"cycle={cpad} stage=revise_chapters concurrency={self.cfg.max_parallel_revisions}"
             )
-            self._run_revision_stage(cycle, touched_chapters)
-            if self._should_run_seam_polish(cycle):
-                self._log(
-                    f"cycle={cpad} stage=seam_polish concurrency={self.cfg.max_parallel_revisions}"
-                )
-                self._run_seam_polish_stage(cycle, touched_chapters)
-            else:
-                self._log(
-                    f"cycle={cpad} stage=seam_polish_skip reason=non_final_cycle"
-                )
+            revision_summary = self._run_revision_stage(cycle, touched_chapters)
+            self._update_cycle_stage_status(
+                cycle_status,
+                "revision",
+                revision_summary["status"],
+                artifact_glob=f"revisions/cycle_{cpad}/*.revision_report.json",
+                chapter_count=revision_summary["chapter_count"],
+                units=revision_summary["units"],
+            )
+            self._write_cycle_status(cycle, cycle_status)
             self._log(f"cycle={cpad} stage=assemble_post_revision_snapshot")
-            self._assemble_post_revision_snapshot(cycle)
+            post_snapshot_reused = self._assemble_post_revision_snapshot(cycle)
+            self._update_cycle_stage_status(
+                cycle_status,
+                "assemble_post_revision_snapshot",
+                "reused" if post_snapshot_reused else "complete",
+                outputs=[
+                    f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md",
+                ],
+            )
+            self._write_cycle_status(cycle, cycle_status)
             self._log(f"cycle={cpad} stage=continuity_reconciliation")
-            self._run_continuity_reconciliation(cycle)
+            continuity_result = self._run_continuity_reconciliation(cycle)
+            continuity_status = "complete"
+            continuity_reason = None
+            if isinstance(continuity_result, dict):
+                continuity_status = (
+                    str(continuity_result.get("status", "complete")).strip()
+                    or "complete"
+                )
+                continuity_reason = (
+                    str(continuity_result.get("reason", "")).strip() or None
+                )
+            else:
+                continuity_status = "reused" if continuity_result else "complete"
+            self._update_cycle_stage_status(
+                cycle_status,
+                "continuity_reconciliation",
+                continuity_status,
+                reason=continuity_reason,
+            )
+            self._write_cycle_status(cycle, cycle_status)
+            success_cycle = cycle
 
         self._write_final_report(success_cycle, gate_records)
         self._print_cost_summary()
         if success_cycle is None:
-            self._log("status=FAIL reason=max_cycles_reached_without_gate_pass")
+            self._log("status=FAIL reason=no_cycles_completed")
             return 1
 
         self._log(f"status=PASS success_cycle={self._cpad(success_cycle)}")
@@ -827,13 +1135,17 @@ class NovelPipelineRunner:
             "premise_candidates_prompt.md",
             "premise_uniqueness_clustering_prompt.md",
             "outline_prompt.md",
+            "outline_review_prompt.md",
+            "outline_revision_prompt.md",
+            "spatial_layout_prompt.md",
             "chapter_draft_prompt.md",
             "chapter_expand_prompt.md",
             "chapter_review_prompt.md",
             "chapter_revision_prompt.md",
-            "chapter_seam_polish_prompt.md",
+            "revision_aggregator_prompt.md",
             "full_award_review_prompt.md",
             "cross_chapter_audit_prompt.md",
+            "local_window_audit_prompt.md",
             "continuity_sheet_prompt.md",
         ]
         for name in prompt_names:
@@ -845,6 +1157,7 @@ class NovelPipelineRunner:
             "chapter_review.schema.json",
             "full_award_review.schema.json",
             "cross_chapter_audit.schema.json",
+            "local_window_audit.schema.json",
             "revision_packet.schema.json",
             "gate.schema.json",
             "style_bible.schema.json",
@@ -869,8 +1182,17 @@ class NovelPipelineRunner:
             except Exception:
                 self.validation_warnings = []
 
-    def _should_run_seam_polish(self, cycle: int) -> bool:
-        return cycle >= self.cfg.max_cycles
+    def _starting_cycle(self) -> int:
+        if self.cfg.add_cycles > 0:
+            return self.cfg.base_completed_cycles + 1
+        return 1
+
+    def _is_global_only_final_cycle(self, cycle: int) -> bool:
+        return bool(
+            self.cfg.final_cycle_global_only
+            and self.cfg.max_cycles > 1
+            and cycle == self.cfg.max_cycles
+        )
 
     def _cross_chapter_audit_rel(self, cycle: int) -> str:
         return f"reviews/cycle_{self._cpad(cycle)}/cross_chapter_audit.json"
@@ -950,7 +1272,18 @@ class NovelPipelineRunner:
                 },
                 "dry_run": self.cfg.dry_run,
                 "validation_mode": self.cfg.validation_mode,
+                "outline_review_cycles": self.cfg.outline_review_cycles,
+                "final_cycle_global_only": self.cfg.final_cycle_global_only,
+                "skip_outline_review": self.cfg.skip_outline_review,
                 "skip_cross_chapter_audit": self.cfg.skip_cross_chapter_audit,
+                "skip_local_window_audit": self.cfg.skip_local_window_audit,
+                "require_local_window_for_revision": (
+                    self.cfg.require_local_window_for_revision
+                ),
+                "local_window_size": self.cfg.local_window_size,
+                "local_window_overlap": self.cfg.local_window_overlap,
+                "add_cycles": self.cfg.add_cycles,
+                "base_completed_cycles": self.cfg.base_completed_cycles,
             },
         )
 
@@ -3018,85 +3351,613 @@ class NovelPipelineRunner:
         )
         self._write_text("premise/premise_brainstorming.md", content)
 
-    def _run_outline_stage(self) -> None:
-        existing_outline_ready = (
-            (self.run_dir / "outline" / "outline.md").is_file()
-            and (self.run_dir / "outline" / "chapter_specs.jsonl").is_file()
-            and (self.run_dir / "outline" / "scene_plan.tsv").is_file()
-            and (self.run_dir / "outline" / "style_bible.json").is_file()
-            and (self.run_dir / "outline" / "continuity_sheet.json").is_file()
-            and (self.run_dir / "outline" / "title.txt").is_file()
-        )
-        if existing_outline_ready:
-            outline_outputs = [
-                self.run_dir / "outline" / "outline.md",
-                self.run_dir / "outline" / "chapter_specs.jsonl",
-                self.run_dir / "outline" / "scene_plan.tsv",
-                self.run_dir / "outline" / "style_bible.json",
-                self.run_dir / "outline" / "continuity_sheet.json",
-                self.run_dir / "outline" / "title.txt",
-            ]
-            outline_inputs = [
-                self.run_dir / "input" / "premise.txt",
-                self.run_dir / "config" / "constitution.md",
-                self.run_dir / "config" / "prompts" / "outline_prompt.md",
-            ]
-            if not self._artifacts_fresh_against_inputs(outline_outputs, outline_inputs):
-                self._log("outline_resume_stale reason=input_newer_than_outline; rerunning outline stage")
-            else:
-                try:
-                    self.chapter_specs = self._load_and_validate_chapter_specs()
-                    self._validate_scene_plan()
-                    self.style_bible = self._load_and_validate_style_bible()
-                    self._validate_continuity_sheet()
-                    self._ensure_outline_continuity_snapshot()
-                    self.novel_title = self._load_title()
-                    self._write_chapter_spec_files()
-                    self._build_static_story_context()
-                    self._log(
-                        f"outline_resume_complete chapters={len(self.chapter_specs)} title={self.novel_title!r}"
-                    )
-                    return
-                except PipelineError as exc:
-                    self._log(
-                        f"outline_resume_invalid reason={exc}; rerunning outline stage"
-                    )
+    def _set_precycle_stage_entry(
+        self,
+        stage_key: str,
+        stage_status: str,
+        *,
+        required: bool = True,
+        reason: str | None = None,
+        outputs: list[str] | None = None,
+        units: dict[str, Any] | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        entry: dict[str, Any] = {
+            "status": stage_status,
+            "required": required,
+        }
+        if reason:
+            entry["reason"] = reason
+        if outputs:
+            entry["outputs"] = outputs
+        if units is not None:
+            entry["units"] = units
+        if extra:
+            entry.update(extra)
+        self._precycle_stage_entries[stage_key] = entry
 
-        prompt = self._render_prompt("outline_prompt.md", {})
-        job = self._make_job(
-            job_id="outline",
-            stage="outline",
+    def _build_outline_review_job(
+        self,
+        cycle_num: int,
+        validation_error: str | None = None,
+        retry_attempt: int = 0,
+    ) -> JobSpec:
+        review_rel = self._outline_review_rel(cycle_num)
+        prompt = self._render_prompt(
+            "outline_review_prompt.md",
+            {
+                "OUTLINE_REVIEW_CYCLE": str(cycle_num),
+                "OUTLINE_REVIEW_OUTPUT_FILE": review_rel,
+            },
+        )
+        if validation_error:
+            safe_error = " ".join(str(validation_error).split())
+            prompt += (
+                "\n\nValidator feedback from previous attempt:\n"
+                f"- {safe_error}\n"
+                "Regenerate the full outline review JSON so it satisfies the contract exactly.\n"
+            )
+        retry_suffix = f"_retry_{retry_attempt}" if retry_attempt > 0 else ""
+        return self._make_job(
+            job_id=f"outline_review_cycle_{self._cpad(cycle_num)}{retry_suffix}",
+            stage="outline_review",
             stage_group="outline",
             cycle=0,
             chapter_id=None,
             allowed_inputs=[
                 "input/premise.txt",
+                *self._outline_core_output_rels(),
                 "config/constitution.md",
-                "config/prompts/outline_prompt.md",
+                "config/prompts/outline_review_prompt.md",
             ],
-            required_outputs=[
-                "outline/outline.md",
-                "outline/chapter_specs.jsonl",
-                "outline/scene_plan.tsv",
-                "outline/style_bible.json",
-                "outline/continuity_sheet.json",
-                "outline/title.txt",
-            ],
+            required_outputs=[review_rel],
             prompt_text=prompt,
         )
-        self._run_job(job)
-        self.chapter_specs = self._load_and_validate_chapter_specs()
-        self._validate_scene_plan()
-        self.style_bible = self._load_and_validate_style_bible()
-        self._validate_continuity_sheet()
+
+    def _build_outline_revision_job(
+        self,
+        cycle_num: int,
+        review_rel: str,
+        validation_error: str | None = None,
+        retry_attempt: int = 0,
+    ) -> JobSpec:
+        prompt = self._render_prompt(
+            "outline_revision_prompt.md",
+            {
+                "OUTLINE_REVIEW_CYCLE": str(cycle_num),
+                "OUTLINE_REVIEW_FILE": review_rel,
+                "OUTLINE_FILE": "outline/outline.md",
+                "CHAPTER_SPECS_FILE": "outline/chapter_specs.jsonl",
+                "SCENE_PLAN_FILE": "outline/scene_plan.tsv",
+                "STYLE_BIBLE_FILE": "outline/style_bible.json",
+                "CONTINUITY_SHEET_FILE": "outline/continuity_sheet.json",
+                "TITLE_FILE": "outline/title.txt",
+            },
+        )
+        if validation_error:
+            safe_error = " ".join(str(validation_error).split())
+            prompt += (
+                "\n\nValidator feedback from previous attempt:\n"
+                f"- {safe_error}\n"
+                "Regenerate the canonical outline artifacts so they validate together.\n"
+            )
+        retry_suffix = f"_retry_{retry_attempt}" if retry_attempt > 0 else ""
+        return self._make_job(
+            job_id=f"outline_revision_cycle_{self._cpad(cycle_num)}{retry_suffix}",
+            stage="outline_revision",
+            stage_group="outline",
+            cycle=0,
+            chapter_id=None,
+            allowed_inputs=[
+                "input/premise.txt",
+                review_rel,
+                *self._outline_core_output_rels(),
+                "config/constitution.md",
+                "config/prompts/outline_revision_prompt.md",
+            ],
+            required_outputs=self._outline_core_output_rels(),
+            prompt_text=prompt,
+        )
+
+    def _build_spatial_layout_job(
+        self,
+        validation_error: str | None = None,
+        retry_attempt: int = 0,
+    ) -> JobSpec:
+        layout_rel = self._spatial_layout_rel()
+        prompt = self._render_prompt(
+            "spatial_layout_prompt.md",
+            {
+                "SPATIAL_LAYOUT_FILE": layout_rel,
+            },
+        )
+        if validation_error:
+            safe_error = " ".join(str(validation_error).split())
+            prompt += (
+                "\n\nValidator feedback from previous attempt:\n"
+                f"- {safe_error}\n"
+                "Regenerate the spatial layout JSON so it satisfies the contract exactly.\n"
+            )
+        retry_suffix = f"_retry_{retry_attempt}" if retry_attempt > 0 else ""
+        return self._make_job(
+            job_id=f"spatial_layout{retry_suffix}",
+            stage="spatial_layout",
+            stage_group="outline",
+            cycle=0,
+            chapter_id=None,
+            allowed_inputs=[
+                "input/premise.txt",
+                *self._outline_core_output_rels(),
+                "config/constitution.md",
+                "config/prompts/spatial_layout_prompt.md",
+            ],
+            required_outputs=[layout_rel],
+            prompt_text=prompt,
+        )
+
+    def _run_outline_review_cycle(self, cycle_num: int) -> str:
+        review_rel = self._outline_review_rel(cycle_num)
+        review_path = self.run_dir / review_rel
+        chapter_ids = {spec.chapter_id for spec in self.chapter_specs}
+        self._materialize_output_alias(
+            base_dir=self.run_dir,
+            required_rel=review_rel,
+            stage="outline_review",
+            cycle=None,
+            chapter_id=None,
+        )
+        if review_path.is_file():
+            try:
+                self._load_repaired_outline_review(review_rel, cycle_num, chapter_ids)
+                if self._artifact_fresh_against_inputs(
+                    review_path, self._outline_review_input_paths()
+                ):
+                    self._log(
+                        f"outline_review_resume cycle={self._cpad(cycle_num)} status=reused"
+                    )
+                    return "reused"
+                self._log(
+                    f"outline_review_resume_stale cycle={self._cpad(cycle_num)} "
+                    "reason=input_newer_than_review"
+                )
+            except PipelineError as exc:
+                self._log(
+                    f"outline_review_resume_invalid cycle={self._cpad(cycle_num)} reason={exc}"
+                )
+
+        attempts = 0
+        validation_error: str | None = None
+        while True:
+            job = self._build_outline_review_job(
+                cycle_num,
+                validation_error=validation_error,
+                retry_attempt=attempts,
+            )
+            self._run_job(job)
+            try:
+                self._load_repaired_outline_review(review_rel, cycle_num, chapter_ids)
+                self._log(f"outline_review_complete cycle={self._cpad(cycle_num)}")
+                return "complete"
+            except PipelineError as exc:
+                if attempts >= OUTLINE_REVIEW_VALIDATION_RETRY_MAX:
+                    raise
+                attempts += 1
+                validation_error = str(exc)
+                self._log(
+                    f"outline_review_validation_retry cycle={self._cpad(cycle_num)} "
+                    f"attempt={attempts}/{OUTLINE_REVIEW_VALIDATION_RETRY_MAX} reason={exc}"
+                )
+
+    def _run_outline_revision_cycle(self, cycle_num: int) -> str:
+        review_rel = self._outline_review_rel(cycle_num)
+        record_rel = self._outline_revision_record_rel(cycle_num)
+        record_path = self.run_dir / record_rel
+        chapter_ids = {spec.chapter_id for spec in self.chapter_specs}
+        if record_path.is_file():
+            try:
+                self._load_repaired_outline_review(review_rel, cycle_num, chapter_ids)
+                record_data = self._read_json(record_rel)
+                self._validate_outline_revision_record(record_data, cycle_num, record_rel)
+                record_inputs = [
+                    self.run_dir / "input" / "premise.txt",
+                    self.run_dir / "config" / "constitution.md",
+                    self.run_dir / "config" / "prompts" / "outline_review_prompt.md",
+                    self.run_dir / "config" / "prompts" / "outline_revision_prompt.md",
+                    self.run_dir / review_rel,
+                ]
+                if (
+                    self._artifact_fresh_against_inputs(record_path, record_inputs)
+                    and self._outline_revision_record_matches_current_outputs(record_data)
+                ):
+                    self._load_current_outline_state(refresh_snapshots=False)
+                    self._sync_continuity_sheet_spatial_reference()
+                    self._log(
+                        f"outline_revision_resume cycle={self._cpad(cycle_num)} status=reused"
+                    )
+                    return "reused"
+                self._log(
+                    f"outline_revision_resume_stale cycle={self._cpad(cycle_num)} "
+                    "reason=record_or_outputs_stale"
+                )
+            except PipelineError as exc:
+                self._log(
+                    f"outline_revision_resume_invalid cycle={self._cpad(cycle_num)} "
+                    f"reason={exc}"
+                )
+
+        self._ensure_outline_pre_revision_snapshot(cycle_num)
+        attempts = 0
+        validation_error: str | None = None
+        while True:
+            job = self._build_outline_revision_job(
+                cycle_num,
+                review_rel,
+                validation_error=validation_error,
+                retry_attempt=attempts,
+            )
+            self._run_job(job)
+            try:
+                self._load_current_outline_state(refresh_snapshots=False)
+                self._sync_continuity_sheet_spatial_reference()
+                self._validate_continuity_sheet()
+                self._write_json(
+                    record_rel, self._outline_revision_record_payload(cycle_num, review_rel)
+                )
+                self._log(f"outline_revision_complete cycle={self._cpad(cycle_num)}")
+                return "complete"
+            except PipelineError as exc:
+                if attempts >= OUTLINE_REVISION_VALIDATION_RETRY_MAX:
+                    raise
+                attempts += 1
+                validation_error = str(exc)
+                self._log(
+                    f"outline_revision_validation_retry cycle={self._cpad(cycle_num)} "
+                    f"attempt={attempts}/{OUTLINE_REVISION_VALIDATION_RETRY_MAX} reason={exc}"
+                )
+
+    def _run_spatial_layout_stage(self) -> str:
+        layout_rel = self._spatial_layout_rel()
+        layout_path = self.run_dir / layout_rel
+        self._materialize_output_alias(
+            base_dir=self.run_dir,
+            required_rel=layout_rel,
+            stage="spatial_layout",
+            cycle=None,
+            chapter_id=None,
+        )
+        if layout_path.is_file():
+            try:
+                data = self._load_repaired_spatial_layout(layout_rel)
+                layout_inputs = [
+                    self.run_dir / "input" / "premise.txt",
+                    *self._outline_core_output_paths(),
+                    self.run_dir / "config" / "constitution.md",
+                    self.run_dir / "config" / "prompts" / "spatial_layout_prompt.md",
+                ]
+                if self._artifact_fresh_against_inputs(layout_path, layout_inputs):
+                    self.spatial_layout = data
+                    self._sync_continuity_sheet_spatial_reference()
+                    self._log("spatial_layout_resume status=reused")
+                    return "reused"
+                self._log("spatial_layout_resume_stale reason=input_newer_than_layout")
+            except PipelineError as exc:
+                self._log(f"spatial_layout_resume_invalid reason={exc}")
+
+        attempts = 0
+        validation_error: str | None = None
+        while True:
+            job = self._build_spatial_layout_job(
+                validation_error=validation_error,
+                retry_attempt=attempts,
+            )
+            self._run_job(job)
+            try:
+                self.spatial_layout = self._load_repaired_spatial_layout(layout_rel)
+                self._sync_continuity_sheet_spatial_reference()
+                self._log("spatial_layout_complete")
+                return "complete"
+            except PipelineError as exc:
+                if attempts >= SPATIAL_LAYOUT_VALIDATION_RETRY_MAX:
+                    raise
+                attempts += 1
+                validation_error = str(exc)
+                self._log(
+                    "spatial_layout_validation_retry "
+                    f"attempt={attempts}/{SPATIAL_LAYOUT_VALIDATION_RETRY_MAX} reason={exc}"
+                )
+
+    def _reuse_outline_review_and_revision_cycle_if_available(self, cycle_num: int) -> bool:
+        review_rel = self._outline_review_rel(cycle_num)
+        record_rel = self._outline_revision_record_rel(cycle_num)
+        record_path = self.run_dir / record_rel
+        chapter_ids = {spec.chapter_id for spec in self.chapter_specs}
+        if not record_path.is_file():
+            return False
+        try:
+            self._materialize_output_alias(
+                base_dir=self.run_dir,
+                required_rel=review_rel,
+                stage="outline_review",
+                cycle=None,
+                chapter_id=None,
+            )
+            self._load_repaired_outline_review(review_rel, cycle_num, chapter_ids)
+            record_data = self._read_json(record_rel)
+            self._validate_outline_revision_record(record_data, cycle_num, record_rel)
+            record_inputs = [
+                self.run_dir / "input" / "premise.txt",
+                self.run_dir / "config" / "constitution.md",
+                self.run_dir / "config" / "prompts" / "outline_review_prompt.md",
+                self.run_dir / "config" / "prompts" / "outline_revision_prompt.md",
+                self.run_dir / review_rel,
+            ]
+            if not (
+                self._artifact_fresh_against_inputs(record_path, record_inputs)
+                and self._outline_revision_record_matches_current_outputs(record_data)
+            ):
+                return False
+            self._load_current_outline_state(refresh_snapshots=False)
+            self._sync_continuity_sheet_spatial_reference()
+            self._log(
+                f"outline_review_revision_resume cycle={self._cpad(cycle_num)} status=reused"
+            )
+            return True
+        except PipelineError as exc:
+            self._log(
+                f"outline_review_revision_resume_invalid cycle={self._cpad(cycle_num)} "
+                f"reason={exc}"
+            )
+            return False
+
+    def _run_outline_stage(self) -> None:
+        self._precycle_stage_entries = {}
+        if self._add_cycles_mode():
+            self._run_outline_stage_add_cycles()
+            return
+        existing_outline_ready = all(path.is_file() for path in self._outline_core_output_paths())
+        if existing_outline_ready:
+            outline_inputs = [
+                self.run_dir / "input" / "premise.txt",
+                self.run_dir / "config" / "constitution.md",
+                self.run_dir / "config" / "prompts" / "outline_prompt.md",
+            ]
+            if not self._artifacts_fresh_against_inputs(
+                self._outline_core_output_paths(), outline_inputs
+            ):
+                self._log(
+                    "outline_resume_stale reason=input_newer_than_outline; rerunning outline stage"
+                )
+            else:
+                try:
+                    self._load_current_outline_state(refresh_snapshots=False)
+                    self._sync_continuity_sheet_spatial_reference()
+                    self._log(
+                        f"outline_resume_complete chapters={len(self.chapter_specs)} "
+                        f"title={self.novel_title!r}"
+                    )
+                except PipelineError as exc:
+                    self.chapter_specs = []
+                    self.style_bible = {}
+                    self.novel_title = ""
+                    self._log(f"outline_resume_invalid reason={exc}; rerunning outline stage")
+                else:
+                    existing_outline_ready = True
+        if not existing_outline_ready or not self.chapter_specs:
+            prompt = self._render_prompt("outline_prompt.md", {})
+            job = self._make_job(
+                job_id="outline",
+                stage="outline",
+                stage_group="outline",
+                cycle=0,
+                chapter_id=None,
+                allowed_inputs=[
+                    "input/premise.txt",
+                    "config/constitution.md",
+                    "config/prompts/outline_prompt.md",
+                ],
+                required_outputs=self._outline_core_output_rels(),
+                prompt_text=prompt,
+            )
+            self._run_job(job)
+            self._load_current_outline_state(refresh_snapshots=False)
+            self._sync_continuity_sheet_spatial_reference()
+            self._log(
+                f"outline_complete chapters={len(self.chapter_specs)} title={self.novel_title!r}"
+            )
+
+        outline_review_outputs: list[str] = []
+        outline_review_units: dict[str, Any] = {}
+        outline_revision_outputs: list[str] = []
+        outline_revision_units: dict[str, Any] = {}
+
+        if self.cfg.skip_outline_review:
+            self._set_precycle_stage_entry(
+                "outline_review",
+                "skipped",
+                required=False,
+                reason="config_skip_outline_review",
+                units={},
+            )
+            self._set_precycle_stage_entry(
+                "outline_revision",
+                "skipped",
+                required=False,
+                reason="config_skip_outline_review",
+                units={},
+            )
+        else:
+            for cycle_num in range(1, self.cfg.outline_review_cycles + 1):
+                cycle_key = self._cpad(cycle_num)
+                review_rel = self._outline_review_rel(cycle_num)
+                revision_rel = self._outline_revision_record_rel(cycle_num)
+                if self._reuse_outline_review_and_revision_cycle_if_available(cycle_num):
+                    review_status = "reused"
+                    revision_status = "reused"
+                else:
+                    review_status = self._run_outline_review_cycle(cycle_num)
+                    revision_status = self._run_outline_revision_cycle(cycle_num)
+                outline_review_outputs.append(review_rel)
+                outline_review_units[f"cycle_{cycle_key}"] = {
+                    "status": review_status,
+                    "output": review_rel,
+                }
+                outline_revision_outputs.append(revision_rel)
+                outline_revision_units[f"cycle_{cycle_key}"] = {
+                    "status": revision_status,
+                    "output": revision_rel,
+                }
+
+            outline_review_stage_status = (
+                "reused"
+                if outline_review_units
+                and all(row.get("status") == "reused" for row in outline_review_units.values())
+                else "complete"
+            )
+            outline_revision_stage_status = (
+                "reused"
+                if outline_revision_units
+                and all(
+                    row.get("status") == "reused" for row in outline_revision_units.values()
+                )
+                else "complete"
+            )
+            self._set_precycle_stage_entry(
+                "outline_review",
+                outline_review_stage_status,
+                outputs=outline_review_outputs,
+                units=outline_review_units,
+                extra={"review_cycles": self.cfg.outline_review_cycles},
+            )
+            self._set_precycle_stage_entry(
+                "outline_revision",
+                outline_revision_stage_status,
+                outputs=outline_revision_outputs,
+                units=outline_revision_units,
+                extra={"review_cycles": self.cfg.outline_review_cycles},
+            )
+
+        spatial_layout_status = self._run_spatial_layout_stage()
+        self._set_precycle_stage_entry(
+            "spatial_layout",
+            spatial_layout_status,
+            outputs=[self._spatial_layout_rel()],
+        )
+
         self._ensure_outline_continuity_snapshot()
-        self.novel_title = self._load_title()
         self._write_chapter_spec_files()
         self._build_static_story_context()
-        self._log(f"outline_complete chapters={len(self.chapter_specs)} title={self.novel_title!r}")
+
+    def _run_outline_stage_add_cycles(self) -> None:
+        existing_outline_ready = all(path.is_file() for path in self._outline_core_output_paths())
+        if not existing_outline_ready:
+            raise PipelineError(
+                "--add-cycles requires existing outline artifacts in run-dir; missing canonical outline outputs"
+            )
+        self._load_current_outline_state(refresh_snapshots=False)
+        self._log(
+            f"outline_resume_complete chapters={len(self.chapter_specs)} title={self.novel_title!r}"
+        )
+
+        if self.cfg.skip_outline_review:
+            self._set_precycle_stage_entry(
+                "outline_review",
+                "skipped",
+                required=False,
+                reason="config_skip_outline_review",
+                units={},
+            )
+            self._set_precycle_stage_entry(
+                "outline_revision",
+                "skipped",
+                required=False,
+                reason="config_skip_outline_review",
+                units={},
+            )
+        else:
+            chapter_ids = {spec.chapter_id for spec in self.chapter_specs}
+            outline_review_outputs: list[str] = []
+            outline_review_units: dict[str, Any] = {}
+            outline_revision_outputs: list[str] = []
+            outline_revision_units: dict[str, Any] = {}
+            for cycle_num in range(1, self.cfg.outline_review_cycles + 1):
+                cycle_key = self._cpad(cycle_num)
+                review_rel = self._outline_review_rel(cycle_num)
+                revision_rel = self._outline_revision_record_rel(cycle_num)
+                if not (self.run_dir / review_rel).is_file():
+                    raise PipelineError(
+                        f"--add-cycles requires existing {review_rel}; rerunning outline review is disabled in additive mode"
+                    )
+                self._load_repaired_outline_review(review_rel, cycle_num, chapter_ids)
+                outline_review_outputs.append(review_rel)
+                outline_review_units[f"cycle_{cycle_key}"] = {
+                    "status": "reused",
+                    "output": review_rel,
+                }
+                if not (self.run_dir / revision_rel).is_file():
+                    raise PipelineError(
+                        f"--add-cycles requires existing {revision_rel}; rerunning outline revision is disabled in additive mode"
+                    )
+                record_data = self._read_json(revision_rel)
+                self._validate_outline_revision_record(record_data, cycle_num, revision_rel)
+                outline_revision_outputs.append(revision_rel)
+                outline_revision_units[f"cycle_{cycle_key}"] = {
+                    "status": "reused",
+                    "output": revision_rel,
+                }
+
+            self._set_precycle_stage_entry(
+                "outline_review",
+                "reused",
+                outputs=outline_review_outputs,
+                units=outline_review_units,
+                extra={"review_cycles": self.cfg.outline_review_cycles},
+            )
+            self._set_precycle_stage_entry(
+                "outline_revision",
+                "reused",
+                outputs=outline_revision_outputs,
+                units=outline_revision_units,
+                extra={"review_cycles": self.cfg.outline_review_cycles},
+            )
+
+        layout_rel = self._spatial_layout_rel()
+        if not (self.run_dir / layout_rel).is_file():
+            raise PipelineError(
+                f"--add-cycles requires existing {layout_rel}; rerunning spatial layout is disabled in additive mode"
+            )
+        self.spatial_layout = self._load_repaired_spatial_layout(layout_rel)
+        self._sync_continuity_sheet_spatial_reference()
+        self._log("spatial_layout_resume status=reused")
+        self._set_precycle_stage_entry(
+            "spatial_layout",
+            "reused",
+            outputs=[layout_rel],
+        )
+
+        self._ensure_outline_continuity_snapshot()
+        self._write_chapter_spec_files()
+        self._build_static_story_context()
 
     def _run_draft_stage(self) -> None:
+        if self._add_cycles_mode():
+            missing_chapters: list[str] = []
+            for spec in self.chapter_specs:
+                chapter_path = self.run_dir / "chapters" / f"{spec.chapter_id}.md"
+                if not chapter_path.is_file():
+                    missing_chapters.append(spec.chapter_id)
+                    continue
+                self._validate_chapter_heading(chapter_path, spec.chapter_number)
+            if missing_chapters:
+                raise PipelineError(
+                    "--add-cycles requires drafted chapters in run-dir; missing "
+                    + ", ".join(missing_chapters)
+                )
+            self._log("draft_resume_all_chapters_present")
+            self._log("draft_expand_resume_skipped reason=add_cycles_use_current_chapters")
+            self._log("draft_complete")
+            return
         continuity_sheet_file = self._outline_continuity_snapshot_rel()
+        spatial_layout_file = self._spatial_layout_rel()
         jobs: list[JobSpec] = []
         for spec in self.chapter_specs:
             chapter_file = f"chapters/{spec.chapter_id}.md"
@@ -3111,6 +3972,7 @@ class NovelPipelineRunner:
                         self.run_dir / "outline" / "scene_plan.tsv",
                         self.run_dir / "outline" / "static_story_context.json",
                         self.run_dir / "outline" / "style_bible.json",
+                        self.run_dir / spatial_layout_file,
                         self.run_dir / continuity_sheet_file,
                         self.run_dir / chapter_spec_file,
                         self.run_dir / "config" / "constitution.md",
@@ -3132,6 +3994,7 @@ class NovelPipelineRunner:
                         "CHAPTER_NUMBER": str(spec.chapter_number),
                         "CHAPTER_SPEC_FILE": chapter_spec_file,
                         "CHAPTER_OUTPUT_FILE": chapter_file,
+                        "SPATIAL_LAYOUT_FILE": spatial_layout_file,
                         "CONTINUITY_SHEET_FILE": continuity_sheet_file,
                     },
                 )
@@ -3147,6 +4010,7 @@ class NovelPipelineRunner:
                         "outline/scene_plan.tsv",
                         "outline/static_story_context.json",
                         "outline/style_bible.json",
+                        spatial_layout_file,
                         continuity_sheet_file,
                         chapter_spec_file,
                         "config/constitution.md",
@@ -3170,9 +4034,12 @@ class NovelPipelineRunner:
             chapter_path = self.run_dir / "chapters" / f"{spec.chapter_id}.md"
             self._validate_chapter_heading(chapter_path, spec.chapter_number)
             words = self._count_words_file(chapter_path)
-            if words < spec.projected_min_words:
+            expand_trigger_words = spec.projected_min_words * 0.7
+            if words < expand_trigger_words:
                 self._log(
-                    f"draft_expand chapter={spec.chapter_id} words={words} target={spec.projected_min_words}"
+                    "draft_expand "
+                    f"chapter={spec.chapter_id} words={words} "
+                    f"trigger={expand_trigger_words:.1f} projected_min_words={spec.projected_min_words}"
                 )
                 chapter_file = f"chapters/{spec.chapter_id}.md"
                 chapter_spec_file = f"outline/chapter_specs/{spec.chapter_id}.json"
@@ -3184,6 +4051,7 @@ class NovelPipelineRunner:
                         "CHAPTER_INPUT_FILE": chapter_file,
                         "CHAPTER_OUTPUT_FILE": chapter_file,
                         "CHAPTER_SPEC_FILE": chapter_spec_file,
+                        "SPATIAL_LAYOUT_FILE": spatial_layout_file,
                         "CONTINUITY_SHEET_FILE": continuity_sheet_file,
                     },
                 )
@@ -3200,6 +4068,7 @@ class NovelPipelineRunner:
                         "outline/scene_plan.tsv",
                         "outline/static_story_context.json",
                         "outline/style_bible.json",
+                        spatial_layout_file,
                         continuity_sheet_file,
                         "config/constitution.md",
                         "config/prompts/chapter_expand_prompt.md",
@@ -3227,13 +4096,15 @@ class NovelPipelineRunner:
                 )
         self._log("draft_complete")
 
-    def _run_chapter_review_stage(self, cycle: int) -> None:
+    def _run_chapter_review_stage(self, cycle: int) -> dict[str, Any]:
         cpad = self._cpad(cycle)
         continuity_sheet_file = self._ensure_cycle_continuity_snapshot(cycle)
         jobs: list[JobSpec] = []
+        units: dict[str, dict[str, Any]] = {}
         for spec in self.chapter_specs:
             chapter_input = f"snapshots/cycle_{cpad}/chapters/{spec.chapter_id}.md"
             review_output = f"reviews/cycle_{cpad}/{spec.chapter_id}.review.json"
+            chapter_spec_file = f"outline/chapter_specs/{spec.chapter_id}.json"
             self._materialize_output_alias(
                 base_dir=self.run_dir,
                 required_rel=review_output,
@@ -3251,6 +4122,7 @@ class NovelPipelineRunner:
                     )
                     review_inputs = [
                         self.run_dir / chapter_input,
+                        self.run_dir / chapter_spec_file,
                         self.run_dir / f"context/cycle_{cpad}/global_cycle_context.json",
                         self.run_dir / f"context/cycle_{cpad}/boundary/{spec.chapter_id}.boundary.json",
                         self.run_dir / "outline" / "style_bible.json",
@@ -3259,6 +4131,11 @@ class NovelPipelineRunner:
                         self.run_dir / "config" / "prompts" / "chapter_review_prompt.md",
                     ]
                     if self._artifact_fresh_against_inputs(review_path, review_inputs):
+                        units[spec.chapter_id] = {
+                            "status": "reused",
+                            "validated": True,
+                            "fresh": True,
+                        }
                         continue
                 except PipelineError:
                     pass
@@ -3364,7 +4241,24 @@ class NovelPipelineRunner:
                             reason=str(job_exc),
                             action="retry_job_failed_will_retry",
                         )
+            units[spec.chapter_id] = {
+                "status": units.get(spec.chapter_id, {}).get("status", "complete"),
+                "validated": True,
+                "fresh": True,
+            }
         self._log(f"cycle={cpad} chapter_reviews_complete")
+        reused_count = sum(
+            1 for row in units.values() if row.get("status") == "reused"
+        )
+        return {
+            "status": (
+                "reused"
+                if units and reused_count == len(units)
+                else "complete"
+            ),
+            "chapter_count": len(self.chapter_specs),
+            "units": units,
+        }
 
     def _build_chapter_review_job(
         self,
@@ -3376,6 +4270,7 @@ class NovelPipelineRunner:
         cpad = self._cpad(cycle)
         chapter_input = f"snapshots/cycle_{cpad}/chapters/{spec.chapter_id}.md"
         review_output = f"reviews/cycle_{cpad}/{spec.chapter_id}.review.json"
+        chapter_spec_file = f"outline/chapter_specs/{spec.chapter_id}.json"
         global_context_file = f"context/cycle_{cpad}/global_cycle_context.json"
         boundary_context_file = f"context/cycle_{cpad}/boundary/{spec.chapter_id}.boundary.json"
         continuity_sheet_file = self._ensure_cycle_continuity_snapshot(cycle)
@@ -3384,6 +4279,7 @@ class NovelPipelineRunner:
             {
                 "CHAPTER_ID": spec.chapter_id,
                 "CHAPTER_INPUT_FILE": chapter_input,
+                "CHAPTER_SPEC_FILE": chapter_spec_file,
                 "GLOBAL_CYCLE_CONTEXT_FILE": global_context_file,
                 "CHAPTER_BOUNDARY_CONTEXT_FILE": boundary_context_file,
                 "CONTINUITY_SHEET_FILE": continuity_sheet_file,
@@ -3411,6 +4307,7 @@ class NovelPipelineRunner:
             chapter_id=spec.chapter_id,
             allowed_inputs=[
                 chapter_input,
+                chapter_spec_file,
                 global_context_file,
                 boundary_context_file,
                 "outline/style_bible.json",
@@ -3422,15 +4319,18 @@ class NovelPipelineRunner:
             prompt_text=prompt,
         )
 
-    def _run_parallel_full_book_review_stages(self, cycle: int) -> None:
+    def _run_parallel_full_book_review_stages(self, cycle: int) -> dict[str, Any]:
         stage_calls = [("full_award_review", self._run_full_award_review_stage)]
         if not self.cfg.skip_cross_chapter_audit:
             stage_calls.append(("cross_chapter_audit", self._run_cross_chapter_audit_stage))
+        if self._local_window_stage_enabled() and not self.cfg.skip_local_window_audit:
+            stage_calls.append(("local_window_audit", self._run_local_window_audit_stage))
         if len(stage_calls) == 1:
-            stage_calls[0][1](cycle)
-            return
+            stage_name, func = stage_calls[0]
+            return {stage_name: func(cycle)}
 
         failures: list[str] = []
+        results: dict[str, Any] = {}
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(stage_calls)) as executor:
             future_map = {
                 executor.submit(func, cycle): stage_name for stage_name, func in stage_calls
@@ -3438,7 +4338,7 @@ class NovelPipelineRunner:
             for future in concurrent.futures.as_completed(future_map):
                 stage_name = future_map[future]
                 try:
-                    future.result()
+                    results[stage_name] = future.result()
                 except Exception as exc:
                     failures.append(f"{stage_name}: {exc}")
         if failures:
@@ -3446,12 +4346,14 @@ class NovelPipelineRunner:
             raise PipelineError(
                 f"parallel_full_book_review phase had stage failures:\n{joined}"
             )
+        return results
 
-    def _run_full_award_review_stage(self, cycle: int) -> None:
+    def _run_full_award_review_stage(self, cycle: int) -> bool:
         cpad = self._cpad(cycle)
         full_novel_file = f"snapshots/cycle_{cpad}/FINAL_NOVEL.md"
         global_context_file = f"context/cycle_{cpad}/global_cycle_context.json"
         continuity_sheet_file = self._ensure_cycle_continuity_snapshot(cycle)
+        spatial_layout_file = self._spatial_layout_rel()
         output_file = f"reviews/cycle_{cpad}/full_award.review.json"
         self._materialize_output_alias(
             base_dir=self.run_dir,
@@ -3477,13 +4379,14 @@ class NovelPipelineRunner:
                     self.run_dir / full_novel_file,
                     self.run_dir / global_context_file,
                     self.run_dir / "outline" / "style_bible.json",
+                    self.run_dir / spatial_layout_file,
                     self.run_dir / continuity_sheet_file,
                     self.run_dir / "config" / "constitution.md",
                     self.run_dir / "config" / "prompts" / "full_award_review_prompt.md",
                 ]
                 if self._artifact_fresh_against_inputs(output_path, review_inputs):
                     self._log(f"cycle={cpad} full_award_review_resume_present")
-                    return
+                    return True
                 self._log(
                     f"cycle={cpad} full_award_review_resume_stale reason=input_newer_than_review"
                 )
@@ -3612,6 +4515,7 @@ class NovelPipelineRunner:
                         action="retry_job_failed_will_retry",
                     )
         self._log(f"cycle={cpad} full_award_review_complete")
+        return False
 
     def _build_full_award_review_job(
         self,
@@ -3623,6 +4527,7 @@ class NovelPipelineRunner:
         full_novel_file = f"snapshots/cycle_{cpad}/FINAL_NOVEL.md"
         global_context_file = f"context/cycle_{cpad}/global_cycle_context.json"
         continuity_sheet_file = self._ensure_cycle_continuity_snapshot(cycle)
+        spatial_layout_file = self._spatial_layout_rel()
         output_file = f"reviews/cycle_{cpad}/full_award.review.json"
         prompt = self._render_prompt(
             "full_award_review_prompt.md",
@@ -3631,6 +4536,7 @@ class NovelPipelineRunner:
                 "CYCLE_INT": str(cycle),
                 "FULL_NOVEL_FILE": full_novel_file,
                 "GLOBAL_CYCLE_CONTEXT_FILE": global_context_file,
+                "SPATIAL_LAYOUT_FILE": spatial_layout_file,
                 "CONTINUITY_SHEET_FILE": continuity_sheet_file,
                 "FULL_AWARD_OUTPUT_FILE": output_file,
             },
@@ -3658,6 +4564,7 @@ class NovelPipelineRunner:
                 full_novel_file,
                 global_context_file,
                 "outline/style_bible.json",
+                spatial_layout_file,
                 continuity_sheet_file,
                 "config/constitution.md",
                 "config/prompts/full_award_review_prompt.md",
@@ -3666,10 +4573,11 @@ class NovelPipelineRunner:
             prompt_text=prompt,
         )
 
-    def _run_cross_chapter_audit_stage(self, cycle: int) -> None:
+    def _run_cross_chapter_audit_stage(self, cycle: int) -> bool:
         cpad = self._cpad(cycle)
         full_novel_file = f"snapshots/cycle_{cpad}/FINAL_NOVEL.md"
         continuity_sheet_file = self._ensure_cycle_continuity_snapshot(cycle)
+        spatial_layout_file = self._spatial_layout_rel()
         output_file = self._cross_chapter_audit_rel(cycle)
         self._materialize_output_alias(
             base_dir=self.run_dir,
@@ -3700,13 +4608,14 @@ class NovelPipelineRunner:
                     self.run_dir / continuity_sheet_file,
                     self.run_dir / "outline" / "style_bible.json",
                     self.run_dir / "outline" / "outline.md",
+                    self.run_dir / spatial_layout_file,
                     self.run_dir / "config" / "constitution.md",
                     self.run_dir / "config" / "prompts" / "cross_chapter_audit_prompt.md",
                 ]
                 if self._artifact_fresh_against_inputs(output_path, audit_inputs):
                     self._log(f"cycle={cpad} cross_chapter_audit_resume_present")
                     self._log_cross_chapter_audit_convergence(cycle, data)
-                    return
+                    return True
                 self._log(
                     f"cycle={cpad} cross_chapter_audit_resume_stale reason=input_newer_than_audit"
                 )
@@ -3766,7 +4675,6 @@ class NovelPipelineRunner:
                     output_file,
                     full_novel_file,
                 )
-                self._log_cross_chapter_audit_convergence(cycle, data)
                 break
             except PipelineError as exc:
                 if attempts >= CROSS_CHAPTER_AUDIT_VALIDATION_RETRY_MAX:
@@ -3827,7 +4735,9 @@ class NovelPipelineRunner:
                         reason=str(job_exc),
                         action="retry_job_failed_will_retry",
                     )
+        self._log_cross_chapter_audit_convergence(cycle, data)
         self._log(f"cycle={cpad} cross_chapter_audit_complete")
+        return False
 
     def _build_cross_chapter_audit_job(
         self,
@@ -3838,6 +4748,7 @@ class NovelPipelineRunner:
         cpad = self._cpad(cycle)
         full_novel_file = f"snapshots/cycle_{cpad}/FINAL_NOVEL.md"
         continuity_sheet_file = self._ensure_cycle_continuity_snapshot(cycle)
+        spatial_layout_file = self._spatial_layout_rel()
         output_file = self._cross_chapter_audit_rel(cycle)
         prompt = self._render_prompt(
             "cross_chapter_audit_prompt.md",
@@ -3845,6 +4756,7 @@ class NovelPipelineRunner:
                 "CYCLE_PADDED": cpad,
                 "CYCLE_INT": str(cycle),
                 "FULL_NOVEL_FILE": full_novel_file,
+                "SPATIAL_LAYOUT_FILE": spatial_layout_file,
                 "CONTINUITY_SHEET_FILE": continuity_sheet_file,
                 "CROSS_CHAPTER_AUDIT_FILE": output_file,
             },
@@ -3873,8 +4785,337 @@ class NovelPipelineRunner:
                 continuity_sheet_file,
                 "outline/style_bible.json",
                 "outline/outline.md",
+                spatial_layout_file,
                 "config/constitution.md",
                 "config/prompts/cross_chapter_audit_prompt.md",
+            ],
+            required_outputs=[output_file],
+            prompt_text=prompt,
+        )
+
+    def _window_id_for_chapters(self, chapters_reviewed: list[str]) -> str:
+        windows = self._compute_windows(
+            [spec.chapter_id for spec in self.chapter_specs],
+            self.cfg.local_window_size,
+            self.cfg.local_window_overlap,
+        )
+        for idx, candidate in enumerate(windows, start=1):
+            if candidate == chapters_reviewed:
+                return self._window_id_for_index(idx)
+        raise PipelineError(
+            "window chapters do not match configured local-window layout: "
+            + ", ".join(chapters_reviewed)
+        )
+
+    def _validate_local_window_window_output(
+        self,
+        data: dict[str, Any],
+        *,
+        rel: str,
+        window_id: str,
+        chapters_reviewed: list[str],
+    ) -> None:
+        actual_window_id = str(data.get("window_id", "")).strip()
+        if actual_window_id != window_id:
+            raise PipelineError(f"{rel} window_id mismatch (expected {window_id})")
+        actual_chapters = [
+            str(chapter_id).strip()
+            for chapter_id in data.get("chapters_reviewed", [])
+            if str(chapter_id).strip()
+        ]
+        if actual_chapters != chapters_reviewed:
+            raise PipelineError(
+                f"{rel} chapters_reviewed mismatch (expected {chapters_reviewed})"
+            )
+
+    def _run_local_window_audit_stage(self, cycle: int) -> dict[str, Any]:
+        windows = self._compute_windows(
+            [spec.chapter_id for spec in self.chapter_specs],
+            self.cfg.local_window_size,
+            self.cfg.local_window_overlap,
+        )
+        if not windows:
+            return {
+                "status": "skipped",
+                "reason": "insufficient_chapters",
+                "units": {},
+                "window_count": 0,
+            }
+
+        cpad = self._cpad(cycle)
+        units: dict[str, dict[str, Any]] = {}
+        jobs: list[JobSpec] = []
+        blocking = self._local_window_stage_required()
+
+        try:
+            chapter_line_index = self._read_json(self._chapter_line_index_rel(cycle))
+
+            for window in windows:
+                window_id = self._window_id_for_chapters(window)
+                state = self._local_window_audit_unit_state(cycle, window_id, window)
+                if state["status"] == "reused":
+                    state["chapters_reviewed"] = list(window)
+                    units[window_id] = state
+                    continue
+                units[window_id] = {
+                    "status": state["status"],
+                    "validated": bool(state.get("validated", False)),
+                    "fresh": bool(state.get("fresh", False)),
+                    "artifact": self._local_window_audit_rel(cycle, window_id),
+                    "chapter_count": len(window),
+                    "chapters_reviewed": list(window),
+                }
+                if state.get("reason"):
+                    units[window_id]["reason"] = state["reason"]
+                jobs.append(
+                    self._build_local_window_audit_job(
+                        cycle,
+                        window,
+                        chapter_line_index,
+                    )
+                )
+        except PipelineError as exc:
+            if blocking:
+                raise
+            self._record_validation_warning(
+                stage="local_window_audit",
+                cycle=cycle,
+                chapter_id=None,
+                artifact=f"reviews/cycle_{cpad}",
+                reason=str(exc),
+                action="continued_after_local_window_setup_failure",
+            )
+            return {
+                "status": "failed",
+                "reason": "setup_failed_nonblocking",
+                "units": units,
+                "window_count": len(windows),
+            }
+
+        if jobs:
+            try:
+                self._run_jobs_parallel(
+                    jobs,
+                    self.cfg.max_parallel_reviews,
+                    f"local_window_cycle_{cpad}",
+                )
+            except PipelineError as exc:
+                if self._local_window_stage_required():
+                    raise
+                self._record_validation_warning(
+                    stage="local_window_audit",
+                    cycle=cycle,
+                    chapter_id=None,
+                    artifact=f"reviews/cycle_{cpad}",
+                    reason=str(exc),
+                    action="continued_after_parallel_local_window_failure",
+                )
+        else:
+            self._log(f"cycle={cpad} local_window_resume_all_windows_present")
+
+        all_reused = True
+        all_complete = True
+        any_complete = False
+
+        for window in windows:
+            window_id = self._window_id_for_chapters(window)
+            rel = self._local_window_audit_rel(cycle, window_id)
+            attempts = 0
+            while True:
+                try:
+                    self._materialize_output_alias(
+                        base_dir=self.run_dir,
+                        required_rel=rel,
+                        stage="local_window_audit",
+                        cycle=cycle,
+                        chapter_id=None,
+                    )
+                    data = self._load_repaired_local_window_audit(
+                        rel,
+                        cycle,
+                        {spec.chapter_id for spec in self.chapter_specs},
+                        f"snapshots/cycle_{cpad}/FINAL_NOVEL.md",
+                    )
+                    self._validate_local_window_window_output(
+                        data,
+                        rel=rel,
+                        window_id=window_id,
+                        chapters_reviewed=window,
+                    )
+                    units[window_id] = {
+                        "status": (
+                            "reused"
+                            if units.get(window_id, {}).get("status") == "reused"
+                            else "complete"
+                        ),
+                        "validated": True,
+                        "fresh": True,
+                        "artifact": rel,
+                        "chapter_count": len(window),
+                        "chapters_reviewed": list(window),
+                    }
+                    any_complete = True
+                    break
+                except PipelineError as exc:
+                    if attempts >= LOCAL_WINDOW_AUDIT_VALIDATION_RETRY_MAX:
+                        if blocking:
+                            raise
+                        units[window_id] = {
+                            "status": "failed",
+                            "validated": False,
+                            "fresh": False,
+                            "artifact": rel,
+                            "chapter_count": len(window),
+                            "chapters_reviewed": list(window),
+                            "reason": str(exc),
+                        }
+                        all_complete = False
+                        all_reused = False
+                        self._record_validation_warning(
+                            stage="local_window_audit",
+                            cycle=cycle,
+                            chapter_id=None,
+                            artifact=rel,
+                            reason=str(exc),
+                            action="left_invalid_local_window_artifact",
+                        )
+                        break
+                    attempts += 1
+                    self._log(
+                        "cycle="
+                        f"{cpad} local_window_validation_retry window={window_id} "
+                        f"attempt={attempts}/{LOCAL_WINDOW_AUDIT_VALIDATION_RETRY_MAX} reason={exc}"
+                    )
+                    retry_job = self._build_local_window_audit_job(
+                        cycle,
+                        window,
+                        chapter_line_index,
+                        validation_error=str(exc),
+                        retry_attempt=attempts,
+                    )
+                    try:
+                        self._run_job(retry_job)
+                    except PipelineError as job_exc:
+                        if attempts >= LOCAL_WINDOW_AUDIT_VALIDATION_RETRY_MAX:
+                            if blocking:
+                                raise
+                            units[window_id] = {
+                                "status": "failed",
+                                "validated": False,
+                                "fresh": False,
+                                "artifact": rel,
+                                "chapter_count": len(window),
+                                "chapters_reviewed": list(window),
+                                "reason": str(job_exc),
+                            }
+                            all_complete = False
+                            all_reused = False
+                            self._record_validation_warning(
+                                stage="local_window_audit",
+                                cycle=cycle,
+                                chapter_id=None,
+                                artifact=rel,
+                                reason=str(job_exc),
+                                action="left_invalid_local_window_artifact_after_retry_job_failure",
+                            )
+                            break
+                        self._record_validation_warning(
+                            stage="local_window_audit",
+                            cycle=cycle,
+                            chapter_id=None,
+                            artifact=rel,
+                            reason=str(job_exc),
+                            action="retry_local_window_job_failed_will_retry",
+                        )
+            window_status = str(units.get(window_id, {}).get("status", "")).strip()
+            if window_status != "reused":
+                all_reused = False
+            if window_status not in {"reused", "complete"}:
+                all_complete = False
+
+        if all_reused:
+            status = "reused"
+            reason = None
+        elif all_complete:
+            status = "complete"
+            reason = None
+        elif any_complete:
+            status = "partial"
+            reason = "nonblocking_windows_missing_or_invalid"
+        else:
+            status = "failed"
+            reason = "nonblocking_windows_missing_or_invalid"
+        self._log(f"cycle={cpad} local_window_audit_complete status={status}")
+        result = {
+            "status": status,
+            "units": units,
+            "window_count": len(windows),
+        }
+        if reason:
+            result["reason"] = reason
+        return result
+
+    def _build_local_window_audit_job(
+        self,
+        cycle: int,
+        window: list[str],
+        chapter_line_index: dict[str, dict[str, int]],
+        validation_error: str | None = None,
+        retry_attempt: int = 0,
+    ) -> JobSpec:
+        del chapter_line_index
+        cpad = self._cpad(cycle)
+        window_id = self._window_id_for_chapters(window)
+        full_novel_file = f"snapshots/cycle_{cpad}/FINAL_NOVEL.md"
+        chapter_line_index_file = self._chapter_line_index_rel(cycle)
+        continuity_sheet_file = self._ensure_cycle_continuity_snapshot(cycle)
+        output_file = self._local_window_audit_rel(cycle, window_id)
+        window_chapter_specs = [
+            f"outline/chapter_specs/{chapter_id}.json" for chapter_id in window
+        ]
+        prompt = self._render_prompt(
+            "local_window_audit_prompt.md",
+            {
+                "CYCLE_PADDED": cpad,
+                "CYCLE_INT": str(cycle),
+                "WINDOW_ID": window_id,
+                "FULL_NOVEL_FILE": full_novel_file,
+                "CHAPTER_LINE_INDEX_FILE": chapter_line_index_file,
+                "CONTINUITY_SHEET_FILE": continuity_sheet_file,
+                "WINDOW_CHAPTER_IDS": json.dumps(window),
+                "WINDOW_CHAPTER_SPECS": "\n".join(
+                    f"{idx}. `{rel}`" for idx, rel in enumerate(window_chapter_specs, start=1)
+                ),
+                "LOCAL_WINDOW_OUTPUT_FILE": output_file,
+            },
+        )
+        if validation_error:
+            safe_error = " ".join(str(validation_error).split())
+            prompt += (
+                "\n\nValidator feedback from previous attempt:\n"
+                f"- {safe_error}\n"
+                "Regenerate the local-window audit JSON so it satisfies the contract exactly.\n"
+                "Prefer repairing malformed shape over inventing new findings.\n"
+            )
+            prompt += self._retry_guidance_for_validation_error(
+                validation_error=safe_error,
+                target_file=full_novel_file,
+            )
+        retry_suffix = f"_retry_{retry_attempt}" if retry_attempt > 0 else ""
+        return self._make_job(
+            job_id=f"cycle_{cpad}_local_window_{window_id}{retry_suffix}",
+            stage="local_window_audit",
+            stage_group="cross_chapter_audit",
+            cycle=cycle,
+            chapter_id=None,
+            allowed_inputs=[
+                full_novel_file,
+                chapter_line_index_file,
+                continuity_sheet_file,
+                "outline/style_bible.json",
+                "config/constitution.md",
+                "config/prompts/local_window_audit_prompt.md",
+                *window_chapter_specs,
             ],
             required_outputs=[output_file],
             prompt_text=prompt,
@@ -3920,7 +5161,11 @@ class NovelPipelineRunner:
             )
 
     def _build_revision_packets(
-        self, cycle: int, by_chapter: dict[str, list[dict[str, Any]]]
+        self,
+        cycle: int,
+        by_chapter: dict[str, list[dict[str, Any]]],
+        *,
+        extra_non_negotiables: list[str] | None = None,
     ) -> None:
         cpad = self._cpad(cycle)
         dialogue_rules = self.style_bible.get("dialogue_rules", {})
@@ -3936,6 +5181,16 @@ class NovelPipelineRunner:
             "Maintain character-specific voice signatures from style bible.",
             "Honor aesthetic risk policy: sanitization is the primary craft risk — do not soften, euphemize, or retreat from the story's established register. When in doubt, err toward rawness.",
         ]
+        if extra_non_negotiables:
+            combined_non_negotiables: list[str] = []
+            seen_non_negotiables: set[str] = set()
+            for entry in [*non_negotiables, *extra_non_negotiables]:
+                normalized = str(entry).strip()
+                if not normalized or normalized in seen_non_negotiables:
+                    continue
+                seen_non_negotiables.add(normalized)
+                combined_non_negotiables.append(normalized)
+            non_negotiables = combined_non_negotiables
         for chapter_id, findings in by_chapter.items():
             snapshot_file = (
                 self.run_dir
@@ -3981,10 +5236,884 @@ class NovelPipelineRunner:
                     pass_packet,
                 )
 
-    def _run_revision_stage(self, cycle: int, chapter_ids: list[str]) -> None:
+    def _compact_aggregator_input_rel(self, cycle: int) -> str:
+        return f"packets/cycle_{self._cpad(cycle)}/compact_aggregator_input.json"
+
+    def _aggregation_decisions_rel(self, cycle: int) -> str:
+        return f"packets/cycle_{self._cpad(cycle)}/aggregation_decisions.json"
+
+    def _aggregation_materialization_summary_rel(self, cycle: int) -> str:
+        return f"packets/cycle_{self._cpad(cycle)}/aggregation_materialization_summary.json"
+
+    def _aggregation_suppressions_rel(self, cycle: int) -> str:
+        return f"packets/cycle_{self._cpad(cycle)}/aggregation_suppressions.json"
+
+    def _aggregation_unfixable_rel(self, cycle: int) -> str:
+        return f"packets/cycle_{self._cpad(cycle)}/aggregation_unfixable.json"
+
+    def _aggregation_locator_excerpt_pair(
+        self, finding: dict[str, Any]
+    ) -> tuple[str, str]:
+        locator_excerpts = finding.get("locator_excerpts")
+        if not isinstance(locator_excerpts, dict):
+            return "", ""
+        snippets: list[str] = []
+        seen: set[str] = set()
+        for field_name in (
+            "evidence",
+            "problem",
+            "rewrite_direction",
+            "acceptance_test",
+        ):
+            entries = locator_excerpts.get(field_name, [])
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                excerpt = str(entry.get("excerpt", "")).strip()
+                if not excerpt or excerpt in seen:
+                    continue
+                seen.add(excerpt)
+                snippets.append(excerpt)
+        if not snippets:
+            return "", ""
+        locator_excerpt = snippets[0]
+        counterpart_excerpt = snippets[1] if len(snippets) > 1 else ""
+        return locator_excerpt, counterpart_excerpt
+
+    def _compact_aggregator_source_payload(
+        self, finding: dict[str, Any]
+    ) -> dict[str, str]:
+        raw_source = self._canonical_finding_source_name(finding.get("source", ""))
+        raw_severity = str(finding.get("severity", "")).strip().upper()
+        payload = {
+            "source": raw_source,
+            "severity": raw_severity,
+        }
+        if raw_source in {"award", "craft", "dialogue", "prose"}:
+            payload["source"] = "chapter_review"
+            payload["review_lens"] = raw_source
+        if payload["source"] == "elevation" and raw_severity in {"HIGH", "MEDIUM"}:
+            payload["severity"] = f"ELEVATION_{raw_severity}"
+        return payload
+
+    def _chapter_local_spans_for_evidence(
+        self,
+        *,
+        cycle: int,
+        chapter_id: str,
+        evidence: Any,
+        chapter_line_index: dict[str, dict[str, int]] | None = None,
+    ) -> list[tuple[int, int]]:
+        normalized = self._normalize_evidence_field(evidence)
+        if not normalized:
+            return []
+        if chapter_line_index is None:
+            try:
+                raw_index = self._read_json(self._chapter_line_index_rel(cycle))
+            except PipelineError:
+                raw_index = {}
+            chapter_line_index = raw_index if isinstance(raw_index, dict) else {}
+        chapter_bounds = (
+            chapter_line_index.get(chapter_id, {})
+            if isinstance(chapter_line_index, dict)
+            else {}
+        )
+        compiled_novel_rel = f"snapshots/cycle_{self._cpad(cycle)}/FINAL_NOVEL.md"
+        chapter_snapshot_rel = f"snapshots/cycle_{self._cpad(cycle)}/chapters/{chapter_id}.md"
+        live_chapter_rel = f"chapters/{chapter_id}.md"
+        spans: list[tuple[int, int]] = []
+        seen: set[tuple[int, int]] = set()
+        for span in self._extract_line_citation_spans(normalized):
+            if not isinstance(span, dict):
+                continue
+            file_rel = str(span.get("file_rel", "")).strip()
+            start_line = int(span.get("start_line", 0) or 0)
+            end_line = int(span.get("end_line", 0) or 0)
+            if start_line <= 0 or end_line <= 0:
+                continue
+            local_start: int | None = None
+            local_end: int | None = None
+            if file_rel in {chapter_snapshot_rel, live_chapter_rel}:
+                local_start = start_line
+                local_end = max(start_line, end_line)
+            elif file_rel == compiled_novel_rel:
+                chapter_start = int(chapter_bounds.get("start_line", 0) or 0)
+                chapter_end = int(chapter_bounds.get("end_line", 0) or 0)
+                if chapter_start <= 0 or chapter_end < chapter_start:
+                    continue
+                overlap_start = max(start_line, chapter_start)
+                overlap_end = min(end_line, chapter_end)
+                if overlap_end < overlap_start:
+                    continue
+                local_start = overlap_start - chapter_start + 1
+                local_end = overlap_end - chapter_start + 1
+            if local_start is None or local_end is None:
+                continue
+            key = (local_start, local_end)
+            if key in seen:
+                continue
+            seen.add(key)
+            spans.append(key)
+        return spans
+
+    def _evidence_span_match_score(
+        self,
+        current_spans: list[tuple[int, int]],
+        prior_spans: list[tuple[int, int]],
+        *,
+        tolerance_lines: int = 20,
+    ) -> int | None:
+        best_score: int | None = None
+        for current_start, current_end in current_spans:
+            for prior_start, prior_end in prior_spans:
+                gap = 0
+                if current_end < prior_start:
+                    gap = prior_start - current_end
+                elif prior_end < current_start:
+                    gap = current_start - prior_end
+                if gap > tolerance_lines:
+                    continue
+                overlap = min(current_end, prior_end) - max(current_start, prior_start) + 1
+                if overlap > 0:
+                    score = 1000 + overlap
+                else:
+                    score = max(1, tolerance_lines - gap + 1)
+                if best_score is None or score > best_score:
+                    best_score = score
+        return best_score
+
+    def _load_prior_revision_attempts(
+        self, cycle: int, chapter_ids: list[str]
+    ) -> dict[str, list[dict[str, Any]]]:
+        if cycle <= 1:
+            return {}
+        previous_cycle = cycle - 1
+        try:
+            raw_index = self._read_json(self._chapter_line_index_rel(previous_cycle))
+        except PipelineError:
+            raw_index = {}
+        previous_line_index = raw_index if isinstance(raw_index, dict) else {}
+        attempts_by_chapter: dict[str, list[dict[str, Any]]] = {}
+        for chapter_id in chapter_ids:
+            report_rel = self._revision_report_rel(previous_cycle, chapter_id)
+            report_path = self.run_dir / report_rel
+            if not report_path.is_file():
+                continue
+            packet_rel = self._revision_packet_rel(previous_cycle, chapter_id)
+            expected_ids: set[str] = set()
+            source_by_finding_id: dict[str, str] = {}
+            if (self.run_dir / packet_rel).is_file():
+                try:
+                    packet_data = self._read_json(packet_rel)
+                    expected_ids = self._finding_ids_from_packet(packet_data)
+                    for finding in packet_data.get("findings", []):
+                        if not isinstance(finding, dict):
+                            continue
+                        finding_id = str(finding.get("finding_id", "")).strip()
+                        if not finding_id:
+                            continue
+                        source_by_finding_id[finding_id] = self._compact_aggregator_source_payload(
+                            finding
+                        )["source"]
+                except PipelineError:
+                    expected_ids = set()
+                    source_by_finding_id = {}
+            try:
+                report_data = self._load_repaired_revision_report(
+                    report_rel,
+                    chapter_id,
+                    expected_ids,
+                    chapter_file=f"chapters/{chapter_id}.md",
+                )
+            except PipelineError:
+                continue
+            chapter_attempts: list[dict[str, Any]] = []
+            for row in report_data.get("finding_results", []):
+                if not isinstance(row, dict):
+                    continue
+                status = str(row.get("status_after_revision", "")).strip()
+                if status not in {"PARTIAL", "UNRESOLVED"}:
+                    continue
+                revision_note = str(row.get("revision_note", "")).strip()
+                if not revision_note:
+                    continue
+                local_spans = self._chapter_local_spans_for_evidence(
+                    cycle=previous_cycle,
+                    chapter_id=chapter_id,
+                    evidence=row.get("evidence", ""),
+                    chapter_line_index=previous_line_index,
+                )
+                if not local_spans:
+                    continue
+                finding_id = str(row.get("finding_id", "")).strip()
+                chapter_attempts.append(
+                    {
+                        "cycle": previous_cycle,
+                        "finding_id": finding_id,
+                        "status": status,
+                        "revision_note": revision_note,
+                        "local_spans": local_spans,
+                        "source": source_by_finding_id.get(finding_id, ""),
+                    }
+                )
+            if chapter_attempts:
+                attempts_by_chapter[chapter_id] = chapter_attempts
+        return attempts_by_chapter
+
+    def _prior_attempt_context_for_finding(
+        self,
+        *,
+        cycle: int,
+        chapter_id: str,
+        finding: dict[str, Any],
+        chapter_line_index: dict[str, dict[str, int]] | None,
+        prior_attempts: list[dict[str, Any]],
+    ) -> str | None:
+        if not prior_attempts:
+            return None
+        current_spans = self._chapter_local_spans_for_evidence(
+            cycle=cycle,
+            chapter_id=chapter_id,
+            evidence=finding.get("evidence", ""),
+            chapter_line_index=chapter_line_index,
+        )
+        if not current_spans:
+            return None
+        current_source = self._compact_aggregator_source_payload(finding)["source"]
+        best_attempt: dict[str, Any] | None = None
+        best_score: int | None = None
+        for attempt in prior_attempts:
+            if not isinstance(attempt, dict):
+                continue
+            prior_spans = attempt.get("local_spans", [])
+            if not isinstance(prior_spans, list) or not prior_spans:
+                continue
+            span_score = self._evidence_span_match_score(current_spans, prior_spans)
+            if span_score is None:
+                continue
+            total_score = span_score
+            if str(attempt.get("source", "")).strip() == current_source:
+                total_score += 50
+            if best_score is None or total_score > best_score:
+                best_score = total_score
+                best_attempt = attempt
+        if best_attempt is None:
+            return None
+        note = str(best_attempt.get("revision_note", "")).strip()
+        if not note:
+            return None
+        prior_cycle = int(best_attempt.get("cycle", max(1, cycle - 1)) or max(1, cycle - 1))
+        prior_status = str(best_attempt.get("status", "")).strip().upper() or "PARTIAL"
+        return f"Cycle {prior_cycle} {prior_status} revision note: {note}"
+
+    def _build_compact_aggregator_input(
+        self, cycle: int, chapter_ids: list[str]
+    ) -> dict[str, Any]:
+        continuity_sheet_file = self._ensure_cycle_continuity_snapshot(cycle)
+        style_bible = self.style_bible or self._load_and_validate_style_bible()
+        try:
+            raw_index = self._read_json(self._chapter_line_index_rel(cycle))
+        except PipelineError:
+            raw_index = {}
+        chapter_line_index = raw_index if isinstance(raw_index, dict) else {}
+        cross_chapter_metrics = self._cross_chapter_metrics_for_aggregator(
+            cycle, set(chapter_ids)
+        )
+        prior_attempts_by_chapter = self._load_prior_revision_attempts(cycle, chapter_ids)
+        chapters_payload: dict[str, dict[str, list[dict[str, Any]]]] = {}
+        for chapter_id in chapter_ids:
+            pass_payload: dict[str, list[dict[str, Any]]] = {}
+            for pass_def in REVISION_PASS_DEFS:
+                pass_key = pass_def["key"]
+                packet_rel = self._revision_pass_packet_rel(cycle, chapter_id, pass_key)
+                packet_data = self._read_json(packet_rel)
+                packet_findings = packet_data.get("findings", [])
+                if not isinstance(packet_findings, list):
+                    continue
+                compact_rows: list[dict[str, Any]] = []
+                for finding in packet_findings:
+                    if not isinstance(finding, dict):
+                        continue
+                    finding_id = str(finding.get("finding_id", "")).strip()
+                    if not finding_id:
+                        continue
+                    source_payload = self._compact_aggregator_source_payload(finding)
+                    locator_excerpt, counterpart_excerpt = (
+                        self._aggregation_locator_excerpt_pair(finding)
+                    )
+                    compact_row = {
+                        "finding_id": finding_id,
+                        "source": source_payload["source"],
+                        "severity": source_payload["severity"],
+                        "pass_key": pass_key,
+                        "problem": str(finding.get("problem", "")).strip(),
+                        "rewrite_direction": str(
+                            finding.get("rewrite_direction", "")
+                        ).strip(),
+                        "acceptance_test": str(
+                            finding.get("acceptance_test", "")
+                        ).strip(),
+                    }
+                    review_lens = source_payload.get("review_lens")
+                    if review_lens:
+                        compact_row["review_lens"] = review_lens
+                    if locator_excerpt:
+                        compact_row["locator_excerpt"] = locator_excerpt
+                    if counterpart_excerpt:
+                        compact_row["counterpart_excerpt"] = counterpart_excerpt
+                    prior_attempt_context = self._prior_attempt_context_for_finding(
+                        cycle=cycle,
+                        chapter_id=chapter_id,
+                        finding=finding,
+                        chapter_line_index=chapter_line_index,
+                        prior_attempts=prior_attempts_by_chapter.get(chapter_id, []),
+                    )
+                    if prior_attempt_context:
+                        compact_row["prior_attempt_context"] = prior_attempt_context
+                    compact_rows.append(compact_row)
+                if compact_rows:
+                    pass_payload[pass_key] = compact_rows
+            if pass_payload:
+                chapters_payload[chapter_id] = pass_payload
+        return {
+            "shared_context": {
+                "continuity_sheet": self._read_json(continuity_sheet_file),
+                "style_bible": {
+                    "character_voice_profiles": style_bible.get(
+                        "character_voice_profiles", []
+                    ),
+                    "dialogue_rules": style_bible.get("dialogue_rules", {}),
+                    "prose_style_profile": style_bible.get("prose_style_profile", {}),
+                    "aesthetic_risk_policy": style_bible.get(
+                        "aesthetic_risk_policy", {}
+                    ),
+                },
+                "cross_chapter_metrics": cross_chapter_metrics,
+                "chapter_count": len(self.chapter_specs),
+            },
+            "chapters": chapters_payload,
+        }
+
+    def _cross_chapter_metrics_for_aggregator(
+        self, cycle: int, chapter_ids: set[str]
+    ) -> dict[str, int]:
+        metrics = {key: 0 for key in CROSS_CHAPTER_AUDIT_METRIC_KEYS}
+        rel = self._cross_chapter_audit_rel(cycle)
+        if not (self.run_dir / rel).exists():
+            return metrics
+        try:
+            audit = self._load_repaired_cross_chapter_audit(
+                rel,
+                cycle,
+                chapter_ids,
+                f"snapshots/cycle_{self._cpad(cycle)}/FINAL_NOVEL.md",
+            )
+        except PipelineError:
+            return metrics
+        for key in CROSS_CHAPTER_AUDIT_METRIC_KEYS:
+            value = audit.get(key, 0)
+            if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                metrics[key] = value
+        return metrics
+
+    def _compact_aggregator_input_finding_ids(
+        self, compact_input: dict[str, Any]
+    ) -> set[str]:
+        finding_ids: set[str] = set()
+        chapters = compact_input.get("chapters", {})
+        if not isinstance(chapters, dict):
+            return finding_ids
+        for chapter_payload in chapters.values():
+            if not isinstance(chapter_payload, dict):
+                continue
+            for pass_payload in chapter_payload.values():
+                if not isinstance(pass_payload, list):
+                    continue
+                for finding in pass_payload:
+                    if not isinstance(finding, dict):
+                        continue
+                    finding_id = str(finding.get("finding_id", "")).strip()
+                    if finding_id:
+                        finding_ids.add(finding_id)
+        return finding_ids
+
+    def _llm_aggregator_input_paths(self, cycle: int) -> list[Path]:
+        return [
+            self.run_dir / self._compact_aggregator_input_rel(cycle),
+            self.run_dir / "outline" / "chapter_specs.jsonl",
+            self.run_dir / "config" / "prompts" / "revision_aggregator_prompt.md",
+        ]
+
+    def _build_revision_aggregator_job(self, cycle: int) -> JobSpec:
+        cpad = self._cpad(cycle)
+        compact_input_file = self._compact_aggregator_input_rel(cycle)
+        decisions_file = self._aggregation_decisions_rel(cycle)
+        prompt = self._render_prompt(
+            "revision_aggregator_prompt.md",
+            {
+                "CYCLE_PADDED": cpad,
+                "COMPACT_AGGREGATOR_INPUT_FILE": compact_input_file,
+                "AGGREGATION_DECISIONS_OUTPUT_FILE": decisions_file,
+            },
+        )
+        return self._make_job(
+            job_id=f"cycle_{cpad}_revision_aggregator",
+            stage="llm_aggregator",
+            stage_group="revision",
+            cycle=cycle,
+            chapter_id=None,
+            allowed_inputs=[
+                compact_input_file,
+                "outline/chapter_specs.jsonl",
+                "config/prompts/revision_aggregator_prompt.md",
+            ],
+            required_outputs=[decisions_file],
+            prompt_text=prompt,
+        )
+
+    def _run_llm_aggregator_stage(
+        self, cycle: int, chapter_ids: list[str]
+    ) -> dict[str, Any]:
+        cpad = self._cpad(cycle)
+        compact_input = self._build_compact_aggregator_input(cycle, chapter_ids)
+        compact_rel = self._compact_aggregator_input_rel(cycle)
+        self._write_json(compact_rel, compact_input)
+        input_finding_ids = self._compact_aggregator_input_finding_ids(compact_input)
+        outputs = [compact_rel]
+        if not input_finding_ids:
+            self._log(f"cycle={cpad} llm_aggregator_skip reason=no_packet_findings")
+            return {
+                "status": "skipped",
+                "reason": "no_packet_findings",
+                "outputs": outputs,
+            }
+
+        decisions_rel = self._aggregation_decisions_rel(cycle)
+        decisions_path = self.run_dir / decisions_rel
+        if self._artifact_fresh_against_inputs(
+            decisions_path, self._llm_aggregator_input_paths(cycle)
+        ):
+            try:
+                decisions = self._load_repaired_aggregation_decisions(
+                    decisions_rel, input_finding_ids
+                )
+                return {
+                    "status": "reused",
+                    "outputs": outputs + [decisions_rel],
+                    "decisions": decisions,
+                }
+            except PipelineError as exc:
+                self._log(
+                    f"cycle={cpad} llm_aggregator_resume_invalid reason={exc}"
+                )
+
+        try:
+            self._run_job(self._build_revision_aggregator_job(cycle))
+        except PipelineError as exc:
+            if not self._soft_validation_enabled():
+                raise
+            self._record_validation_warning(
+                stage="llm_aggregator",
+                cycle=cycle,
+                chapter_id=None,
+                artifact=decisions_rel,
+                reason=str(exc),
+                action="continued_with_mechanical_packets_after_llm_aggregator_failure",
+            )
+            return {
+                "status": "failed",
+                "reason": "llm_aggregator_failed_fallback_to_mechanical_packets",
+                "outputs": outputs,
+            }
+
+        try:
+            decisions = self._load_repaired_aggregation_decisions(
+                decisions_rel, input_finding_ids
+            )
+        except PipelineError as exc:
+            if not self._soft_validation_enabled():
+                raise
+            self._record_validation_warning(
+                stage="llm_aggregator",
+                cycle=cycle,
+                chapter_id=None,
+                artifact=decisions_rel,
+                reason=str(exc),
+                action="continued_with_mechanical_packets_after_invalid_aggregation_decisions",
+            )
+            return {
+                "status": "failed",
+                "reason": "invalid_decisions_fallback_to_mechanical_packets",
+                "outputs": outputs,
+            }
+        return {
+            "status": "complete",
+            "outputs": outputs + [decisions_rel],
+            "decisions": decisions,
+        }
+
+    def _materialize_aggregation_decisions_stage(
+        self,
+        cycle: int,
+        chapter_ids: list[str],
+        aggregator_summary: dict[str, Any],
+    ) -> dict[str, Any]:
+        outputs = [
+            self._aggregation_materialization_summary_rel(cycle),
+            self._aggregation_suppressions_rel(cycle),
+            self._aggregation_unfixable_rel(cycle),
+        ]
+        decisions = aggregator_summary.get("decisions")
+        if not isinstance(decisions, dict):
+            return {
+                "status": "skipped",
+                "reason": "llm_aggregator_fallback_to_mechanical_packets",
+            }
+
+        decisions_sha1 = self._aggregation_decisions_sha1(decisions)
+        if self._aggregation_materialization_is_current(
+            cycle, chapter_ids, decisions_sha1
+        ):
+            return {
+                "status": "reused",
+                "outputs": outputs,
+            }
+
+        baseline_by_chapter = self._load_materializable_packet_findings(
+            cycle, chapter_ids
+        )
+        try:
+            self._apply_aggregation_decisions(
+                cycle,
+                chapter_ids,
+                decisions,
+                baseline_by_chapter=baseline_by_chapter,
+            )
+        except PipelineError as exc:
+            if not self._soft_validation_enabled():
+                raise
+            self._build_revision_packets(cycle, baseline_by_chapter)
+            self._record_validation_warning(
+                stage="materialize_aggregation_decisions",
+                cycle=cycle,
+                chapter_id=None,
+                artifact=self._aggregation_materialization_summary_rel(cycle),
+                reason=str(exc),
+                action="continued_with_mechanical_packets_after_materialization_failure",
+            )
+            return {
+                "status": "failed",
+                "reason": "materialization_failed_fallback_to_mechanical_packets",
+                "outputs": outputs,
+            }
+        return {
+            "status": "complete",
+            "outputs": outputs,
+        }
+
+    def _load_materializable_packet_findings(
+        self, cycle: int, chapter_ids: list[str]
+    ) -> dict[str, list[dict[str, Any]]]:
+        by_chapter: dict[str, list[dict[str, Any]]] = {}
+        for chapter_id in chapter_ids:
+            packet_data = self._read_json(self._revision_packet_rel(cycle, chapter_id))
+            packet_findings = packet_data.get("findings", [])
+            if not isinstance(packet_findings, list):
+                raise PipelineError(
+                    f"{self._revision_packet_rel(cycle, chapter_id)} findings must be an array"
+                )
+            rows: list[dict[str, Any]] = []
+            for finding in packet_findings:
+                if isinstance(finding, dict):
+                    rows.append(copy.deepcopy(finding))
+            by_chapter[chapter_id] = rows
+        return by_chapter
+
+    def _aggregation_decisions_sha1(self, decisions: dict[str, Any]) -> str:
+        rendered = json.dumps(decisions, ensure_ascii=True, sort_keys=True)
+        return hashlib.sha1(rendered.encode("utf-8")).hexdigest()
+
+    def _aggregation_materialization_is_current(
+        self, cycle: int, chapter_ids: list[str], decisions_sha1: str
+    ) -> bool:
+        summary_rel = self._aggregation_materialization_summary_rel(cycle)
+        try:
+            summary_data = self._read_json(summary_rel)
+        except PipelineError:
+            return False
+        if summary_data.get("decisions_sha1") != decisions_sha1:
+            return False
+        for rel in (
+            self._aggregation_suppressions_rel(cycle),
+            self._aggregation_unfixable_rel(cycle),
+        ):
+            if not (self.run_dir / rel).is_file():
+                return False
+        for chapter_id in chapter_ids:
+            packet_rels = [self._revision_packet_rel(cycle, chapter_id)]
+            packet_rels.extend(
+                self._revision_pass_packet_rel(cycle, chapter_id, pass_def["key"])
+                for pass_def in REVISION_PASS_DEFS
+            )
+            for rel in packet_rels:
+                try:
+                    packet_data = self._read_json(rel)
+                except PipelineError:
+                    return False
+                applied = packet_data.get("aggregation_applied")
+                if not isinstance(applied, dict):
+                    return False
+                if applied.get("decisions_sha1") != decisions_sha1:
+                    return False
+        return True
+
+    def _append_aggregation_guidance(
+        self, base_text: str, notes: list[str]
+    ) -> str:
+        cleaned_notes = [str(note).strip() for note in notes if str(note).strip()]
+        if not cleaned_notes:
+            return base_text
+        guidance = "\n".join(f"- {note}" for note in cleaned_notes)
+        base = str(base_text).strip()
+        if base:
+            return f"{base}\n\nAggregator guidance:\n{guidance}"
+        return f"Aggregator guidance:\n{guidance}"
+
+    def _apply_aggregation_decisions(
+        self,
+        cycle: int,
+        chapter_ids: list[str],
+        decisions: dict[str, Any],
+        *,
+        baseline_by_chapter: dict[str, list[dict[str, Any]]] | None = None,
+    ) -> None:
+        baseline = (
+            baseline_by_chapter
+            if baseline_by_chapter is not None
+            else self._load_materializable_packet_findings(cycle, chapter_ids)
+        )
+        finding_by_id: dict[str, dict[str, Any]] = {}
+        ordered_ids_by_chapter: dict[str, list[str]] = {}
+        for chapter_id in chapter_ids:
+            ordered_ids: list[str] = []
+            for finding in baseline.get(chapter_id, []):
+                finding_id = str(finding.get("finding_id", "")).strip()
+                if not finding_id:
+                    continue
+                if finding_id in finding_by_id:
+                    raise PipelineError(f"duplicate finding_id in packets: {finding_id}")
+                finding_by_id[finding_id] = copy.deepcopy(finding)
+                ordered_ids.append(finding_id)
+            ordered_ids_by_chapter[chapter_id] = ordered_ids
+
+        for row in decisions.get("merges", []):
+            if not isinstance(row, dict):
+                continue
+            target_id = str(row.get("target_finding", "")).strip()
+            target = finding_by_id.get(target_id)
+            if target is None:
+                continue
+            merged_direction = str(row.get("merged_rewrite_direction", "")).strip()
+            if merged_direction:
+                target["rewrite_direction"] = merged_direction
+            absorbed_findings = row.get("absorbed_findings", [])
+            if not isinstance(absorbed_findings, list):
+                continue
+            for absorbed_id_raw in absorbed_findings:
+                absorbed_id = str(absorbed_id_raw).strip()
+                if not absorbed_id or absorbed_id == target_id:
+                    continue
+                absorbed = finding_by_id.pop(absorbed_id, None)
+                if absorbed is None:
+                    continue
+                target["evidence"] = self._merge_evidence_citations(
+                    str(target.get("evidence", "")),
+                    str(absorbed.get("evidence", "")),
+                )
+
+        for bucket_key in ("suppressions", "unfixable"):
+            for row in decisions.get(bucket_key, []):
+                if not isinstance(row, dict):
+                    continue
+                finding_id = str(row.get("finding_id", "")).strip()
+                if finding_id:
+                    finding_by_id.pop(finding_id, None)
+
+        for row in decisions.get("pass_reassignments", []):
+            if not isinstance(row, dict):
+                continue
+            finding_id = str(row.get("finding_id", "")).strip()
+            finding = finding_by_id.get(finding_id)
+            if finding is None:
+                continue
+            to_pass = str(row.get("to_pass", "")).strip()
+            if to_pass:
+                finding["aggregated_pass_key"] = to_pass
+
+        guidance_by_finding_id: dict[str, list[str]] = {}
+        for row in decisions.get("canonical_choices", []):
+            if not isinstance(row, dict):
+                continue
+            choice_id = str(row.get("choice_id", "")).strip()
+            value = str(row.get("value", "")).strip()
+            grounding = str(row.get("grounding", "")).strip()
+            if not (choice_id and value and grounding):
+                continue
+            note = f"Canonical choice [{choice_id}]: {value}. Grounding: {grounding}"
+            affected_findings = row.get("affected_findings", [])
+            if not isinstance(affected_findings, list):
+                continue
+            for finding_id_raw in affected_findings:
+                finding_id = str(finding_id_raw).strip()
+                if finding_id in finding_by_id:
+                    guidance_by_finding_id.setdefault(finding_id, []).append(note)
+
+        consistency_directive_rules: list[str] = []
+        for row in decisions.get("consistency_directives", []):
+            if not isinstance(row, dict):
+                continue
+            rule = str(row.get("rule", "")).strip()
+            if rule:
+                consistency_directive_rules.append(rule)
+
+        for row in decisions.get("context_injections", []):
+            if not isinstance(row, dict):
+                continue
+            target_id = str(row.get("target_finding", "")).strip()
+            context = str(row.get("cross_chapter_context", "")).strip()
+            if target_id in finding_by_id and context:
+                finding_by_id[target_id]["cross_chapter_context"] = context
+
+        for finding_id, notes in guidance_by_finding_id.items():
+            finding = finding_by_id.get(finding_id)
+            if finding is None:
+                continue
+            finding["rewrite_direction"] = self._append_aggregation_guidance(
+                str(finding.get("rewrite_direction", "")),
+                notes,
+            )
+
+        materialized_by_chapter: dict[str, list[dict[str, Any]]] = {}
+        for chapter_id in chapter_ids:
+            rows: list[dict[str, Any]] = []
+            for finding_id in ordered_ids_by_chapter.get(chapter_id, []):
+                finding = finding_by_id.get(finding_id)
+                if finding is not None:
+                    rows.append(copy.deepcopy(finding))
+            materialized_by_chapter[chapter_id] = rows
+
+        self._build_revision_packets(
+            cycle,
+            materialized_by_chapter,
+            extra_non_negotiables=consistency_directive_rules,
+        )
+        decisions_sha1 = self._aggregation_decisions_sha1(decisions)
+        self._tag_aggregation_applied_metadata(cycle, chapter_ids, decisions_sha1)
+
+        summary = {
+            "cycle": cycle,
+            "decisions_sha1": decisions_sha1,
+            "chapters_materialized": len(chapter_ids),
+            "finding_count_after_materialization": sum(
+                len(rows) for rows in materialized_by_chapter.values()
+            ),
+            "merge_count": len(
+                [row for row in decisions.get("merges", []) if isinstance(row, dict)]
+            ),
+            "canonical_choice_count": len(
+                [
+                    row
+                    for row in decisions.get("canonical_choices", [])
+                    if isinstance(row, dict)
+                ]
+            ),
+            "consistency_directive_count": len(
+                [
+                    row
+                    for row in decisions.get("consistency_directives", [])
+                    if isinstance(row, dict)
+                ]
+            ),
+            "context_injection_count": len(
+                [
+                    row
+                    for row in decisions.get("context_injections", [])
+                    if isinstance(row, dict)
+                ]
+            ),
+            "suppression_count": len(
+                [
+                    row
+                    for row in decisions.get("suppressions", [])
+                    if isinstance(row, dict)
+                ]
+            ),
+            "unfixable_count": len(
+                [
+                    row
+                    for row in decisions.get("unfixable", [])
+                    if isinstance(row, dict)
+                ]
+            ),
+            "pass_reassignment_count": len(
+                [
+                    row
+                    for row in decisions.get("pass_reassignments", [])
+                    if isinstance(row, dict)
+                ]
+            ),
+        }
+        self._write_json(self._aggregation_materialization_summary_rel(cycle), summary)
+        self._write_json(
+            self._aggregation_suppressions_rel(cycle),
+            {
+                "cycle": cycle,
+                "decisions_sha1": decisions_sha1,
+                "suppressions": [
+                    row
+                    for row in decisions.get("suppressions", [])
+                    if isinstance(row, dict)
+                ],
+            },
+        )
+        self._write_json(
+            self._aggregation_unfixable_rel(cycle),
+            {
+                "cycle": cycle,
+                "decisions_sha1": decisions_sha1,
+                "unfixable": [
+                    row
+                    for row in decisions.get("unfixable", [])
+                    if isinstance(row, dict)
+                ],
+            },
+        )
+
+    def _tag_aggregation_applied_metadata(
+        self, cycle: int, chapter_ids: list[str], decisions_sha1: str
+    ) -> None:
+        metadata = {
+            "decisions_sha1": decisions_sha1,
+            "decisions_file": self._aggregation_decisions_rel(cycle),
+        }
+        for chapter_id in chapter_ids:
+            packet_rels = [self._revision_packet_rel(cycle, chapter_id)]
+            packet_rels.extend(
+                self._revision_pass_packet_rel(cycle, chapter_id, pass_def["key"])
+                for pass_def in REVISION_PASS_DEFS
+            )
+            for rel in packet_rels:
+                packet_data = self._read_json(rel)
+                packet_data["aggregation_applied"] = metadata
+                self._write_json(rel, packet_data)
+
+    def _run_revision_stage(self, cycle: int, chapter_ids: list[str]) -> dict[str, Any]:
         cpad = self._cpad(cycle)
         global_context_file = f"context/cycle_{cpad}/global_cycle_context.json"
         continuity_sheet_file = self._ensure_cycle_continuity_snapshot(cycle)
+        units: dict[str, dict[str, Any]] = {}
 
         for pass_index, pass_def in enumerate(REVISION_PASS_DEFS, start=1):
             pass_key = pass_def["key"]
@@ -4020,10 +6149,20 @@ class NovelPipelineRunner:
                                 expected_ids,
                                 chapter_file=chapter_file,
                             )
+                            units[f"{chapter_id}.{pass_key}"] = {
+                                "status": "reused",
+                                "validated": True,
+                                "fresh": True,
+                            }
                             continue
                         except PipelineError:
                             pass
                     self._write_json(report_file, no_op_report)
+                    units[f"{chapter_id}.{pass_key}"] = {
+                        "status": "complete",
+                        "validated": True,
+                        "fresh": True,
+                    }
                     continue
 
                 if report_path.is_file():
@@ -4046,6 +6185,11 @@ class NovelPipelineRunner:
                         ):
                             freshness_floor = max(freshness_floor, chapter_mtime)
                         if report_mtime >= freshness_floor:
+                            units[f"{chapter_id}.{pass_key}"] = {
+                                "status": "reused",
+                                "validated": True,
+                                "fresh": True,
+                            }
                             continue
                     except PipelineError:
                         pass
@@ -4181,6 +6325,13 @@ class NovelPipelineRunner:
                                 reason=str(job_exc),
                                 action=f"retry_job_failed_will_retry_{pass_key}",
                             )
+                units[f"{chapter_id}.{pass_key}"] = {
+                    "status": units.get(f"{chapter_id}.{pass_key}", {}).get(
+                        "status", "complete"
+                    ),
+                    "validated": True,
+                    "fresh": True,
+                }
             self._log(
                 f"cycle={cpad} revision_pass_complete pass={pass_key} chapters={len(chapter_ids)}"
             )
@@ -4223,6 +6374,18 @@ class NovelPipelineRunner:
                     action="replaced_invalid_merged_revision_report_with_fallback",
                 )
         self._log(f"cycle={cpad} revisions_complete chapters={len(chapter_ids)}")
+        reused_count = sum(
+            1 for row in units.values() if row.get("status") == "reused"
+        )
+        return {
+            "status": (
+                "reused"
+                if units and reused_count == len(units)
+                else "complete"
+            ),
+            "chapter_count": len(chapter_ids),
+            "units": units,
+        }
 
     def _has_valid_later_revision_pass_report(
         self,
@@ -4432,8 +6595,176 @@ class NovelPipelineRunner:
             buckets[key].append(finding)
         return buckets
 
-    def _assign_revision_pass_key(self, finding: dict[str, Any]) -> str:
+    def _finding_routing_text(self, finding: dict[str, Any]) -> str:
+        parts: list[str] = []
+        for key in (
+            "finding_id",
+            "source",
+            "problem",
+            "rewrite_direction",
+            "acceptance_test",
+        ):
+            value = finding.get(key)
+            if isinstance(value, str) and value.strip():
+                parts.append(value.strip().lower())
+        cross_context = finding.get("cross_chapter_context")
+        if isinstance(cross_context, str) and cross_context.strip():
+            parts.append(cross_context.strip().lower())
+        return "\n".join(parts)
+
+    def _finding_prefers_dialogue_pass(self, finding: dict[str, Any]) -> bool:
         source = self._canonical_finding_source_name(finding.get("source", ""))
+        if source == "dialogue":
+            return True
+        if source in {"local_window", "elevation", "prose"}:
+            return False
+
+        text = self._finding_routing_text(finding)
+        finding_id = str(finding.get("finding_id", "")).strip().upper()
+
+        explicit_hints = (
+            "dialogue-interiority",
+            "dialogue interiority",
+            "dialogue-interiority suppression",
+            "dialogue interiority suppression",
+            "focalizer's mind goes quiet",
+            "focalizer mind goes quiet",
+            "between lines of exchange",
+            "dialogue scenes where the focalizer",
+        )
+        if any(hint in text for hint in explicit_hints):
+            return True
+
+        dialogue_hints = (
+            "dialogue scene",
+            "lines of exchange",
+            "insider shorthand",
+            "compressed loaded exchange",
+            "speaker",
+            "exchange",
+        )
+        interiority_hints = (
+            "focalizer",
+            "recognition",
+            "relational worry",
+            "social-dynamic",
+            "social dynamic",
+            "interiority suppression",
+            "interiority failure",
+        )
+        return (
+            any(hint in text for hint in dialogue_hints)
+            and any(hint in text for hint in interiority_hints)
+        ) or (
+            "DIALOGUE" in finding_id and "INTERIORITY" in finding_id
+        )
+
+    def _finding_prefers_prose_pass(self, finding: dict[str, Any]) -> bool:
+        source = self._canonical_finding_source_name(finding.get("source", ""))
+        if source == "prose":
+            return True
+        if source in {"dialogue", "local_window", "elevation"}:
+            return False
+
+        text = self._finding_routing_text(finding)
+        finding_id = str(finding.get("finding_id", "")).strip().upper()
+
+        structural_override_hints = (
+            "continuity",
+            "contradiction",
+            "causal",
+            "cause and effect",
+            "process beat",
+            "process legibility",
+            "operational legibility",
+            "decision coherence",
+            "underseeded payoff",
+            "late-arriving solution",
+            "late-arriving engine",
+            "convenience",
+            "handoff",
+            "bridge scene",
+            "structural recurrence",
+            "setup",
+            "payoff",
+            "timeline",
+            "timebase",
+            "uptake",
+            "proof chain",
+            "proof beat",
+            "window mechanics",
+            "transfer math",
+            "node count",
+            "earpiece state",
+        )
+        if any(hint in text for hint in structural_override_hints):
+            return False
+
+        prose_hints = (
+            "narration",
+            "narrator",
+            "prose",
+            "overstatement",
+            "composed writing",
+            "composed narration",
+            "narrator performance",
+            "calibration leakage",
+            "calibration-only",
+            "style-bible echo",
+            "style bible echo",
+            "style-bible-adjacent",
+            "copied style-bible",
+            "copied style bible",
+            "clipped narration",
+            "clipped clockwork",
+            "thematic underlining",
+            "editorial commentary",
+            "abstract noun",
+            "abstract nouns",
+            "parallel clause",
+            "parallel clauses",
+            "close-third",
+            "close third",
+            "interiority",
+            "screenplay-distance",
+            "screenplay distance",
+            "telemetry",
+            "thesis-writing",
+            "repeated certification",
+            "summary capper",
+            "narrative capper",
+        )
+        prose_id_hints = (
+            "PROSE",
+            "OVERSTATEMENT",
+            "STYLE_BIBLE",
+            "STYLEBIBLE",
+            "COMPOSED",
+            "CLIPPED",
+            "INTERIORITY",
+            "NARRATOR",
+            "TELEMETRY",
+        )
+        return any(hint in text for hint in prose_hints) or any(
+            hint in finding_id for hint in prose_id_hints
+        )
+
+    def _assign_revision_pass_key(self, finding: dict[str, Any]) -> str:
+        aggregated_pass_key = str(finding.get("aggregated_pass_key", "")).strip()
+        if aggregated_pass_key in REVISION_PASS_KEYS:
+            return aggregated_pass_key
+        source = self._canonical_finding_source_name(finding.get("source", ""))
+        if source in {"local_window", "elevation"}:
+            pass_hint = str(finding.get("pass_hint", "")).strip()
+            if pass_hint in REVISION_PASS_KEYS:
+                return pass_hint
+            return "p1_structural_craft"
+        if self._finding_prefers_dialogue_pass(finding):
+            return "p2_dialogue_idiolect_cadence"
+        if source == "dialogue":
+            return "p2_dialogue_idiolect_cadence"
+        if self._finding_prefers_prose_pass(finding):
+            return "p3_prose_copyedit"
         severity = str(finding.get("severity", "")).strip().upper()
         if severity in {"HIGH", "CRITICAL"}:
             return "p1_structural_craft"
@@ -4445,8 +6776,6 @@ class NovelPipelineRunner:
             "cross_chapter",
         }:
             return "p1_structural_craft"
-        if source == "dialogue":
-            return "p2_dialogue_idiolect_cadence"
         return "p3_prose_copyedit"
 
     def _revision_packet_rel(self, cycle: int, chapter_id: str) -> str:
@@ -4514,317 +6843,56 @@ class NovelPipelineRunner:
             "pass_summaries": pass_summaries,
         }
 
-    def _run_seam_polish_stage(self, cycle: int, chapter_ids: list[str]) -> None:
-        if not chapter_ids:
-            return
-        cpad = self._cpad(cycle)
-        continuity_sheet_file = self._ensure_cycle_continuity_snapshot(cycle)
-        chapter_order = [spec.chapter_id for spec in self.chapter_specs]
-        order_index = {cid: idx for idx, cid in enumerate(chapter_order)}
-        touched = sorted(chapter_ids, key=lambda cid: order_index[cid])
-        wave_even = [cid for cid in touched if order_index[cid] % 2 == 0]
-        wave_odd = [cid for cid in touched if order_index[cid] % 2 == 1]
-
-        for wave_idx, wave_ids in enumerate((wave_even, wave_odd), start=1):
-            if not wave_ids:
-                continue
-            post_boundary_files = self._build_post_revision_boundary_context(cycle, wave_ids)
-            jobs: list[JobSpec] = []
-            for chapter_id in wave_ids:
-                chapter_number = self._chapter_number(chapter_id)
-                chapter_file = f"chapters/{chapter_id}.md"
-                chapter_path = self.run_dir / chapter_file
-                boundary_file = post_boundary_files[chapter_id]
-                seam_report_file = f"revisions/cycle_{cpad}/{chapter_id}.seam_report.json"
-                seam_report_path = self.run_dir / seam_report_file
-                if chapter_path.is_file() and seam_report_path.is_file():
-                    try:
-                        self._validate_chapter_heading(chapter_path, chapter_number)
-                        self._load_repaired_seam_report(
-                            seam_report_file,
-                            chapter_id,
-                        )
-                        seam_inputs = [
-                            self.run_dir / chapter_file,
-                            self.run_dir / boundary_file,
-                            self.run_dir / "outline" / "outline.md",
-                            self.run_dir / continuity_sheet_file,
-                            self.run_dir / "outline" / "style_bible.json",
-                            self.run_dir / "config" / "constitution.md",
-                            self.run_dir / "config" / "prompts" / "chapter_seam_polish_prompt.md",
-                        ]
-                        if self._artifact_fresh_against_inputs(
-                            seam_report_path, seam_inputs
-                        ):
-                            continue
-                    except PipelineError:
-                        pass
-
-                jobs.append(
-                    self._build_chapter_seam_polish_job(
-                        cycle=cycle,
-                        chapter_id=chapter_id,
-                        chapter_number=chapter_number,
-                        boundary_file=boundary_file,
-                        continuity_sheet_file=continuity_sheet_file,
-                    )
-                )
-
-            if jobs:
-                try:
-                    self._run_jobs_parallel(
-                        jobs,
-                        self.cfg.max_parallel_revisions,
-                        f"seam_polish_cycle_{cpad}_wave_{wave_idx}",
-                    )
-                except PipelineError as exc:
-                    if not self._soft_validation_enabled():
-                        raise
-                    self._record_validation_warning(
-                        stage="chapter_seam_polish",
-                        cycle=cycle,
-                        chapter_id=None,
-                        artifact=f"revisions/cycle_{cpad}",
-                        reason=str(exc),
-                        action=f"continued_after_parallel_seam_failure_wave_{wave_idx}",
-                    )
-            else:
-                self._log(
-                    f"cycle={cpad} seam_polish_resume_wave_{wave_idx} all_chapters_present"
-                )
-            for chapter_id in wave_ids:
-                chapter_path = self.run_dir / "chapters" / f"{chapter_id}.md"
-                self._validate_chapter_heading(chapter_path, self._chapter_number(chapter_id))
-                seam_rel = f"revisions/cycle_{cpad}/{chapter_id}.seam_report.json"
-                attempts = 0
-                while True:
-                    try:
-                        self._materialize_output_alias(
-                            base_dir=self.run_dir,
-                            required_rel=seam_rel,
-                            stage="chapter_seam_polish",
-                            cycle=cycle,
-                            chapter_id=chapter_id,
-                        )
-                        self._load_repaired_seam_report(
-                            seam_rel,
-                            chapter_id,
-                        )
-                        break
-                    except PipelineError as exc:
-                        if attempts >= SEAM_VALIDATION_RETRY_MAX:
-                            if not self._soft_validation_enabled():
-                                raise
-                            fallback = self._fallback_seam_report_payload(
-                                chapter_id=chapter_id,
-                                reason=str(exc),
-                            )
-                            self._write_json(seam_rel, fallback)
-                            self._record_validation_warning(
-                                stage="chapter_seam_polish",
-                                cycle=cycle,
-                                chapter_id=chapter_id,
-                                artifact=seam_rel,
-                                reason=str(exc),
-                                action="wrote_fallback_seam_report",
-                            )
-                            break
-                        attempts += 1
-                        self._log(
-                            "cycle="
-                            f"{cpad} seam_validation_retry chapter={chapter_id} "
-                            f"attempt={attempts}/{SEAM_VALIDATION_RETRY_MAX} reason={exc}"
-                        )
-                        retry_job = self._build_chapter_seam_polish_job(
-                            cycle=cycle,
-                            chapter_id=chapter_id,
-                            chapter_number=self._chapter_number(chapter_id),
-                            boundary_file=post_boundary_files[chapter_id],
-                            continuity_sheet_file=continuity_sheet_file,
-                            validation_error=str(exc),
-                            retry_attempt=attempts,
-                        )
-                        try:
-                            self._run_job(retry_job)
-                        except PipelineError as job_exc:
-                            if attempts >= SEAM_VALIDATION_RETRY_MAX:
-                                if not self._soft_validation_enabled():
-                                    raise
-                                fallback = self._fallback_seam_report_payload(
-                                    chapter_id=chapter_id,
-                                    reason=str(job_exc),
-                                )
-                                self._write_json(seam_rel, fallback)
-                                self._record_validation_warning(
-                                    stage="chapter_seam_polish",
-                                    cycle=cycle,
-                                    chapter_id=chapter_id,
-                                    artifact=seam_rel,
-                                    reason=str(job_exc),
-                                    action="wrote_fallback_seam_report_after_retry_job_failure",
-                                )
-                                break
-                            self._record_validation_warning(
-                                stage="chapter_seam_polish",
-                                cycle=cycle,
-                                chapter_id=chapter_id,
-                                artifact=seam_rel,
-                                reason=str(job_exc),
-                                action="retry_seam_job_failed_will_retry",
-                            )
-
-    def _build_chapter_seam_polish_job(
-        self,
-        *,
-        cycle: int,
-        chapter_id: str,
-        chapter_number: int,
-        boundary_file: str,
-        continuity_sheet_file: str,
-        validation_error: str | None = None,
-        retry_attempt: int = 0,
-    ) -> JobSpec:
-        cpad = self._cpad(cycle)
-        chapter_file = f"chapters/{chapter_id}.md"
-        seam_report_file = f"revisions/cycle_{cpad}/{chapter_id}.seam_report.json"
-        prompt = self._render_prompt(
-            "chapter_seam_polish_prompt.md",
-            {
-                "CHAPTER_ID": chapter_id,
-                "CHAPTER_NUMBER": str(chapter_number),
-                "CHAPTER_INPUT_FILE": chapter_file,
-                "CHAPTER_OUTPUT_FILE": chapter_file,
-                "CHAPTER_BOUNDARY_CONTEXT_FILE": boundary_file,
-                "CONTINUITY_SHEET_FILE": continuity_sheet_file,
-                "SEAM_REPORT_FILE": seam_report_file,
-            },
-        )
-        if validation_error:
-            safe_error = " ".join(str(validation_error).split())
-            prompt += (
-                "\n\nValidator feedback from previous attempt:\n"
-                f"- {safe_error}\n"
-                "Regenerate the seam report JSON so it satisfies the contract exactly.\n"
-                "If the chapter text is already correct, keep the text stable and fix only the report shape.\n"
-            )
-        retry_suffix = f"_retry_{retry_attempt}" if retry_attempt > 0 else ""
-        return self._make_job(
-            job_id=f"cycle_{cpad}_seam_{chapter_id}{retry_suffix}",
-            stage="chapter_seam_polish",
-            stage_group="revision",
-            cycle=cycle,
-            chapter_id=chapter_id,
-            allowed_inputs=[
-                chapter_file,
-                boundary_file,
-                "outline/outline.md",
-                continuity_sheet_file,
-                "outline/style_bible.json",
-                "config/constitution.md",
-                "config/prompts/chapter_seam_polish_prompt.md",
-            ],
-            required_outputs=[chapter_file, seam_report_file],
-            prompt_text=prompt,
-        )
-
-    def _build_post_revision_boundary_context(
-        self, cycle: int, chapter_ids: list[str]
-    ) -> dict[str, str]:
-        cpad = self._cpad(cycle)
-        chapter_ids_ordered = [spec.chapter_id for spec in self.chapter_specs]
-        chapter_to_idx = {cid: idx for idx, cid in enumerate(chapter_ids_ordered)}
-        out: dict[str, str] = {}
-
-        for chapter_id in chapter_ids:
-            if chapter_id not in chapter_to_idx:
-                raise PipelineError(
-                    f"chapter_id missing from ordered chapter list for seam polish: {chapter_id}"
-                )
-            idx = chapter_to_idx[chapter_id]
-            spec = self.chapter_specs[idx]
-            prev_id = chapter_ids_ordered[idx - 1] if idx > 0 else None
-            next_id = (
-                chapter_ids_ordered[idx + 1] if idx < len(chapter_ids_ordered) - 1 else None
-            )
-
-            prev_tail_excerpt = ""
-            next_head_excerpt = ""
-            if prev_id:
-                prev_path = self.run_dir / "chapters" / f"{prev_id}.md"
-                prev_tail_excerpt = self._tail_excerpt(prev_path, max_lines=35, max_chars=1800)
-            if next_id:
-                next_path = self.run_dir / "chapters" / f"{next_id}.md"
-                next_head_excerpt = self._head_excerpt(next_path, max_lines=35, max_chars=1800)
-
-            rel = f"context/cycle_{cpad}/post_revision_boundary/{chapter_id}.boundary.json"
-            payload = {
-                "chapter_id": chapter_id,
-                "prev_chapter_id": prev_id,
-                "next_chapter_id": next_id,
-                "prev_tail_excerpt": prev_tail_excerpt,
-                "next_head_excerpt": next_head_excerpt,
-                "open_hooks_to_carry": spec.must_land_beats,
-                "secondary_character_beats": spec.secondary_character_beats,
-                "setups_to_plant": spec.setups_to_plant,
-                "payoffs_to_land": spec.payoffs_to_land,
-                "state_deltas_required": [
-                    spec.pressure_source,
-                    spec.state_shift,
-                ],
-                "focus": "Resolve seam continuity with minimal edits.",
-            }
-            self._write_json(rel, payload)
-            out[chapter_id] = rel
-        return out
-
     def _aggregate_findings(self, cycle: int) -> dict[str, Any]:
         cpad = self._cpad(cycle)
         chapter_ids = [spec.chapter_id for spec in self.chapter_specs]
         by_chapter: dict[str, list[dict[str, Any]]] = {cid: [] for cid in chapter_ids}
         findings: list[dict[str, Any]] = []
         chapter_review_failures = 0
+        chapter_review_skipped = self._is_global_only_final_cycle(cycle)
         cross_chapter_audit_failed = False
 
-        for chapter_id in chapter_ids:
-            rel = f"reviews/cycle_{cpad}/{chapter_id}.review.json"
-            chapter_file = f"snapshots/cycle_{cpad}/chapters/{chapter_id}.md"
-            self._materialize_output_alias(
-                base_dir=self.run_dir,
-                required_rel=rel,
-                stage="aggregate_findings",
-                cycle=cycle,
-                chapter_id=chapter_id,
-            )
-            try:
-                review = self._load_repaired_chapter_review(
-                    rel,
-                    chapter_id,
-                    chapter_file,
-                )
-            except PipelineError as exc:
-                if not self._soft_validation_enabled():
-                    raise
-                review = self._fallback_chapter_review_payload(
-                    cycle=cycle,
-                    chapter_id=chapter_id,
-                    chapter_file=chapter_file,
-                    reason=str(exc),
-                )
-                self._write_json(rel, review)
-                self._record_validation_warning(
+        if not chapter_review_skipped:
+            for chapter_id in chapter_ids:
+                rel = f"reviews/cycle_{cpad}/{chapter_id}.review.json"
+                chapter_file = f"snapshots/cycle_{cpad}/chapters/{chapter_id}.md"
+                self._materialize_output_alias(
+                    base_dir=self.run_dir,
+                    required_rel=rel,
                     stage="aggregate_findings",
                     cycle=cycle,
                     chapter_id=chapter_id,
-                    artifact=rel,
-                    reason=str(exc),
-                    action="replaced_invalid_chapter_review_with_fallback",
                 )
-            if any(v == "FAIL" for v in review["verdicts"].values()):
-                chapter_review_failures += 1
-            for raw in review["findings"]:
-                finding = self._normalize_finding(raw, cycle)
-                findings.append(finding)
-                by_chapter[chapter_id].append(finding)
+                try:
+                    review = self._load_repaired_chapter_review(
+                        rel,
+                        chapter_id,
+                        chapter_file,
+                    )
+                except PipelineError as exc:
+                    if not self._soft_validation_enabled():
+                        raise
+                    review = self._fallback_chapter_review_payload(
+                        cycle=cycle,
+                        chapter_id=chapter_id,
+                        chapter_file=chapter_file,
+                        reason=str(exc),
+                    )
+                    self._write_json(rel, review)
+                    self._record_validation_warning(
+                        stage="aggregate_findings",
+                        cycle=cycle,
+                        chapter_id=chapter_id,
+                        artifact=rel,
+                        reason=str(exc),
+                        action="replaced_invalid_chapter_review_with_fallback",
+                    )
+                if any(v == "FAIL" for v in review["verdicts"].values()):
+                    chapter_review_failures += 1
+                for raw in review["findings"]:
+                    finding = self._normalize_finding(raw, cycle)
+                    findings.append(finding)
+                    by_chapter[chapter_id].append(finding)
 
         full_rel = f"reviews/cycle_{cpad}/full_award.review.json"
         full_novel_file = f"snapshots/cycle_{cpad}/FINAL_NOVEL.md"
@@ -4872,7 +6940,14 @@ class NovelPipelineRunner:
                 action="replaced_invalid_full_award_with_fallback",
             )
         for raw in full_review["findings"]:
-            finding = self._normalize_finding(raw, cycle, force_source="award_global")
+            raw_source, _normalized_severity = (
+                self._normalize_full_award_finding_source_and_severity(
+                    str(raw.get("source", "")).strip(),
+                    str(raw.get("severity", "")).strip(),
+                )
+            )
+            force_source = "elevation" if raw_source == "elevation" else "award_global"
+            finding = self._normalize_finding(raw, cycle, force_source=force_source)
             findings.append(finding)
             by_chapter[finding["chapter_id"]].append(finding)
         for finding in self._expand_full_award_pattern_findings(
@@ -4953,6 +7028,70 @@ class NovelPipelineRunner:
                     finding = self._normalize_finding(raw, cycle, force_source="cross_chapter")
                     findings.append(finding)
                     by_chapter[finding["chapter_id"]].append(finding)
+
+        local_window_available = 0
+        local_window_expected = 0
+        if self._local_window_stage_enabled() and not self.cfg.skip_local_window_audit:
+            windows = self._compute_windows(
+                chapter_ids,
+                self.cfg.local_window_size,
+                self.cfg.local_window_overlap,
+            )
+            local_window_expected = len(windows)
+            for window in windows:
+                window_id = self._window_id_for_chapters(window)
+                rel = self._local_window_audit_rel(cycle, window_id)
+                path = self.run_dir / rel
+                if not path.is_file():
+                    self._record_validation_warning(
+                        stage="aggregate_findings",
+                        cycle=cycle,
+                        chapter_id=None,
+                        artifact=rel,
+                        reason="local-window audit artifact missing before aggregation",
+                        action="local_window_audit_missing_before_aggregation",
+                    )
+                    continue
+                self._materialize_output_alias(
+                    base_dir=self.run_dir,
+                    required_rel=rel,
+                    stage="aggregate_findings",
+                    cycle=cycle,
+                    chapter_id=None,
+                )
+                try:
+                    audit_data = self._load_repaired_local_window_audit(
+                        rel,
+                        cycle,
+                        set(chapter_ids),
+                        full_novel_file,
+                    )
+                    self._validate_local_window_window_output(
+                        audit_data,
+                        rel=rel,
+                        window_id=window_id,
+                        chapters_reviewed=window,
+                    )
+                except PipelineError as exc:
+                    if self._local_window_stage_required():
+                        raise
+                    self._record_validation_warning(
+                        stage="aggregate_findings",
+                        cycle=cycle,
+                        chapter_id=None,
+                        artifact=rel,
+                        reason=str(exc),
+                        action="ignored_invalid_local_window_audit_before_aggregation",
+                    )
+                    continue
+                local_window_available += 1
+                for raw in audit_data.get("findings", []):
+                    finding = self._normalize_finding(raw, cycle, force_source="local_window")
+                    findings.append(finding)
+                    by_chapter[finding["chapter_id"]].append(finding)
+        else:
+            local_window_expected = 0
+            local_window_available = 0
 
         for finding in self._build_min_word_findings(cycle):
             findings.append(finding)
@@ -5057,8 +7196,11 @@ class NovelPipelineRunner:
             "by_source": self._count_by_key(unique_findings, "source"),
             "chapters_touched": sorted(by_chapter.keys()),
             "chapter_review_failures": chapter_review_failures,
+            "chapter_review_skipped": chapter_review_skipped,
             "full_award_verdict": full_review["verdict"],
             "cross_chapter_audit_failed": cross_chapter_audit_failed,
+            "local_window_windows_expected": local_window_expected,
+            "local_window_windows_available": local_window_available,
         }
         self._write_json(f"findings/cycle_{cpad}/summary.json", summary)
         self._write_text(
@@ -5071,10 +7213,12 @@ class NovelPipelineRunner:
             "by_chapter": by_chapter,
             "full_award_verdict": full_review["verdict"],
             "chapter_review_failures": chapter_review_failures,
+            "chapter_review_skipped": chapter_review_skipped,
             "cross_chapter_audit_failed": cross_chapter_audit_failed,
         }
 
     def _build_min_word_findings(self, cycle: int) -> list[dict[str, Any]]:
+        return []
         cpad = self._cpad(cycle)
         findings: list[dict[str, Any]] = []
         for spec in self.chapter_specs:
@@ -5105,6 +7249,251 @@ class NovelPipelineRunner:
                 self._normalize_finding(raw, cycle, force_source="length_guardrail")
             )
         return findings
+
+    def _cycle_status_rel(self, cycle: int) -> str:
+        return f"status/cycle_{self._cpad(cycle)}/cycle_status.json"
+
+    def _quality_summary_rel(self, cycle: int) -> str:
+        return f"status/cycle_{self._cpad(cycle)}/quality_summary.json"
+
+    def _local_window_stage_enabled(self) -> bool:
+        return True
+
+    def _local_window_stage_required(self) -> bool:
+        return bool(self.cfg.require_local_window_for_revision)
+
+    def _load_existing_cycle_status(self, cycle: int) -> dict[str, Any] | None:
+        rel = self._cycle_status_rel(cycle)
+        path = self.run_dir / rel
+        if not path.is_file():
+            return None
+        try:
+            data = self._read_json(rel)
+        except PipelineError as exc:
+            self._log(
+                f"cycle={self._cpad(cycle)} cycle_status_resume_invalid reason={exc}"
+            )
+            return None
+        if not isinstance(data, dict):
+            self._log(
+                f"cycle={self._cpad(cycle)} cycle_status_resume_invalid reason=not_object"
+            )
+            return None
+        if data.get("cycle") != cycle:
+            self._log(
+                f"cycle={self._cpad(cycle)} cycle_status_resume_invalid reason=cycle_mismatch"
+            )
+            return None
+        if not isinstance(data.get("stages"), dict):
+            self._log(
+                f"cycle={self._cpad(cycle)} cycle_status_resume_invalid reason=missing_stages"
+            )
+            return None
+        return data
+
+    def _resume_cycle_status(
+        self, cycle: int, existing_cycle_status: dict[str, Any]
+    ) -> dict[str, Any]:
+        cycle_status = self._new_cycle_status(cycle)
+        existing_stages = existing_cycle_status.get("stages", {})
+        if isinstance(existing_stages, dict):
+            for stage_key in OBSERVABILITY_STAGE_KEYS:
+                if stage_key in self._precycle_stage_entries:
+                    cycle_status["stages"][stage_key] = copy.deepcopy(
+                        self._precycle_stage_entries[stage_key]
+                    )
+                    continue
+                existing_entry = existing_stages.get(stage_key)
+                if not isinstance(existing_entry, dict):
+                    continue
+                merged_entry = copy.deepcopy(existing_entry)
+                merged_entry["required"] = cycle_status["stages"][stage_key]["required"]
+                if stage_key == "chapter_review" and self._is_global_only_final_cycle(cycle):
+                    merged_entry["status"] = "skipped"
+                    merged_entry["reason"] = "final_cycle_global_only"
+                    merged_entry["units"] = {}
+                elif stage_key == "cross_chapter_audit" and self.cfg.skip_cross_chapter_audit:
+                    merged_entry["status"] = "skipped"
+                    merged_entry["reason"] = "config_skip_cross_chapter_audit"
+                    merged_entry.pop("units", None)
+                elif stage_key == "local_window_audit" and (
+                    self.cfg.skip_local_window_audit or not self._local_window_stage_enabled()
+                ):
+                    merged_entry["status"] = "skipped"
+                    merged_entry["reason"] = (
+                        "config_skip_local_window_audit"
+                        if self.cfg.skip_local_window_audit
+                        else "stage_not_enabled"
+                    )
+                    merged_entry["units"] = {}
+                cycle_status["stages"][stage_key] = merged_entry
+        cycle_status["run_mode"] = "resume"
+        if isinstance(existing_cycle_status.get("advisory_gate"), dict):
+            cycle_status["advisory_gate"] = copy.deepcopy(
+                existing_cycle_status["advisory_gate"]
+            )
+        cycle_status["resume"] = {
+            "source": "cycle_status",
+            "status_file": self._cycle_status_rel(cycle),
+        }
+        return cycle_status
+
+    def _new_cycle_status(self, cycle: int) -> dict[str, Any]:
+        stages: dict[str, dict[str, Any]] = {}
+        for stage_key in OBSERVABILITY_STAGE_KEYS:
+            required = True
+            status = "pending"
+            reason = None
+            if stage_key in self._precycle_stage_entries:
+                stages[stage_key] = copy.deepcopy(self._precycle_stage_entries[stage_key])
+                continue
+            if stage_key == "chapter_review" and self._is_global_only_final_cycle(cycle):
+                required = False
+                status = "skipped"
+                reason = "final_cycle_global_only"
+            elif stage_key == "cross_chapter_audit" and self.cfg.skip_cross_chapter_audit:
+                required = False
+                status = "skipped"
+                reason = "config_skip_cross_chapter_audit"
+            elif stage_key == "local_window_audit":
+                required = self._local_window_stage_required()
+                if self.cfg.skip_local_window_audit or not self._local_window_stage_enabled():
+                    required = False
+                    status = "skipped"
+                    reason = (
+                        "config_skip_local_window_audit"
+                        if self.cfg.skip_local_window_audit
+                        else "stage_not_enabled"
+                    )
+            elif stage_key in {
+                "llm_aggregator",
+                "materialize_aggregation_decisions",
+            }:
+                required = False
+            entry: dict[str, Any] = {
+                "status": status,
+                "required": required,
+            }
+            if stage_key == "local_window_audit":
+                entry["units"] = {}
+            if reason:
+                entry["reason"] = reason
+            stages[stage_key] = entry
+
+        return {
+            "cycle": cycle,
+            "max_cycles": self.cfg.max_cycles,
+            "min_cycles": self.cfg.min_cycles,
+            "run_mode": "fresh",
+            "completion_policy": {
+                "terminate_on_quality_pass": False,
+                "terminate_on_max_cycles": True,
+            },
+            "stages": stages,
+            "warnings_file": "reports/validation_warnings.json",
+            "updated_at_utc": self._utc_now(),
+        }
+
+    def _refresh_cycle_resume_metadata(self, cycle_status: dict[str, Any]) -> None:
+        stages = cycle_status.get("stages", {})
+        reusable_stages: list[str] = []
+        earliest_rerun_stage: str | None = None
+        for stage_key in OBSERVABILITY_STAGE_KEYS:
+            entry = stages.get(stage_key, {})
+            status = entry.get("status")
+            required = bool(entry.get("required", True))
+            if status in {"complete", "reused", "skipped"}:
+                reusable_stages.append(stage_key)
+                continue
+            if earliest_rerun_stage is None and required:
+                earliest_rerun_stage = stage_key
+        existing_resume = cycle_status.get("resume", {})
+        resume: dict[str, Any] = {}
+        if isinstance(existing_resume, dict):
+            for key in ("source", "status_file"):
+                if key in existing_resume:
+                    resume[key] = existing_resume[key]
+        resume["earliest_rerun_stage"] = earliest_rerun_stage
+        resume["reusable_stages"] = reusable_stages
+        resume["next_action"] = (
+            f"run_{earliest_rerun_stage}"
+            if earliest_rerun_stage is not None
+            else "cycle_complete"
+        )
+        cycle_status["resume"] = resume
+
+    def _update_cycle_stage_status(
+        self,
+        cycle_status: dict[str, Any],
+        stage_key: str,
+        stage_status: str,
+        *,
+        reason: str | None = None,
+        outputs: list[str] | None = None,
+        artifact_glob: str | None = None,
+        chapter_count: int | None = None,
+        units: dict[str, dict[str, Any]] | None = None,
+    ) -> None:
+        stages = cycle_status.setdefault("stages", {})
+        entry = stages.setdefault(stage_key, {})
+        entry["status"] = stage_status
+        if reason:
+            entry["reason"] = reason
+        elif "reason" in entry and stage_status not in {"skipped", "failed"}:
+            entry.pop("reason", None)
+        if outputs is not None:
+            entry["outputs"] = outputs
+        elif stage_status == "skipped":
+            entry.pop("outputs", None)
+        if artifact_glob is not None:
+            entry["artifact_glob"] = artifact_glob
+        elif stage_status == "skipped":
+            entry.pop("artifact_glob", None)
+        if chapter_count is not None:
+            entry["chapter_count"] = chapter_count
+        elif stage_status == "skipped":
+            entry.pop("chapter_count", None)
+        if units is not None:
+            entry["units"] = units
+        elif stage_status == "skipped":
+            entry.pop("units", None)
+        self._refresh_cycle_resume_metadata(cycle_status)
+        cycle_status["updated_at_utc"] = self._utc_now()
+
+    def _write_cycle_status(self, cycle: int, cycle_status: dict[str, Any]) -> None:
+        payload = copy.deepcopy(cycle_status)
+        self._refresh_cycle_resume_metadata(payload)
+        payload["updated_at_utc"] = self._utc_now()
+        self._write_json(self._cycle_status_rel(cycle), payload)
+
+    def _write_quality_summary(
+        self,
+        cycle: int,
+        aggregate: dict[str, Any],
+        advisory_gate: dict[str, Any] | None = None,
+        *,
+        cycle_status: dict[str, Any] | None = None,
+    ) -> None:
+        summary = dict(aggregate.get("summary", {}))
+        summary["cycle"] = cycle
+        summary["advisory_only"] = True
+        summary["validation_warning_count"] = len(self.validation_warnings)
+        if cycle_status is not None:
+            stages = cycle_status.get("stages", {})
+            if isinstance(stages, dict):
+                local_window_stage = stages.get("local_window_audit")
+                if isinstance(local_window_stage, dict):
+                    summary["local_window_audit"] = copy.deepcopy(local_window_stage)
+        if advisory_gate is not None:
+            summary["advisory_gate"] = {
+                "decision": advisory_gate.get("decision"),
+                "reason": advisory_gate.get("reason"),
+                "full_award_verdict": advisory_gate.get("full_award_verdict"),
+                "unresolved_medium_plus_count": advisory_gate.get(
+                    "unresolved_medium_plus_count"
+                ),
+            }
+        self._write_json(self._quality_summary_rel(cycle), summary)
 
     def _write_gate(self, cycle: int, aggregate: dict[str, Any]) -> dict[str, Any]:
         cpad = self._cpad(cycle)
@@ -5156,206 +7545,30 @@ class NovelPipelineRunner:
         self._write_json(f"gate/cycle_{cpad}/gate.json", gate)
         return gate
 
-    def _load_existing_gate(self, cycle: int) -> dict[str, Any] | None:
+    def _assemble_snapshot(self, cycle: int) -> bool:
         cpad = self._cpad(cycle)
-        rel = f"gate/cycle_{cpad}/gate.json"
-        path = self.run_dir / rel
-        if not path.is_file():
-            return None
-        self._materialize_output_alias(
-            base_dir=self.run_dir,
-            required_rel=f"reviews/cycle_{cpad}/full_award.review.json",
-            stage="gate",
-            cycle=cycle,
-            chapter_id=None,
-        )
-        if not self.cfg.skip_cross_chapter_audit:
-            self._materialize_output_alias(
-                base_dir=self.run_dir,
-                required_rel=self._cross_chapter_audit_rel(cycle),
-                stage="gate",
-                cycle=cycle,
-                chapter_id=None,
-            )
-        # Resume gates must be anchored to immutable cycle-local review inputs.
-        # Live chapters mutate after later revisions, so using chapters/*.md here
-        # incorrectly invalidates completed earlier cycles and prevents resuming
-        # into the next cycle.
-        gate_inputs = [
-            self.run_dir / "input" / "premise.txt",
-            self.run_dir / "outline" / "outline.md",
-            self.run_dir / "outline" / "chapter_specs.jsonl",
-            self.run_dir / "outline" / "scene_plan.tsv",
-            self.run_dir / "outline" / "style_bible.json",
+        snapshot_outputs = [
             self.run_dir / "snapshots" / f"cycle_{cpad}" / "FINAL_NOVEL.md",
-            self.run_dir / "reviews" / f"cycle_{cpad}" / "full_award.review.json",
+            self.run_dir / "snapshots" / f"cycle_{cpad}" / "FINAL_NOVEL.pre_review.md",
+            self.run_dir / "snapshots" / f"cycle_{cpad}" / "snapshot_manifest.json",
         ]
-        if not self.cfg.skip_cross_chapter_audit:
-            gate_inputs.append(self.run_dir / self._cross_chapter_audit_rel(cycle))
-        for spec in self.chapter_specs:
-            gate_inputs.append(
-                self.run_dir
-                / "snapshots"
-                / f"cycle_{cpad}"
-                / "chapters"
-                / f"{spec.chapter_id}.md"
-            )
-            gate_inputs.append(
-                self.run_dir / "reviews" / f"cycle_{cpad}" / f"{spec.chapter_id}.review.json"
-            )
-        if not self._artifact_fresh_against_inputs(path, gate_inputs):
-            self._log(f"cycle={cpad} gate_resume_stale reason=input_newer_than_gate")
-            return None
-        gate = self._read_json(rel)
-        required = {
-            "cycle",
-            "full_award_verdict",
-            "unresolved_medium_plus_count",
-            "chapter_review_failures",
-            "decision",
-            "reason",
-        }
-        missing = sorted(k for k in required if k not in gate)
-        if missing:
-            raise PipelineError(f"{rel} missing required keys: {', '.join(missing)}")
-        if gate["cycle"] != cycle:
-            raise PipelineError(
-                f"{rel} cycle mismatch while resuming ({gate['cycle']} != {cycle})"
-            )
-        if gate["decision"] not in {"PASS", "FAIL"}:
-            raise PipelineError(f"{rel} invalid decision: {gate['decision']}")
-        if gate["full_award_verdict"] not in {"PASS", "FAIL"}:
-            raise PipelineError(
-                f"{rel} invalid full_award_verdict: {gate['full_award_verdict']}"
-            )
-        if not self.cfg.skip_cross_chapter_audit:
-            if not isinstance(gate.get("cross_chapter_audit_failed"), bool):
-                self._log(
-                    f"cycle={cpad} gate_resume_stale reason=missing_cross_chapter_audit_flag"
-                )
-                return None
-            audit_rel = self._cross_chapter_audit_rel(cycle)
-            audit_path = self.run_dir / audit_rel
-            if not audit_path.is_file():
-                self._log(
-                    f"cycle={cpad} gate_resume_stale reason=missing_cross_chapter_audit"
-                )
-                return None
-            try:
-                audit_data = self._load_repaired_cross_chapter_audit(
-                    audit_rel,
-                    cycle,
-                    {spec.chapter_id for spec in self.chapter_specs},
-                    f"snapshots/cycle_{cpad}/FINAL_NOVEL.md",
-                )
-            except PipelineError:
-                self._log(
-                    f"cycle={cpad} gate_resume_stale reason=invalid_cross_chapter_audit"
-                )
-                return None
-            audit_failed = self._is_cross_chapter_audit_fallback_payload(audit_data, cycle)
-            if audit_failed != gate["cross_chapter_audit_failed"]:
-                self._log(
-                    f"cycle={cpad} gate_resume_stale reason=cross_chapter_audit_state_mismatch"
-                )
-                return None
-        return gate
-
-    def _cycle_revisions_complete(self, cycle: int) -> bool:
-        cpad = self._cpad(cycle)
-        target_list = self.run_dir / "findings" / f"cycle_{cpad}" / "chapter_target_list.txt"
-        if not target_list.is_file():
-            return False
-        chapter_ids = [
-            line.strip()
-            for line in target_list.read_text(encoding="utf-8").splitlines()
-            if line.strip()
-        ]
-        if not chapter_ids:
-            return False
-        require_seam_reports = self._should_run_seam_polish(cycle)
-
-        for chapter_id in chapter_ids:
-            chapter_number = self._chapter_number(chapter_id)
-            chapter_file = f"chapters/{chapter_id}.md"
-            chapter_path = self.run_dir / chapter_file
-            if not chapter_path.is_file():
-                return False
-            try:
-                self._validate_chapter_heading(chapter_path, chapter_number)
-            except PipelineError:
-                return False
-
-            packet_rel = f"packets/cycle_{cpad}/{chapter_id}.revision_packet.json"
-            packet_path = self.run_dir / packet_rel
-            if not packet_path.is_file():
-                return False
-            try:
-                packet_data = self._read_json(packet_rel)
-            except PipelineError:
-                return False
-            packet_findings = packet_data.get("findings", [])
-            expected_ids = {
-                str(f.get("finding_id", "")).strip()
-                for f in packet_findings
-                if isinstance(f, dict) and str(f.get("finding_id", "")).strip()
-            }
-
-            report_rel = f"revisions/cycle_{cpad}/{chapter_id}.revision_report.json"
-            report_path = self.run_dir / report_rel
-            if not report_path.is_file():
-                return False
-            try:
-                self._load_repaired_revision_report(
-                    report_rel,
-                    chapter_id,
-                    expected_ids,
-                    chapter_file=chapter_file,
-                )
-            except PipelineError:
-                return False
-
-            if not require_seam_reports:
-                continue
-
-            seam_rel = f"revisions/cycle_{cpad}/{chapter_id}.seam_report.json"
-            seam_path = self.run_dir / seam_rel
-            if not seam_path.is_file():
-                return False
-            try:
-                self._load_repaired_seam_report(seam_rel, chapter_id)
-            except PipelineError:
-                return False
-        return True
-
-    def _cycle_post_revision_outputs_complete(self, cycle: int) -> bool:
-        cpad = self._cpad(cycle)
-        required = [
-            self.run_dir / "snapshots" / f"cycle_{cpad}" / "FINAL_NOVEL.post_revision.md",
+        snapshot_outputs.extend(
             self.run_dir
             / "snapshots"
             / f"cycle_{cpad}"
-            / "snapshot_manifest.post_revision.json",
-            self.run_dir / "outline" / "continuity_sheet.json",
-            self.run_dir / "reviews" / f"cycle_{cpad}" / "continuity_conflicts.json",
-        ]
-        return all(path.is_file() for path in required)
-
-    def _ensure_resumed_cycle_post_revision_outputs(self, cycle: int) -> None:
-        cpad = self._cpad(cycle)
-        if self._cycle_post_revision_outputs_complete(cycle):
-            self._log(f"cycle={cpad} stage=resume_post_revision_check status=complete")
-            return
-        self._log(
-            f"cycle={cpad} stage=resume_post_revision_check status=incomplete; rebuilding_outputs"
+            / "chapters"
+            / f"{spec.chapter_id}.md"
+            for spec in self.chapter_specs
         )
-        self._log(f"cycle={cpad} stage=assemble_post_revision_snapshot")
-        self._assemble_post_revision_snapshot(cycle)
-        self._log(f"cycle={cpad} stage=continuity_reconciliation")
-        self._run_continuity_reconciliation(cycle)
-
-    def _assemble_snapshot(self, cycle: int) -> None:
-        cpad = self._cpad(cycle)
+        live_inputs = [
+            self.run_dir / "chapters" / f"{spec.chapter_id}.md"
+            for spec in self.chapter_specs
+        ]
+        if snapshot_outputs and self._artifacts_fresh_against_inputs(
+            snapshot_outputs, live_inputs
+        ):
+            self._log(f"cycle={cpad} snapshot_resume_present")
+            return True
         snapshot_chapters_dir = self.run_dir / "snapshots" / f"cycle_{cpad}" / "chapters"
         snapshot_chapters_dir.mkdir(parents=True, exist_ok=True)
 
@@ -5383,9 +7596,33 @@ class NovelPipelineRunner:
             "chapter_sha256": chapter_hashes,
         }
         self._write_json(f"snapshots/cycle_{cpad}/snapshot_manifest.json", manifest)
+        return False
 
-    def _assemble_post_revision_snapshot(self, cycle: int) -> None:
+    def _assemble_post_revision_snapshot(self, cycle: int) -> bool:
         cpad = self._cpad(cycle)
+        snapshot_outputs = [
+            self.run_dir / "snapshots" / f"cycle_{cpad}" / "FINAL_NOVEL.post_revision.md",
+            self.run_dir / "snapshots" / f"cycle_{cpad}" / "snapshot_manifest.post_revision.json",
+            self.run_dir / "FINAL_NOVEL.md",
+        ]
+        snapshot_outputs.extend(
+            self.run_dir
+            / "snapshots"
+            / f"cycle_{cpad}"
+            / "post_revision"
+            / "chapters"
+            / f"{spec.chapter_id}.md"
+            for spec in self.chapter_specs
+        )
+        live_inputs = [
+            self.run_dir / "chapters" / f"{spec.chapter_id}.md"
+            for spec in self.chapter_specs
+        ]
+        if snapshot_outputs and self._artifacts_fresh_against_inputs(
+            snapshot_outputs, live_inputs
+        ):
+            self._log(f"cycle={cpad} post_revision_snapshot_resume_present")
+            return True
         post_dir = self.run_dir / "snapshots" / f"cycle_{cpad}" / "post_revision" / "chapters"
         post_dir.mkdir(parents=True, exist_ok=True)
 
@@ -5411,8 +7648,9 @@ class NovelPipelineRunner:
             "chapter_sha256": chapter_hashes,
         }
         self._write_json(f"snapshots/cycle_{cpad}/snapshot_manifest.post_revision.json", manifest)
+        return False
 
-    def _run_continuity_reconciliation(self, cycle: int) -> None:
+    def _run_continuity_reconciliation(self, cycle: int) -> dict[str, Any]:
         cpad = self._cpad(cycle)
         full_novel_file = (
             f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md"
@@ -5422,9 +7660,13 @@ class NovelPipelineRunner:
             self._log(
                 f"cycle={cpad} continuity_reconciliation_skip reason=no_post_revision_snapshot"
             )
-            return
+            return {
+                "status": "skipped",
+                "reason": "no_post_revision_snapshot",
+            }
 
         continuity_sheet_file = "outline/continuity_sheet.json"
+        spatial_layout_file = self._spatial_layout_rel()
         conflict_log_file = f"reviews/cycle_{cpad}/continuity_conflicts.json"
         global_context_file = f"context/cycle_{cpad}/global_cycle_context.json"
 
@@ -5433,6 +7675,7 @@ class NovelPipelineRunner:
         base_inputs = [
             full_novel_path,
             self.run_dir / global_context_file,
+            self.run_dir / spatial_layout_file,
             self.run_dir / "config" / "constitution.md",
             self.run_dir / "config" / "prompts" / "continuity_sheet_prompt.md",
         ]
@@ -5447,7 +7690,7 @@ class NovelPipelineRunner:
             )
             if continuity_fresh and conflict_fresh:
                 self._log(f"cycle={cpad} continuity_reconciliation_resume_present")
-                return
+                return {"status": "reused"}
             self._log(
                 f"cycle={cpad} continuity_reconciliation_resume_stale reason=input_newer_than_reconciliation"
             )
@@ -5462,6 +7705,7 @@ class NovelPipelineRunner:
                 "CYCLE_PADDED": cpad,
                 "FULL_NOVEL_FILE": full_novel_file,
                 "GLOBAL_CYCLE_CONTEXT_FILE": global_context_file,
+                "SPATIAL_LAYOUT_FILE": spatial_layout_file,
                 "CONTINUITY_SHEET_OUTPUT_FILE": continuity_sheet_file,
                 "CONFLICT_LOG_OUTPUT_FILE": conflict_log_file,
             },
@@ -5476,6 +7720,7 @@ class NovelPipelineRunner:
                 full_novel_file,
                 continuity_sheet_file,
                 global_context_file,
+                spatial_layout_file,
                 "config/constitution.md",
                 "config/prompts/continuity_sheet_prompt.md",
             ],
@@ -5498,7 +7743,10 @@ class NovelPipelineRunner:
                 reason=str(exc),
                 action="continuity_reconciliation_failed_soft",
             )
-            return
+            return {
+                "status": "failed",
+                "reason": "job_failed_soft",
+            }
         try:
             self._validate_continuity_sheet()
         except PipelineError as exc:
@@ -5525,6 +7773,7 @@ class NovelPipelineRunner:
             f"cycle={cpad} continuity_reconciliation_complete "
             f"conflicts={num_conflicts} new_facts={new_facts} updated={updated_facts}"
         )
+        return {"status": "complete"}
 
     def _validate_continuity_sheet(self) -> None:
         rel = "outline/continuity_sheet.json"
@@ -5568,14 +7817,37 @@ class NovelPipelineRunner:
     def _cycle_continuity_snapshot_rel(self, cycle: int) -> str:
         return f"context/cycle_{self._cpad(cycle)}/continuity_sheet.json"
 
+    def _outline_review_rel(self, cycle_num: int) -> str:
+        return f"outline/outline_review_cycle_{self._cpad(cycle_num)}.json"
+
+    def _outline_revision_record_rel(self, cycle_num: int) -> str:
+        return f"outline/outline_revision_cycle_{self._cpad(cycle_num)}.json"
+
+    def _spatial_layout_rel(self) -> str:
+        return "outline/spatial_layout.json"
+
+    def _chapter_line_index_rel(self, cycle: int) -> str:
+        return f"context/cycle_{self._cpad(cycle)}/chapter_line_index.json"
+
+    def _window_id_for_index(self, index: int) -> str:
+        return f"window_{index:02d}"
+
+    def _local_window_audit_rel(self, cycle: int, window_id: str) -> str:
+        suffix = window_id
+        if suffix.startswith("window_"):
+            suffix = suffix.removeprefix("window_")
+        return f"reviews/cycle_{self._cpad(cycle)}/local_window_{suffix}.json"
+
     def _ensure_outline_continuity_snapshot(self) -> None:
         live_path = self.run_dir / "outline" / "continuity_sheet.json"
         if not live_path.is_file():
             raise PipelineError("outline continuity sheet missing before snapshot creation")
         snapshot_rel = self._outline_continuity_snapshot_rel()
         snapshot_path = self.run_dir / snapshot_rel
-        existing_gates = any((self.run_dir / "gate").glob("cycle_*/gate.json"))
-        if snapshot_path.is_file() and existing_gates:
+        existing_cycle_artifacts = any(
+            (self.run_dir / "status").glob("cycle_*/cycle_status.json")
+        ) or any((self.run_dir / "gate").glob("cycle_*/gate.json"))
+        if snapshot_path.is_file() and existing_cycle_artifacts:
             return
         self._write_text(snapshot_rel, live_path.read_text(encoding="utf-8"))
 
@@ -5602,6 +7874,123 @@ class NovelPipelineRunner:
         self._log(f"title_loaded title={title!r}")
         return title
 
+    def _outline_core_output_rels(self) -> list[str]:
+        return [
+            "outline/outline.md",
+            "outline/chapter_specs.jsonl",
+            "outline/scene_plan.tsv",
+            "outline/style_bible.json",
+            "outline/continuity_sheet.json",
+            "outline/title.txt",
+        ]
+
+    def _outline_core_output_paths(self) -> list[Path]:
+        return [self.run_dir / rel for rel in self._outline_core_output_rels()]
+
+    def _outline_review_input_paths(self) -> list[Path]:
+        return [
+            self.run_dir / "input" / "premise.txt",
+            *self._outline_core_output_paths(),
+            self.run_dir / "config" / "constitution.md",
+            self.run_dir / "config" / "prompts" / "outline_review_prompt.md",
+        ]
+
+    def _outline_pre_revision_snapshot_rels(self, cycle_num: int) -> list[str]:
+        prefix = f"outline/pre_revision/cycle_{self._cpad(cycle_num)}"
+        return [f"{prefix}/{Path(rel).name}" for rel in self._outline_core_output_rels()]
+
+    def _ensure_outline_pre_revision_snapshot(self, cycle_num: int) -> list[str]:
+        outline_rels = self._outline_core_output_rels()
+        snapshot_rels = self._outline_pre_revision_snapshot_rels(cycle_num)
+        if len(outline_rels) != len(snapshot_rels):
+            raise PipelineError("outline snapshot inputs/outputs length mismatch")
+        for source_rel, snapshot_rel in zip(outline_rels, snapshot_rels):
+            source_path = self.run_dir / source_rel
+            if not source_path.is_file():
+                raise PipelineError(
+                    f"cannot snapshot pre-revision outline; missing {source_rel}"
+                )
+            snapshot_path = self.run_dir / snapshot_rel
+            snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+            if snapshot_path.is_file():
+                continue
+            shutil.copy2(source_path, snapshot_path)
+        return snapshot_rels
+
+    def _outline_revision_record_payload(self, cycle_num: int, review_rel: str) -> dict[str, Any]:
+        snapshot_rels = self._outline_pre_revision_snapshot_rels(cycle_num)
+        return {
+            "cycle": cycle_num,
+            "review_file": review_rel,
+            "outline_outputs": self._outline_core_output_rels(),
+            "outline_output_hashes": {
+                rel: self._sha256_file(self.run_dir / rel)
+                for rel in self._outline_core_output_rels()
+            },
+            "pre_revision_outline_outputs": snapshot_rels,
+            "pre_revision_outline_output_hashes": {
+                rel: self._sha256_file(self.run_dir / rel)
+                for rel in snapshot_rels
+                if (self.run_dir / rel).is_file()
+            },
+            "updated_at_utc": self._utc_now(),
+        }
+
+    def _validate_outline_revision_record(
+        self, data: dict[str, Any], cycle_num: int, rel: str
+    ) -> None:
+        if data.get("cycle") != cycle_num:
+            raise PipelineError(f"{rel} cycle must equal {cycle_num}")
+        review_file = self._optional_text(data.get("review_file"))
+        if review_file != self._outline_review_rel(cycle_num):
+            raise PipelineError(
+                f"{rel} review_file must equal {self._outline_review_rel(cycle_num)}"
+            )
+        outputs = data.get("outline_outputs")
+        if outputs != self._outline_core_output_rels():
+            raise PipelineError(f"{rel} outline_outputs mismatch")
+        hashes = data.get("outline_output_hashes")
+        if not isinstance(hashes, dict):
+            raise PipelineError(f"{rel} outline_output_hashes must be an object")
+        for output_rel in self._outline_core_output_rels():
+            expected_hash = self._optional_text(hashes.get(output_rel))
+            if len(expected_hash) != 64:
+                raise PipelineError(
+                    f"{rel} outline_output_hashes missing valid hash for {output_rel}"
+                )
+
+    def _outline_revision_record_matches_current_outputs(self, data: dict[str, Any]) -> bool:
+        hashes = data.get("outline_output_hashes")
+        if not isinstance(hashes, dict):
+            return False
+        for output_rel in self._outline_core_output_rels():
+            output_path = self.run_dir / output_rel
+            if not output_path.is_file():
+                return False
+            if self._optional_text(hashes.get(output_rel)) != self._sha256_file(output_path):
+                return False
+        return True
+
+    def _load_current_outline_state(self, *, refresh_snapshots: bool = True) -> None:
+        self.chapter_specs = self._load_and_validate_chapter_specs()
+        self._validate_scene_plan()
+        self.style_bible = self._load_and_validate_style_bible()
+        self._validate_continuity_sheet()
+        self.novel_title = self._load_title()
+        if refresh_snapshots:
+            self._ensure_outline_continuity_snapshot()
+
+    def _sync_continuity_sheet_spatial_reference(self) -> None:
+        rel = "outline/continuity_sheet.json"
+        data = self._read_json(rel)
+        geography = data.get("geography")
+        if not isinstance(geography, dict):
+            raise PipelineError(f"{rel} 'geography' must be an object")
+        if geography.get("spatial_layout_ref") == self._spatial_layout_rel():
+            return
+        geography["spatial_layout_ref"] = self._spatial_layout_rel()
+        self._write_json(rel, data)
+
     def _write_compiled_novel(
         self, output_path: Path, chapters_dir: Path
     ) -> None:
@@ -5618,6 +8007,69 @@ class NovelPipelineRunner:
             return
         output_path.write_text(rendered, encoding="utf-8")
 
+    def _compute_windows(
+        self, chapter_ids: list[str], window_size: int, overlap: int
+    ) -> list[list[str]]:
+        if window_size < 2:
+            raise PipelineError("local window size must be >= 2")
+        if overlap < 0:
+            raise PipelineError("local window overlap must be >= 0")
+        if overlap >= window_size:
+            raise PipelineError("local window overlap must be smaller than window size")
+        if len(chapter_ids) <= window_size:
+            return [list(chapter_ids)] if len(chapter_ids) >= 2 else []
+        step = window_size - overlap
+        windows: list[list[str]] = []
+        start = 0
+        while start < len(chapter_ids):
+            window = chapter_ids[start : start + window_size]
+            if len(window) >= 2:
+                windows.append(window)
+            if start + window_size >= len(chapter_ids):
+                break
+            start += step
+        return windows
+
+    def _build_chapter_line_index(
+        self, compiled_novel_path: Path
+    ) -> dict[str, dict[str, int]]:
+        if not compiled_novel_path.is_file():
+            raise PipelineError(f"compiled novel missing for line index: {compiled_novel_path}")
+        lines = compiled_novel_path.read_text(encoding="utf-8").splitlines()
+        starts: dict[str, int] = {}
+        spec_index = 0
+        for line_number, line in enumerate(lines, start=1):
+            if spec_index >= len(self.chapter_specs):
+                break
+            expected_heading = f"# Chapter {self.chapter_specs[spec_index].chapter_number}"
+            if line.strip() != expected_heading:
+                continue
+            starts[self.chapter_specs[spec_index].chapter_id] = line_number
+            spec_index += 1
+        if len(starts) != len(self.chapter_specs):
+            missing = [
+                spec.chapter_id
+                for spec in self.chapter_specs
+                if spec.chapter_id not in starts
+            ]
+            raise PipelineError(
+                "compiled novel missing expected chapter headings for line index: "
+                + ", ".join(missing)
+            )
+        index: dict[str, dict[str, int]] = {}
+        for idx, spec in enumerate(self.chapter_specs):
+            start_line = starts[spec.chapter_id]
+            if idx + 1 < len(self.chapter_specs):
+                next_start = starts[self.chapter_specs[idx + 1].chapter_id]
+                end_line = next_start - 1
+            else:
+                end_line = len(lines)
+            index[spec.chapter_id] = {
+                "start_line": start_line,
+                "end_line": max(start_line, end_line),
+            }
+        return index
+
     def _build_static_story_context(self) -> None:
         style_bible = self.style_bible or self._load_and_validate_style_bible()
         chapter_spine = [
@@ -5629,6 +8081,11 @@ class NovelPipelineRunner:
                 "state_shift": spec.state_shift,
                 "texture_mode": spec.texture_mode,
                 "scene_count_target": spec.scene_count_target,
+                "opening_situation": spec.opening_situation,
+                "closing_state": spec.closing_state,
+                "chronology_anchor": spec.chronology_anchor,
+                "entry_obligation": spec.entry_obligation,
+                "exit_pressure": spec.exit_pressure,
                 "objective": spec.objective,
                 "conflict": spec.conflict,
                 "consequence": spec.consequence,
@@ -5644,23 +8101,73 @@ class NovelPipelineRunner:
             for row in style_bible.get("character_voice_profiles", [])
             if str(row.get("character_id", "")).strip()
         ]
+        character_depth = []
+        for row in style_bible.get("character_voice_profiles", []):
+            character_id = str(row.get("character_id", "")).strip()
+            if not character_id:
+                continue
+            payload_row = {"character_id": character_id}
+            interpretive_lens = str(row.get("interpretive_lens", "")).strip()
+            if interpretive_lens:
+                payload_row["interpretive_lens"] = interpretive_lens
+            formative_experiences = row.get("formative_experiences")
+            if isinstance(formative_experiences, list):
+                normalized_experiences = [
+                    str(item).strip()
+                    for item in formative_experiences
+                    if isinstance(item, str) and str(item).strip()
+                ]
+                if normalized_experiences:
+                    payload_row["formative_experiences"] = normalized_experiences
+            if len(payload_row) > 1:
+                character_depth.append(payload_row)
         payload = {
             "premise": self.selected_premise,
             "chapter_count": len(self.chapter_specs),
             "chapter_spine": chapter_spine,
             "character_ids": sorted(set(character_ids)),
+            "character_depth": character_depth,
             "dialogue_rules": style_bible.get("dialogue_rules", {}),
             "prose_style_profile": style_bible.get("prose_style_profile", {}),
             "aesthetic_risk_policy": style_bible.get("aesthetic_risk_policy", {}),
         }
         self._write_json("outline/static_story_context.json", payload)
 
-    def _build_cycle_context_packs(self, cycle: int) -> None:
+    def _build_cycle_context_packs(self, cycle: int) -> bool:
         cpad = self._cpad(cycle)
         cycle_context_dir = self.run_dir / "context" / f"cycle_{cpad}"
         boundary_dir = cycle_context_dir / "boundary"
         boundary_dir.mkdir(parents=True, exist_ok=True)
         continuity_snapshot_rel = self._ensure_cycle_continuity_snapshot(cycle)
+        context_outputs = [
+            self.run_dir / f"context/cycle_{cpad}/global_cycle_context.json",
+            self.run_dir / self._chapter_line_index_rel(cycle),
+        ]
+        context_outputs.extend(
+            self.run_dir / f"context/cycle_{cpad}/boundary/{spec.chapter_id}.boundary.json"
+            for spec in self.chapter_specs
+        )
+        context_inputs = [
+            self.run_dir / "input" / "premise.txt",
+            self.run_dir / "outline" / "chapter_specs.jsonl",
+            self.run_dir / "outline" / "scene_plan.tsv",
+            self.run_dir / "outline" / "style_bible.json",
+            self.run_dir / continuity_snapshot_rel,
+        ]
+        context_inputs.extend(
+            self.run_dir
+            / "snapshots"
+            / f"cycle_{cpad}"
+            / "chapters"
+            / f"{spec.chapter_id}.md"
+            for spec in self.chapter_specs
+        )
+        context_inputs.append(self.run_dir / "snapshots" / f"cycle_{cpad}" / "FINAL_NOVEL.md")
+        if context_outputs and self._artifacts_fresh_against_inputs(
+            context_outputs, context_inputs
+        ):
+            self._log(f"cycle={cpad} cycle_context_resume_present")
+            return True
 
         style_bible = self.style_bible or self._load_and_validate_style_bible()
         scene_counts = self._scene_counts_by_chapter()
@@ -5675,6 +8182,11 @@ class NovelPipelineRunner:
                     "state_shift": spec.state_shift,
                     "texture_mode": spec.texture_mode,
                     "scene_count_target": spec.scene_count_target,
+                    "opening_situation": spec.opening_situation,
+                    "closing_state": spec.closing_state,
+                    "chronology_anchor": spec.chronology_anchor,
+                    "entry_obligation": spec.entry_obligation,
+                    "exit_pressure": spec.exit_pressure,
                     "objective": spec.objective,
                     "conflict": spec.conflict,
                     "consequence": spec.consequence,
@@ -5704,6 +8216,8 @@ class NovelPipelineRunner:
                     "sentence_completion_style": row.get(
                         "sentence_completion_style", ""
                     ),
+                    "interpretive_lens": row.get("interpretive_lens", ""),
+                    "formative_experiences": row.get("formative_experiences", []),
                 }
             )
 
@@ -5718,6 +8232,10 @@ class NovelPipelineRunner:
             "aesthetic_risk_policy": style_bible.get("aesthetic_risk_policy", {}),
         }
         self._write_json(f"context/cycle_{cpad}/global_cycle_context.json", global_context)
+        chapter_line_index = self._build_chapter_line_index(
+            self.run_dir / "snapshots" / f"cycle_{cpad}" / "FINAL_NOVEL.md"
+        )
+        self._write_json(self._chapter_line_index_rel(cycle), chapter_line_index)
 
         chapters_dir = self.run_dir / "snapshots" / f"cycle_{cpad}" / "chapters"
         chapter_ids = [spec.chapter_id for spec in self.chapter_specs]
@@ -5742,6 +8260,11 @@ class NovelPipelineRunner:
                 "prev_tail_excerpt": prev_tail_excerpt,
                 "next_head_excerpt": next_head_excerpt,
                 "open_hooks_to_carry": spec.must_land_beats,
+                "opening_situation": spec.opening_situation,
+                "closing_state": spec.closing_state,
+                "chronology_anchor": spec.chronology_anchor,
+                "entry_obligation": spec.entry_obligation,
+                "exit_pressure": spec.exit_pressure,
                 "secondary_character_beats": spec.secondary_character_beats,
                 "setups_to_plant": spec.setups_to_plant,
                 "payoffs_to_land": spec.payoffs_to_land,
@@ -5752,6 +8275,7 @@ class NovelPipelineRunner:
             }
             rel = f"context/cycle_{cpad}/boundary/{chapter_id}.boundary.json"
             self._write_json(rel, payload)
+        return False
 
     def _scene_counts_by_chapter(self) -> dict[str, int]:
         path = self.run_dir / "outline" / "scene_plan.tsv"
@@ -6229,6 +8753,15 @@ class NovelPipelineRunner:
         if job.stage == "outline":
             self._mock_outline_outputs(workspace)
             return
+        if job.stage == "outline_review":
+            self._mock_outline_review_output(job, workspace)
+            return
+        if job.stage == "outline_revision":
+            self._mock_outline_revision_output(job, workspace)
+            return
+        if job.stage == "spatial_layout":
+            self._mock_spatial_layout_output(workspace)
+            return
         if job.stage == "chapter_draft":
             self._mock_chapter_draft_output(job, workspace)
             return
@@ -6244,11 +8777,14 @@ class NovelPipelineRunner:
         if job.stage == "cross_chapter_audit":
             self._mock_cross_chapter_audit_output(job, workspace)
             return
+        if job.stage == "local_window_audit":
+            self._mock_local_window_audit_output(job, workspace)
+            return
+        if job.stage == "llm_aggregator":
+            self._mock_revision_aggregator_output(job, workspace)
+            return
         if job.stage == "chapter_revision":
             self._mock_chapter_revision_output(job, workspace)
-            return
-        if job.stage == "chapter_seam_polish":
-            self._mock_chapter_seam_polish_output(job, workspace)
             return
         if job.stage == "continuity_reconciliation":
             self._mock_continuity_reconciliation_output(job, workspace)
@@ -6653,6 +9189,11 @@ class NovelPipelineRunner:
                 ),
                 "conflict": f"Pressure escalates in {chapter_id}",
                 "consequence": f"A decision closes options in {chapter_id}",
+                "opening_situation": f"The chapter opens with active pressure already live in {chapter_id}.",
+                "closing_state": f"A concrete condition has changed by the end of {chapter_id}.",
+                "chronology_anchor": "next morning" if i % 3 == 0 else "immediate",
+                "entry_obligation": f"The opening movement of {chapter_id} must introduce a new local pressure.",
+                "exit_pressure": f"An unresolved consequence remains active at the cut of {chapter_id}.",
                 "must_land_beats": [
                     f"Beat A for {chapter_id}",
                     f"Beat B for {chapter_id}",
@@ -6664,21 +9205,19 @@ class NovelPipelineRunner:
             workspace, "outline/chapter_specs.jsonl", chapter_specs_text
         )
 
-        scene_plan_lines = [
-            "scene_id\tchapter_id\tscene_order\tobjective\topposition\tturn\tconsequence_cost\ttension_peak"
-        ]
+        scene_plan_lines = [SCENE_PLAN_HEADER_WITH_UNDERCURRENT]
         for i in range(1, chapter_count + 1):
             chapter_id = f"chapter_{i:02d}"
             if i % 5 == 0:
                 scene_plan_lines.append(
-                    f"scene_{i:02d}_a\t{chapter_id}\t1\tHold pressure in place\tMemory, bureaucracy, or aftermath\tPerception shifts\tA path narrows\tYES"
+                    f"scene_{i:02d}_a\t{chapter_id}\t1\tHold pressure in place\tMemory, bureaucracy, or aftermath\tPerception shifts\tA path narrows\tYES\tnull"
                 )
             else:
                 scene_plan_lines.append(
-                    f"scene_{i:02d}_a\t{chapter_id}\t1\tSet pressure\tCountermove\tComplication\tLoss\tNO"
+                    f"scene_{i:02d}_a\t{chapter_id}\t1\tSet pressure\tCountermove\tComplication\tLoss\tNO\tOne person is testing what the other already knows before they commit."
                 )
                 scene_plan_lines.append(
-                    f"scene_{i:02d}_b\t{chapter_id}\t2\tEscalate pressure\tHard opposition\tDecision\tIrreversible shift\tYES"
+                    f"scene_{i:02d}_b\t{chapter_id}\t2\tEscalate pressure\tHard opposition\tDecision\tIrreversible shift\tYES\tnull"
                 )
         self._write_workspace_text(
             workspace, "outline/scene_plan.tsv", "\n".join(scene_plan_lines) + "\n"
@@ -6701,7 +9240,12 @@ class NovelPipelineRunner:
                     "indirectness": "Public speech stays guarded and angled; private speech becomes blunt only after resistance fails.",
                     "repetition_tolerance": "Allows light repetition under pressure, but never mantra-like reuse of the same phrase.",
                     "evasion_style": "Deflects by returning to logistics, procedure, or concrete task language instead of answering head-on.",
-                    "sentence_completion_style": "Can trail off or restart under pressure, but unfinished turns should remain legible and character-specific."
+                    "sentence_completion_style": "Can trail off or restart under pressure, but unfinished turns should remain legible and character-specific.",
+                    "interpretive_lens": "Reads every conversation for hidden leverage shifts and practical exposure.",
+                    "formative_experiences": [
+                        "Watched a handoff fail because someone reused a route that had already been seen.",
+                        "Learned early that procedural language is often how frightened people hide what they want."
+                    ]
                 },
                 {
                     "character_id": "antagonist",
@@ -6718,7 +9262,11 @@ class NovelPipelineRunner:
                     "indirectness": "Prefers direct institutional framing in public and cooler insinuation in private.",
                     "repetition_tolerance": "Low tolerance for repeated wording; pressure should sharpen rather than loop.",
                     "evasion_style": "Redirects through reframing, technicalities, or narrowed definitions rather than obvious dodge lines.",
-                    "sentence_completion_style": "Usually finishes sentences cleanly; any break in completion should signal loss of control or deliberate intimidation."
+                    "sentence_completion_style": "Usually finishes sentences cleanly; any break in completion should signal loss of control or deliberate intimidation.",
+                    "interpretive_lens": "Treats every interaction as a compliance problem to be managed before it becomes public.",
+                    "formative_experiences": [
+                        "Rose by learning that procedural certainty can override messy human testimony."
+                    ]
                 }
             ],
             "dialogue_rules": {
@@ -6729,7 +9277,8 @@ class NovelPipelineRunner:
                 "default_contraction_use": (
                     "high — contractions are the norm; uncontracted forms reserved "
                     "for emphasis or character-specific formality"
-                )
+                ),
+                "focalizer_dialogue_interiority": "moderate",
             },
             "prose_style_profile": {
                 "narrative_tense": "past tense",
@@ -6741,6 +9290,7 @@ class NovelPipelineRunner:
                     "bureaucratic briefing blocks",
                     "generic cinematic phrasing"
                 ],
+                "default_narrator_mode": "transparent",
                 "chapter_texture_variance": (
                     "Alternate high-intensity scenes with reflective interiority; vary scene count, "
                     "dialogue density, and pacing so no two consecutive chapters feel "
@@ -6794,6 +9344,94 @@ class NovelPipelineRunner:
         )
 
         self._write_workspace_text(workspace, "outline/title.txt", "Untitled Novel\n")
+
+    def _mock_outline_review_output(self, job: JobSpec, workspace: Path) -> None:
+        output = next(
+            (p for p in job.required_outputs if p.startswith("outline/outline_review_cycle_")),
+            None,
+        )
+        if not output:
+            raise PipelineError("mock outline review missing output")
+        cycle_match = re.search(r"cycle_(\d+)", output)
+        cycle_num = int(cycle_match.group(1)) if cycle_match else 1
+        payload = {
+            "cycle": cycle_num,
+            "premise_criteria": [
+                {
+                    "criterion": "Exploit the premise's specific pressure instead of falling back to generic genre scaffolding.",
+                    "met": False,
+                    "evidence": "The middle stretch relies on bridge chapters rather than premise-specific turns.",
+                    "suggestion": "Force one irreversible choice in the middle third that only this premise can produce.",
+                },
+                {
+                    "criterion": "Give the ending a conceptual or emotional aftershock beyond plot closure.",
+                    "met": True,
+                    "evidence": "The late chapters already aim at a public/private reframe rather than simple resolution.",
+                    "suggestion": "Keep sharpening the final chapter's recontextualizing pressure.",
+                },
+            ],
+            "structural_findings": [
+                {
+                    "finding_id": f"OR-{cycle_num:03d}",
+                    "severity": "HIGH",
+                    "check": "midpoint_turn",
+                    "chapters_affected": ["chapter_08", "chapter_09"],
+                    "problem": "The middle currently bridges pressure rather than changing the story's direction.",
+                    "rewrite_direction": "Move a genuine reversal or revelation into chapter 8 so chapter 9 must absorb fallout instead of repeating setup work.",
+                }
+            ],
+            "elevation_suggestions": [
+                {
+                    "suggestion": "Let one supporting character make a structurally disruptive choice that complicates the protagonist's engine rather than servicing it.",
+                    "chapters_affected": ["chapter_06", "chapter_11"],
+                }
+            ],
+            "summary": "Dry-run outline review found a soft middle and recommended a stronger midpoint turn.",
+        }
+        self._write_workspace_json(workspace, output, payload)
+
+    def _mock_outline_revision_output(self, job: JobSpec, workspace: Path) -> None:
+        outline_file = workspace / "outline" / "outline.md"
+        if outline_file.is_file():
+            current = outline_file.read_text(encoding="utf-8").rstrip()
+            if "[Dry-run outline revision applied]" not in current:
+                current += "\n\n[Dry-run outline revision applied]\n"
+                self._write_workspace_text(workspace, "outline/outline.md", current)
+
+    def _mock_spatial_layout_output(self, workspace: Path) -> None:
+        payload = {
+            "summary": "Dry-run spatial layout generated a confined-setting map to anchor movement and adjacency.",
+            "micro": {
+                "setting_name": "Municipal Annex",
+                "structure_type": "three-story civic building",
+                "locations": [
+                    {
+                        "name": "records office",
+                        "floor": 1,
+                        "adjacent_to": ["public hallway", "copy room"],
+                        "access": "public during office hours",
+                        "notable": "fluorescent lights and overflowing archive carts",
+                    },
+                    {
+                        "name": "roof landing",
+                        "floor": 3,
+                        "adjacent_to": ["stairwell", "maintenance closet"],
+                        "access": "staff only",
+                        "notable": "wind-exposed and half screened by ductwork",
+                    },
+                ],
+                "floor_summary": {
+                    "1": "lobby, records office, copy room",
+                    "2": "administrative offices, meeting room",
+                    "3": "archives overflow, maintenance access, roof landing",
+                },
+                "key_routes": [
+                    "records office to roof landing: west stairwell, two flights, roughly 45 seconds at a run",
+                ],
+            },
+            "macro": None,
+        }
+        self._write_workspace_json(workspace, self._spatial_layout_rel(), payload)
 
     def _mock_continuity_reconciliation_output(
         self, job: JobSpec, workspace: Path
@@ -6934,10 +9572,76 @@ class NovelPipelineRunner:
         audit = {
             "cycle": job.cycle,
             "summary": "Dry-run cross-chapter audit pass.",
+            "not_x_y_count": 0,
+            "personified_abstraction_count": 0,
+            "abstract_noun_subject_count": 0,
             "redundancy_findings": [],
             "consistency_findings": [],
         }
         self._write_workspace_json(workspace, output, audit)
+
+    def _mock_local_window_audit_output(self, job: JobSpec, workspace: Path) -> None:
+        output = next(
+            (
+                p
+                for p in job.required_outputs
+                if "/local_window_" in p and p.endswith(".json")
+            ),
+            None,
+        )
+        if not output:
+            raise PipelineError("mock local-window audit missing output path")
+        match = re.search(r"local_window_(\d+)\.json$", output)
+        if not match:
+            raise PipelineError("mock local-window audit output path missing window suffix")
+        chapters_reviewed = sorted(
+            {
+                Path(rel).stem
+                for rel in job.allowed_inputs
+                if rel.startswith("outline/chapter_specs/") and rel.endswith(".json")
+            }
+        )
+        audit = {
+            "cycle": job.cycle,
+            "window_id": f"window_{int(match.group(1)):02d}",
+            "chapters_reviewed": chapters_reviewed,
+            "summary": "Dry-run local-window audit pass.",
+            "findings": [],
+        }
+        self._write_workspace_json(workspace, output, audit)
+
+    def _mock_revision_aggregator_output(self, job: JobSpec, workspace: Path) -> None:
+        input_file = next(
+            (
+                p
+                for p in job.allowed_inputs
+                if p.endswith("compact_aggregator_input.json")
+            ),
+            None,
+        )
+        output_file = next(
+            (
+                p
+                for p in job.required_outputs
+                if p.endswith("aggregation_decisions.json")
+            ),
+            None,
+        )
+        if not input_file or not output_file:
+            raise PipelineError("mock revision aggregator missing input or output path")
+        compact_input = json.loads((workspace / input_file).read_text(encoding="utf-8"))
+        unchanged = sorted(self._compact_aggregator_input_finding_ids(compact_input))
+        payload = {
+            "unchanged": unchanged,
+            "merges": [],
+            "canonical_choices": [],
+            "consistency_directives": [],
+            "context_injections": [],
+            "suppressions": [],
+            "unfixable": [],
+            "pass_reassignments": [],
+        }
+        self._write_workspace_json(workspace, output_file, payload)
 
     def _mock_chapter_revision_output(self, job: JobSpec, workspace: Path) -> None:
         if not job.chapter_id:
@@ -6988,22 +9692,303 @@ class NovelPipelineRunner:
         }
         self._write_workspace_json(workspace, report_file, report)
 
-    def _mock_chapter_seam_polish_output(self, job: JobSpec, workspace: Path) -> None:
-        if not job.chapter_id:
-            raise PipelineError("mock seam polish missing chapter_id")
-        chapter_file = next((p for p in job.required_outputs if p.startswith("chapters/")), None)
-        report_file = next(
-            (p for p in job.required_outputs if p.endswith(".seam_report.json")), None
-        )
-        if not chapter_file or not report_file:
-            raise PipelineError("mock seam polish missing outputs")
-        report = {
-            "chapter_id": job.chapter_id,
-            "seam_changes_made": "NO",
-            "summary": f"Dry-run seam polish for {job.chapter_id}.",
-            "edits": [],
-        }
-        self._write_workspace_json(workspace, report_file, report)
+    def _normalize_outline_review_chapter_ids(self, raw: Any) -> list[str]:
+        chapter_ids: list[str] = []
+        if isinstance(raw, list):
+            candidates = raw
+        elif isinstance(raw, str):
+            candidates = re.findall(r"chapter_\d{2}", raw)
+            if not candidates and CHAPTER_ID_RE.match(raw.strip()):
+                candidates = [raw.strip()]
+        else:
+            candidates = []
+        seen: set[str] = set()
+        for item in candidates:
+            chapter_id = str(item).strip()
+            if not CHAPTER_ID_RE.match(chapter_id) or chapter_id in seen:
+                continue
+            seen.add(chapter_id)
+            chapter_ids.append(chapter_id)
+        return chapter_ids
+
+    def _repair_outline_review_data(
+        self, data: dict[str, Any]
+    ) -> tuple[dict[str, Any], list[str]]:
+        if not isinstance(data, dict):
+            return data, []
+        repaired = copy.deepcopy(data)
+        repairs: list[str] = []
+
+        cycle_value = repaired.get("cycle")
+        if isinstance(cycle_value, str) and cycle_value.strip().isdigit():
+            repaired["cycle"] = int(cycle_value.strip())
+            repairs.append("coerced cycle to int")
+
+        if "premise_criteria" not in repaired and isinstance(repaired.get("criteria"), list):
+            repaired["premise_criteria"] = repaired.pop("criteria")
+            repairs.append("mapped criteria to premise_criteria")
+        if "structural_findings" not in repaired and isinstance(repaired.get("findings"), list):
+            repaired["structural_findings"] = repaired.pop("findings")
+            repairs.append("mapped findings to structural_findings")
+        if repaired.get("elevation_suggestions") is None:
+            repaired["elevation_suggestions"] = []
+            repairs.append("defaulted missing elevation_suggestions")
+
+        criteria = repaired.get("premise_criteria")
+        if isinstance(criteria, list):
+            normalized_criteria: list[dict[str, Any]] = []
+            for idx, row in enumerate(criteria, start=1):
+                if not isinstance(row, dict):
+                    continue
+                met_value = row.get("met", row.get("is_met"))
+                if isinstance(met_value, str):
+                    token = met_value.strip().lower()
+                    met_value = token in {"true", "yes", "y", "1", "met"}
+                criterion = self._optional_text(row.get("criterion")) or self._optional_text(
+                    row.get("name")
+                )
+                evidence = self._optional_text(row.get("evidence")) or self._optional_text(
+                    row.get("problem")
+                )
+                suggestion = self._optional_text(row.get("suggestion")) or self._optional_text(
+                    row.get("rewrite_direction")
+                )
+                normalized_criteria.append(
+                    {
+                        "criterion": criterion,
+                        "met": bool(met_value),
+                        "evidence": evidence,
+                        "suggestion": suggestion,
+                    }
+                )
+                if normalized_criteria[-1] != row:
+                    repairs.append(f"normalized premise_criteria[{idx}]")
+            repaired["premise_criteria"] = normalized_criteria
+
+        findings = repaired.get("structural_findings")
+        if isinstance(findings, list):
+            normalized_findings: list[dict[str, Any]] = []
+            for idx, row in enumerate(findings, start=1):
+                if not isinstance(row, dict):
+                    continue
+                finding_id = self._optional_text(row.get("finding_id")) or self._optional_text(
+                    row.get("id")
+                ) or f"OR-{idx:03d}"
+                severity = self._optional_text(row.get("severity")).upper() or "HIGH"
+                if severity not in FULL_AWARD_SEVERITY_VALUES:
+                    severity = "HIGH"
+                chapters_affected = self._normalize_outline_review_chapter_ids(
+                    row.get("chapters_affected", row.get("chapter_id"))
+                )
+                normalized_findings.append(
+                    {
+                        "finding_id": finding_id,
+                        "severity": severity,
+                        "check": self._optional_text(row.get("check"))
+                        or self._optional_text(row.get("category"))
+                        or "structural",
+                        "chapters_affected": chapters_affected,
+                        "problem": self._optional_text(row.get("problem"))
+                        or self._optional_text(row.get("description")),
+                        "rewrite_direction": self._optional_text(
+                            row.get("rewrite_direction")
+                        )
+                        or self._optional_text(row.get("revision_directive"))
+                        or self._optional_text(row.get("suggestion")),
+                    }
+                )
+                if normalized_findings[-1] != row:
+                    repairs.append(f"normalized structural_findings[{idx}]")
+            repaired["structural_findings"] = normalized_findings
+
+        suggestions = repaired.get("elevation_suggestions")
+        if isinstance(suggestions, list):
+            normalized_suggestions: list[dict[str, Any]] = []
+            for idx, row in enumerate(suggestions, start=1):
+                if not isinstance(row, dict):
+                    continue
+                normalized_suggestions.append(
+                    {
+                        "suggestion": self._optional_text(row.get("suggestion"))
+                        or self._optional_text(row.get("opportunity"))
+                        or self._optional_text(row.get("rewrite_direction")),
+                        "chapters_affected": self._normalize_outline_review_chapter_ids(
+                            row.get("chapters_affected", row.get("chapter_id"))
+                        ),
+                    }
+                )
+                if normalized_suggestions[-1] != row:
+                    repairs.append(f"normalized elevation_suggestions[{idx}]")
+            repaired["elevation_suggestions"] = normalized_suggestions
+
+        return repaired, repairs
+
+    def _validate_outline_review_json(
+        self, data: dict[str, Any], cycle_num: int, chapter_ids: set[str], rel: str
+    ) -> None:
+        if data.get("cycle") != cycle_num:
+            raise PipelineError(f"{rel} cycle must equal {cycle_num}")
+        criteria = data.get("premise_criteria")
+        if not isinstance(criteria, list) or not criteria:
+            raise PipelineError(f"{rel} premise_criteria must be a non-empty array")
+        for idx, row in enumerate(criteria, start=1):
+            if not isinstance(row, dict):
+                raise PipelineError(f"{rel} premise_criteria[{idx}] must be an object")
+            if not self._optional_text(row.get("criterion")):
+                raise PipelineError(f"{rel} premise_criteria[{idx}] missing criterion")
+            if not isinstance(row.get("met"), bool):
+                raise PipelineError(f"{rel} premise_criteria[{idx}] met must be boolean")
+            if not self._optional_text(row.get("evidence")):
+                raise PipelineError(f"{rel} premise_criteria[{idx}] missing evidence")
+            if not self._optional_text(row.get("suggestion")):
+                raise PipelineError(f"{rel} premise_criteria[{idx}] missing suggestion")
+
+        findings = data.get("structural_findings")
+        if not isinstance(findings, list):
+            raise PipelineError(f"{rel} structural_findings must be an array")
+        for idx, row in enumerate(findings, start=1):
+            if not isinstance(row, dict):
+                raise PipelineError(f"{rel} structural_findings[{idx}] must be an object")
+            if not self._optional_text(row.get("finding_id")):
+                raise PipelineError(f"{rel} structural_findings[{idx}] missing finding_id")
+            severity = self._optional_text(row.get("severity")).upper()
+            if severity not in FULL_AWARD_SEVERITY_VALUES:
+                raise PipelineError(
+                    f"{rel} structural_findings[{idx}] invalid severity: {severity}"
+                )
+            if not self._optional_text(row.get("check")):
+                raise PipelineError(f"{rel} structural_findings[{idx}] missing check")
+            chapters_affected = row.get("chapters_affected")
+            if not isinstance(chapters_affected, list):
+                raise PipelineError(
+                    f"{rel} structural_findings[{idx}] chapters_affected must be an array"
+                )
+            for chapter_id in chapters_affected:
+                if chapter_id not in chapter_ids:
+                    raise PipelineError(
+                        f"{rel} structural_findings[{idx}] invalid chapter_id: {chapter_id}"
+                    )
+            if not self._optional_text(row.get("problem")):
+                raise PipelineError(f"{rel} structural_findings[{idx}] missing problem")
+            if not self._optional_text(row.get("rewrite_direction")):
+                raise PipelineError(
+                    f"{rel} structural_findings[{idx}] missing rewrite_direction"
+                )
+
+        suggestions = data.get("elevation_suggestions")
+        if not isinstance(suggestions, list):
+            raise PipelineError(f"{rel} elevation_suggestions must be an array")
+        for idx, row in enumerate(suggestions, start=1):
+            if not isinstance(row, dict):
+                raise PipelineError(f"{rel} elevation_suggestions[{idx}] must be an object")
+            if not self._optional_text(row.get("suggestion")):
+                raise PipelineError(f"{rel} elevation_suggestions[{idx}] missing suggestion")
+            chapters_affected = row.get("chapters_affected")
+            if not isinstance(chapters_affected, list):
+                raise PipelineError(
+                    f"{rel} elevation_suggestions[{idx}] chapters_affected must be an array"
+                )
+            for chapter_id in chapters_affected:
+                if chapter_id not in chapter_ids:
+                    raise PipelineError(
+                        f"{rel} elevation_suggestions[{idx}] invalid chapter_id: {chapter_id}"
+                    )
+        if not self._optional_text(data.get("summary")):
+            raise PipelineError(f"{rel} summary must be non-empty")
+
+    def _load_repaired_outline_review(
+        self, rel: str, cycle_num: int, chapter_ids: set[str]
+    ) -> dict[str, Any]:
+        data = self._read_json(rel)
+        repaired_data, repairs = self._repair_outline_review_data(data)
+        if repairs:
+            self._write_json(rel, repaired_data)
+            self._log(
+                f"outline_review_repair cycle={self._cpad(cycle_num)} "
+                f"applied={len(repairs)} details={' | '.join(repairs)}"
+            )
+            data = repaired_data
+        self._validate_outline_review_json(data, cycle_num, chapter_ids, rel)
+        return data
+
+    def _repair_spatial_layout_data(
+        self, data: dict[str, Any]
+    ) -> tuple[dict[str, Any], list[str]]:
+        if not isinstance(data, dict):
+            return data, []
+        repaired = copy.deepcopy(data)
+        repairs: list[str] = []
+        if "summary" not in repaired:
+            repaired["summary"] = "Spatial layout not required for this premise."
+            repairs.append("defaulted missing summary")
+        for key in ("micro", "macro"):
+            if key not in repaired:
+                repaired[key] = None
+                repairs.append(f"defaulted missing {key}")
+            elif repaired[key] in ("", [], {}):
+                repaired[key] = None
+                repairs.append(f"normalized empty {key} to null")
+        return repaired, repairs
+
+    def _validate_spatial_layout_data(self, data: dict[str, Any], rel: str) -> None:
+        if not self._optional_text(data.get("summary")):
+            raise PipelineError(f"{rel} summary must be non-empty")
+        for key in ("micro", "macro"):
+            section = data.get(key)
+            if section is None:
+                continue
+            if not isinstance(section, dict):
+                raise PipelineError(f"{rel} {key} must be an object or null")
+            locations = section.get("locations")
+            if not isinstance(locations, list) or not locations:
+                raise PipelineError(f"{rel} {key}.locations must be a non-empty array")
+            for idx, row in enumerate(locations, start=1):
+                if not isinstance(row, dict) or not self._optional_text(row.get("name")):
+                    raise PipelineError(
+                        f"{rel} {key}.locations[{idx}] must be an object with a name"
+                    )
+            if key == "micro":
+                if not self._optional_text(section.get("setting_name")):
+                    raise PipelineError(f"{rel} micro.setting_name must be non-empty")
+                if not self._optional_text(section.get("structure_type")):
+                    raise PipelineError(f"{rel} micro.structure_type must be non-empty")
+                if "floor_summary" in section and not isinstance(
+                    section.get("floor_summary"), dict
+                ):
+                    raise PipelineError(f"{rel} micro.floor_summary must be an object")
+                if "key_routes" in section and not isinstance(
+                    section.get("key_routes"), list
+                ):
+                    raise PipelineError(f"{rel} micro.key_routes must be an array")
+            if key == "macro":
+                if not self._optional_text(section.get("world_name")):
+                    raise PipelineError(f"{rel} macro.world_name must be non-empty")
+                if "routes" in section and not isinstance(section.get("routes"), list):
+                    raise PipelineError(f"{rel} macro.routes must be an array")
+                if "routes" in section:
+                    for idx, route in enumerate(section.get("routes", []), start=1):
+                        if not isinstance(route, dict):
+                            raise PipelineError(
+                                f"{rel} macro.routes[{idx}] must be an object"
+                            )
+                        if not self._optional_text(route.get("from")) or not self._optional_text(
+                            route.get("to")
+                        ):
+                            raise PipelineError(
+                                f"{rel} macro.routes[{idx}] must include from/to"
+                            )
+
+    def _load_repaired_spatial_layout(self, rel: str) -> dict[str, Any]:
+        data = self._read_json(rel)
+        repaired_data, repairs = self._repair_spatial_layout_data(data)
+        if repairs:
+            self._write_json(rel, repaired_data)
+            self._log(
+                f"spatial_layout_repair applied={len(repairs)} details={' | '.join(repairs)}"
+            )
+            data = repaired_data
+        self._validate_spatial_layout_data(data, rel)
+        return data
 
     def _load_and_validate_chapter_specs(self) -> list[ChapterSpec]:
         rel = "outline/chapter_specs.jsonl"
@@ -7029,6 +10014,11 @@ class NovelPipelineRunner:
                 pressure_source = str(data.get("pressure_source", "")).strip()
                 state_shift = str(data.get("state_shift", "")).strip()
                 texture_mode = str(data.get("texture_mode", "")).strip()
+                opening_situation = str(data.get("opening_situation", "")).strip()
+                closing_state = str(data.get("closing_state", "")).strip()
+                chronology_anchor = str(data.get("chronology_anchor", "")).strip()
+                entry_obligation = str(data.get("entry_obligation", "")).strip()
+                exit_pressure = str(data.get("exit_pressure", "")).strip()
                 scene_count_target = data.get("scene_count_target")
                 scene_count_target_explicit = scene_count_target is not None
                 if not chapter_engine:
@@ -7078,6 +10068,16 @@ class NovelPipelineRunner:
                 ):
                     raise PipelineError(
                         f"missing required narrative fields in {rel}:{idx} for {chapter_id}"
+                    )
+                if not (
+                    opening_situation
+                    and closing_state
+                    and chronology_anchor
+                    and entry_obligation
+                    and exit_pressure
+                ):
+                    raise PipelineError(
+                        f"missing required edge fields in {rel}:{idx} for {chapter_id}"
                     )
                 if (
                     not isinstance(scene_count_target, int)
@@ -7176,6 +10176,11 @@ class NovelPipelineRunner:
                         scene_count_target=scene_count_target,
                         scene_count_target_explicit=scene_count_target_explicit,
                         must_land_beats=[x.strip() for x in beats_raw],
+                        opening_situation=opening_situation,
+                        closing_state=closing_state,
+                        chronology_anchor=chronology_anchor,
+                        entry_obligation=entry_obligation,
+                        exit_pressure=exit_pressure,
                         secondary_character_beats=[
                             x.strip() for x in secondary_beats_raw
                         ],
@@ -7206,20 +10211,22 @@ class NovelPipelineRunner:
         if not lines:
             raise PipelineError(f"scene plan file is empty: {rel}")
 
-        expected_header = (
-            "scene_id\tchapter_id\tscene_order\tobjective\topposition\tturn\tconsequence_cost\ttension_peak"
-        )
-        if lines[0].strip() != expected_header:
+        header = lines[0].strip()
+        if header not in {SCENE_PLAN_HEADER_LEGACY, SCENE_PLAN_HEADER_WITH_UNDERCURRENT}:
             raise PipelineError(f"scene plan header mismatch in {rel}")
+        has_undercurrent = header == SCENE_PLAN_HEADER_WITH_UNDERCURRENT
 
         scene_count_by_chapter: dict[str, int] = {}
         for i, line in enumerate(lines[1:], start=2):
             if not line.strip():
                 continue
             parts = line.split("\t")
-            if len(parts) != 8:
-                raise PipelineError(f"scene plan row must have 8 columns ({rel}:{i})")
-            scene_id, chapter_id, scene_order, *_rest, tension_peak = parts
+            expected_columns = 9 if has_undercurrent else 8
+            if len(parts) != expected_columns:
+                raise PipelineError(
+                    f"scene plan row must have {expected_columns} columns ({rel}:{i})"
+                )
+            scene_id, chapter_id, scene_order, *_rest, tension_peak = parts[:8]
             if not scene_id.strip():
                 raise PipelineError(f"empty scene_id in {rel}:{i}")
             if not CHAPTER_ID_RE.match(chapter_id):
@@ -7229,6 +10236,12 @@ class NovelPipelineRunner:
             tp = tension_peak.strip().upper()
             if tp not in {"YES", "NO"}:
                 raise PipelineError(f"invalid tension_peak in {rel}:{i}: {tension_peak}")
+            if has_undercurrent:
+                undercurrent = parts[8].strip()
+                if undercurrent and undercurrent.lower() == "null":
+                    undercurrent = ""
+                if undercurrent and not undercurrent.strip():
+                    raise PipelineError(f"invalid undercurrent in {rel}:{i}")
             scene_count_by_chapter[chapter_id] = scene_count_by_chapter.get(chapter_id, 0) + 1
 
         for spec in self.chapter_specs:
@@ -7365,6 +10378,74 @@ class NovelPipelineRunner:
                 else:
                     row["contraction_level"] = contraction_level.strip().lower()
 
+                interpretive_lens = row.get("interpretive_lens")
+                if isinstance(interpretive_lens, str):
+                    cleaned_lens = interpretive_lens.strip()
+                    if cleaned_lens:
+                        row["interpretive_lens"] = cleaned_lens
+                    elif "interpretive_lens" in row:
+                        row.pop("interpretive_lens", None)
+                        repairs.append(
+                            f"character_voice_profiles[{idx}].interpretive_lens removed because blank"
+                        )
+                elif isinstance(interpretive_lens, list):
+                    flattened_lens = "; ".join(
+                        item.strip()
+                        for item in interpretive_lens
+                        if isinstance(item, str) and item.strip()
+                    )
+                    if flattened_lens:
+                        row["interpretive_lens"] = flattened_lens
+                        repairs.append(
+                            f"character_voice_profiles[{idx}].interpretive_lens normalized from list"
+                        )
+                    elif "interpretive_lens" in row:
+                        row.pop("interpretive_lens", None)
+                        repairs.append(
+                            f"character_voice_profiles[{idx}].interpretive_lens removed because empty"
+                        )
+                elif interpretive_lens is not None:
+                    row.pop("interpretive_lens", None)
+                    repairs.append(
+                        f"character_voice_profiles[{idx}].interpretive_lens removed because invalid"
+                    )
+
+                formative_experiences = row.get("formative_experiences")
+                if isinstance(formative_experiences, str):
+                    cleaned_experience = formative_experiences.strip()
+                    if cleaned_experience:
+                        row["formative_experiences"] = [cleaned_experience]
+                        repairs.append(
+                            f"character_voice_profiles[{idx}].formative_experiences normalized from string"
+                        )
+                    elif "formative_experiences" in row:
+                        row.pop("formative_experiences", None)
+                        repairs.append(
+                            f"character_voice_profiles[{idx}].formative_experiences removed because blank"
+                        )
+                elif isinstance(formative_experiences, list):
+                    normalized_experiences = [
+                        item.strip()
+                        for item in formative_experiences
+                        if isinstance(item, str) and item.strip()
+                    ][:3]
+                    if normalized_experiences:
+                        if normalized_experiences != formative_experiences:
+                            repairs.append(
+                                f"character_voice_profiles[{idx}].formative_experiences normalized"
+                            )
+                        row["formative_experiences"] = normalized_experiences
+                    elif "formative_experiences" in row:
+                        row.pop("formative_experiences", None)
+                        repairs.append(
+                            f"character_voice_profiles[{idx}].formative_experiences removed because empty"
+                        )
+                elif formative_experiences is not None:
+                    row.pop("formative_experiences", None)
+                    repairs.append(
+                        f"character_voice_profiles[{idx}].formative_experiences removed because invalid"
+                    )
+
         dialogue_rules = data.get("dialogue_rules")
         if not isinstance(dialogue_rules, dict):
             dialogue_rules = {}
@@ -7422,6 +10503,27 @@ class NovelPipelineRunner:
                 "or character-specific formality"
             )
             repairs.append("dialogue_rules.default_contraction_use defaulted")
+
+        focalizer_dialogue_interiority = dialogue_rules.get(
+            "focalizer_dialogue_interiority"
+        )
+        normalized_interiority = ""
+        if isinstance(focalizer_dialogue_interiority, str) and focalizer_dialogue_interiority.strip():
+            candidate = re.sub(
+                r"[\s_-]+", " ", focalizer_dialogue_interiority.strip().lower()
+            ).strip()
+            if candidate in {"high", "dense", "active", "primary channel"}:
+                normalized_interiority = "high"
+            elif candidate in {"moderate", "balanced", "regular", "medium"}:
+                normalized_interiority = "moderate"
+            elif candidate in {"low", "light", "minimal", "sparse"}:
+                normalized_interiority = "low"
+        if not normalized_interiority:
+            dialogue_rules["focalizer_dialogue_interiority"] = "moderate"
+            repairs.append("dialogue_rules.focalizer_dialogue_interiority defaulted")
+        elif normalized_interiority != focalizer_dialogue_interiority:
+            dialogue_rules["focalizer_dialogue_interiority"] = normalized_interiority
+            repairs.append("dialogue_rules.focalizer_dialogue_interiority normalized")
 
         prose = data.get("prose_style_profile")
         if not isinstance(prose, dict):
@@ -7495,6 +10597,30 @@ class NovelPipelineRunner:
             else:
                 repairs.append("prose_style_profile.forbidden_drift_patterns mapped")
             prose["forbidden_drift_patterns"] = mapped
+
+        default_narrator_mode = prose.get("default_narrator_mode")
+        normalized_narrator_mode = ""
+        if isinstance(default_narrator_mode, str) and default_narrator_mode.strip():
+            candidate = re.sub(
+                r"[\s_-]+", " ", default_narrator_mode.strip().lower()
+            ).strip()
+            if candidate in {
+                "transparent",
+                "transparent scene description",
+                "literal",
+                "literal scene description",
+                "scene grounded",
+                "scene grounded literal",
+            }:
+                normalized_narrator_mode = "transparent"
+            elif candidate in {"literary", "heightened", "ornate", "conspicuous"}:
+                normalized_narrator_mode = "literary"
+        if not normalized_narrator_mode:
+            prose["default_narrator_mode"] = "transparent"
+            repairs.append("prose_style_profile.default_narrator_mode defaulted")
+        elif normalized_narrator_mode != default_narrator_mode:
+            prose["default_narrator_mode"] = normalized_narrator_mode
+            repairs.append("prose_style_profile.default_narrator_mode normalized")
 
         chapter_texture = prose.get("chapter_texture_variance")
         if not (isinstance(chapter_texture, str) and chapter_texture.strip()):
@@ -7671,6 +10797,21 @@ class NovelPipelineRunner:
             "same underlying problem."
         )
 
+    def _normalize_full_award_finding_source_and_severity(
+        self, source: str, severity: str
+    ) -> tuple[str, str]:
+        normalized_source = self._canonical_finding_source_name(source)
+        normalized_severity = str(severity).strip().upper()
+        if normalized_severity == "ELEVATION_HIGH":
+            if not normalized_source:
+                normalized_source = "elevation"
+            return normalized_source, "HIGH"
+        if normalized_severity == "ELEVATION_MEDIUM":
+            if not normalized_source:
+                normalized_source = "elevation"
+            return normalized_source, "MEDIUM"
+        return normalized_source, normalized_severity
+
     def _repair_full_award_review_data(
         self,
         data: dict[str, Any],
@@ -7718,16 +10859,25 @@ class NovelPipelineRunner:
             for idx, finding in enumerate(findings, start=1):
                 if not isinstance(finding, dict):
                     continue
+                source = str(finding.get("source", "")).strip()
+                severity = str(finding.get("severity", "")).strip()
+                normalized_source, normalized_severity = (
+                    self._normalize_full_award_finding_source_and_severity(
+                        source,
+                        severity,
+                    )
+                )
+                if normalized_source and normalized_source != source:
+                    finding["source"] = normalized_source
+                    repairs.append(f"findings[{idx}].source normalized")
+                if normalized_severity and normalized_severity != severity:
+                    finding["severity"] = normalized_severity
+                    repairs.append(f"findings[{idx}].severity normalized")
                 if not str(finding.get("finding_id", "")).strip():
                     legacy_finding_id = str(finding.get("id", "")).strip()
                     if legacy_finding_id:
                         finding["finding_id"] = legacy_finding_id
                         repairs.append(f"findings[{idx}].finding_id mapped from id")
-                severity = str(finding.get("severity", "")).strip()
-                normalized_severity = severity.upper()
-                if normalized_severity and normalized_severity != severity:
-                    finding["severity"] = normalized_severity
-                    repairs.append(f"findings[{idx}].severity normalized")
 
                 chapter_id, changed = self._coerce_full_award_chapter_id(
                     finding.get("chapter_id", ""), chapter_ids
@@ -8022,6 +11172,14 @@ class NovelPipelineRunner:
             if repaired_patterns != pattern_findings:
                 data["pattern_findings"] = repaired_patterns
 
+        verdict = str(data.get("verdict", "")).strip().upper()
+        findings = data.get("findings")
+        has_findings = isinstance(findings, list) and bool(findings)
+        has_pattern_hits = self._full_award_has_pattern_hits(data)
+        if verdict == "PASS" and (has_findings or has_pattern_hits):
+            data["verdict"] = "FAIL"
+            repairs.append("verdict normalized from PASS to FAIL because findings are present")
+
         return data, repairs
 
     def _load_repaired_full_award_review(
@@ -8121,6 +11279,30 @@ class NovelPipelineRunner:
                     f"{rel} character_voice_profiles[{idx}] contraction_level must be "
                     f"one of: high, moderate, low, variable"
                 )
+            if "interpretive_lens" in row and (
+                not isinstance(row.get("interpretive_lens"), str)
+                or not str(row.get("interpretive_lens", "")).strip()
+            ):
+                raise PipelineError(
+                    f"{rel} character_voice_profiles[{idx}] interpretive_lens must be non-empty string when present"
+                )
+            if "formative_experiences" in row:
+                formative_experiences = row.get("formative_experiences")
+                if not isinstance(formative_experiences, list) or not formative_experiences:
+                    raise PipelineError(
+                        f"{rel} character_voice_profiles[{idx}] formative_experiences must be non-empty array when present"
+                    )
+                if len(formative_experiences) > 3:
+                    raise PipelineError(
+                        f"{rel} character_voice_profiles[{idx}] formative_experiences must have at most 3 entries"
+                    )
+                if not all(
+                    isinstance(item, str) and item.strip()
+                    for item in formative_experiences
+                ):
+                    raise PipelineError(
+                        f"{rel} character_voice_profiles[{idx}] formative_experiences entries must be non-empty strings"
+                    )
 
         dialogue_rules = data.get("dialogue_rules")
         if not isinstance(dialogue_rules, dict):
@@ -8131,6 +11313,7 @@ class NovelPipelineRunner:
             "max_consecutive_low_info_replies",
             "idiolect_separation_required",
             "default_contraction_use",
+            "focalizer_dialogue_interiority",
         ):
             if key not in dialogue_rules:
                 raise PipelineError(f"{rel} dialogue_rules missing {key}")
@@ -8163,6 +11346,15 @@ class NovelPipelineRunner:
             raise PipelineError(
                 f"{rel} dialogue_rules default_contraction_use must be non-empty string"
             )
+        focalizer_dialogue_interiority = dialogue_rules.get("focalizer_dialogue_interiority")
+        if (
+            not isinstance(focalizer_dialogue_interiority, str)
+            or focalizer_dialogue_interiority.strip().lower()
+            not in FOCALIZER_DIALOGUE_INTERIORITY_VALUES
+        ):
+            raise PipelineError(
+                f"{rel} dialogue_rules focalizer_dialogue_interiority must be one of: high, moderate, low"
+            )
 
         prose_style = data.get("prose_style_profile")
         if not isinstance(prose_style, dict):
@@ -8174,6 +11366,7 @@ class NovelPipelineRunner:
             "sensory_bias",
             "diction",
             "forbidden_drift_patterns",
+            "default_narrator_mode",
             "chapter_texture_variance",
         ):
             if key not in prose_style:
@@ -8183,6 +11376,14 @@ class NovelPipelineRunner:
                 raise PipelineError(
                     f"{rel} prose_style_profile {text_key} must be non-empty string"
                 )
+        default_narrator_mode = prose_style.get("default_narrator_mode")
+        if (
+            not isinstance(default_narrator_mode, str)
+            or default_narrator_mode.strip() not in {"transparent", "literary"}
+        ):
+            raise PipelineError(
+                f"{rel} prose_style_profile default_narrator_mode must be 'transparent' or 'literary'"
+            )
         for list_key in ("sensory_bias", "forbidden_drift_patterns"):
             value = prose_style[list_key]
             if not isinstance(value, list) or not value:
@@ -8235,6 +11436,11 @@ class NovelPipelineRunner:
                 "state_shift": spec.state_shift,
                 "texture_mode": spec.texture_mode,
                 "scene_count_target": spec.scene_count_target,
+                "opening_situation": spec.opening_situation,
+                "closing_state": spec.closing_state,
+                "chronology_anchor": spec.chronology_anchor,
+                "entry_obligation": spec.entry_obligation,
+                "exit_pressure": spec.exit_pressure,
                 "objective": spec.objective,
                 "conflict": spec.conflict,
                 "consequence": spec.consequence,
@@ -8910,6 +12116,16 @@ class NovelPipelineRunner:
         summary = data.get("summary")
         if not isinstance(summary, str) or not summary.strip():
             raise PipelineError(f"{rel} missing non-empty summary")
+        for metric_key in CROSS_CHAPTER_AUDIT_METRIC_KEYS:
+            metric_value = data.get(metric_key)
+            if (
+                not isinstance(metric_value, int)
+                or isinstance(metric_value, bool)
+                or metric_value < 0
+            ):
+                raise PipelineError(
+                    f"{rel} {metric_key} must be a non-negative integer"
+                )
 
         seen_ids: set[str] = set()
         for array_name, expected_category in (
@@ -8988,6 +12204,32 @@ class NovelPipelineRunner:
                 if coerced != raw_cycle:
                     data["cycle"] = coerced
                     repairs.append("cycle coerced to integer")
+
+        for metric_key in CROSS_CHAPTER_AUDIT_METRIC_KEYS:
+            raw_metric = data.get(metric_key)
+            normalized_metric: int | None = None
+            if (
+                isinstance(raw_metric, int)
+                and not isinstance(raw_metric, bool)
+                and raw_metric >= 0
+            ):
+                normalized_metric = raw_metric
+            elif isinstance(raw_metric, str):
+                stripped = raw_metric.strip()
+                if stripped.isdigit():
+                    normalized_metric = int(stripped)
+            elif (
+                isinstance(raw_metric, float)
+                and raw_metric.is_integer()
+                and raw_metric >= 0
+            ):
+                normalized_metric = int(raw_metric)
+            if normalized_metric is None:
+                data[metric_key] = 0
+                repairs.append(f"{metric_key} defaulted to 0")
+            elif normalized_metric != raw_metric:
+                data[metric_key] = normalized_metric
+                repairs.append(f"{metric_key} normalized")
 
         seen_ids: dict[str, int] = {}
         for array_name, expected_category in (
@@ -9115,6 +12357,9 @@ class NovelPipelineRunner:
         return {
             "cycle": cycle,
             "summary": "Cross-chapter audit could not be completed; fallback with no findings.",
+            "not_x_y_count": 0,
+            "personified_abstraction_count": 0,
+            "abstract_noun_subject_count": 0,
             "redundancy_findings": [],
             "consistency_findings": [],
         }
@@ -9128,9 +12373,942 @@ class NovelPipelineRunner:
         return (
             data.get("cycle") == expected["cycle"]
             and data.get("summary") == expected["summary"]
+            and data.get("not_x_y_count", expected["not_x_y_count"])
+            == expected["not_x_y_count"]
+            and data.get(
+                "personified_abstraction_count",
+                expected["personified_abstraction_count"],
+            )
+            == expected["personified_abstraction_count"]
+            and data.get(
+                "abstract_noun_subject_count",
+                expected["abstract_noun_subject_count"],
+            )
+            == expected["abstract_noun_subject_count"]
             and data.get("redundancy_findings") == expected["redundancy_findings"]
             and data.get("consistency_findings") == expected["consistency_findings"]
         )
+
+    def _normalize_local_window_category(self, value: str) -> str:
+        normalized = re.sub(r"[^a-z0-9]+", "_", str(value).strip().lower()).strip("_")
+        return LOCAL_WINDOW_CATEGORY_ALIASES.get(normalized, normalized)
+
+    def _normalize_local_window_subcategory(self, value: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "_", str(value).strip().lower()).strip("_")
+
+    def _default_local_window_pass_hint(
+        self, category: str, subcategory: str = ""
+    ) -> str | None:
+        normalized_category = self._normalize_local_window_category(category)
+        normalized_subcategory = self._normalize_local_window_subcategory(subcategory)
+        if (
+            normalized_category == "pre_scan"
+            and normalized_subcategory == "composed_seam_prose"
+        ):
+            return "p3_prose_copyedit"
+        return LOCAL_WINDOW_PASS_HINT_BY_CATEGORY.get(normalized_category)
+
+    def _local_window_category_requirements(self, category: str) -> set[str]:
+        normalized = self._normalize_local_window_category(category)
+        if normalized == "factual_coherence":
+            return {"related_chapter_ids", "boundary_span", "counterpart_evidence"}
+        if normalized == "boundary_local_voice_drift":
+            return {"related_chapter_ids", "boundary_span"}
+        if normalized == "redundant_scene_functions":
+            return {"related_chapter_ids"}
+        return set()
+
+    def _validate_local_window_audit_json(
+        self,
+        data: dict[str, Any],
+        cycle: int,
+        chapter_ids: set[str],
+        rel: str,
+        novel_file: str,
+    ) -> None:
+        if not isinstance(data, dict):
+            raise PipelineError(f"{rel} must be a JSON object")
+        if data.get("cycle") != cycle:
+            raise PipelineError(f"{rel} cycle mismatch (expected {cycle})")
+        window_id = str(data.get("window_id", "")).strip()
+        if not window_id:
+            raise PipelineError(f"{rel} missing non-empty window_id")
+        chapters_reviewed = data.get("chapters_reviewed")
+        if not isinstance(chapters_reviewed, list) or len(chapters_reviewed) < 2:
+            raise PipelineError(f"{rel} chapters_reviewed must contain at least 2 chapters")
+        chapters_reviewed_set: set[str] = set()
+        for idx, chapter_id in enumerate(chapters_reviewed, start=1):
+            chapter_id = str(chapter_id).strip()
+            if chapter_id not in chapter_ids:
+                raise PipelineError(
+                    f"{rel} chapters_reviewed[{idx}] must map to chapter_XX in this manuscript"
+                )
+            chapters_reviewed_set.add(chapter_id)
+        summary = data.get("summary")
+        if not isinstance(summary, str) or not summary.strip():
+            raise PipelineError(f"{rel} missing non-empty summary")
+        findings = data.get("findings")
+        if not isinstance(findings, list):
+            raise PipelineError(f"{rel} findings must be an array")
+        seen_ids: set[str] = set()
+        for idx, finding in enumerate(findings, start=1):
+            if not isinstance(finding, dict):
+                raise PipelineError(f"{rel} findings[{idx}] must be object")
+            required = [
+                "finding_id",
+                "category",
+                "subcategory",
+                "severity",
+                "chapter_id",
+                "evidence",
+                "problem",
+                "rewrite_direction",
+                "acceptance_test",
+                "fix_owner_reason",
+                "pass_hint",
+            ]
+            for key in required:
+                if key not in finding or not str(finding[key]).strip():
+                    raise PipelineError(f"{rel} findings[{idx}] missing {key}")
+            finding_id = str(finding["finding_id"]).strip()
+            if finding_id in seen_ids:
+                raise PipelineError(f"{rel} duplicate finding_id: {finding_id}")
+            seen_ids.add(finding_id)
+            category = self._normalize_local_window_category(finding["category"])
+            if finding["severity"] not in SEVERITY_VALUES:
+                raise PipelineError(f"{rel} findings[{idx}] invalid severity")
+            chapter_id = str(finding["chapter_id"]).strip()
+            if chapter_id not in chapter_ids:
+                raise PipelineError(f"{rel} findings[{idx}] invalid chapter_id")
+            if chapter_id not in chapters_reviewed_set:
+                raise PipelineError(
+                    f"{rel} findings[{idx}] chapter_id must be within chapters_reviewed"
+                )
+            pass_hint = str(finding["pass_hint"]).strip()
+            if pass_hint not in REVISION_PASS_KEYS:
+                raise PipelineError(f"{rel} findings[{idx}] invalid pass_hint")
+            evidence = self._normalize_evidence_field(finding["evidence"])
+            if not self._evidence_citations_valid(evidence, novel_file):
+                raise PipelineError(
+                    f"{rel} findings[{idx}] evidence must cite {novel_file}:<line>"
+                )
+            counterpart_evidence = str(finding.get("counterpart_evidence", "")).strip()
+            if counterpart_evidence:
+                normalized_counterpart = self._normalize_evidence_field(counterpart_evidence)
+                if not self._evidence_citations_valid(normalized_counterpart, novel_file):
+                    raise PipelineError(
+                        f"{rel} findings[{idx}] counterpart_evidence must cite {novel_file}:<line>"
+                    )
+            self._validate_rewrite_direction(
+                rewrite_direction=str(finding["rewrite_direction"]),
+                target_file=novel_file,
+                rel=rel,
+                finding_index=idx,
+            )
+            self._validate_acceptance_test(
+                acceptance_test=str(finding["acceptance_test"]),
+                target_file=novel_file,
+                rel=rel,
+                finding_index=idx,
+            )
+            related_chapter_ids = finding.get("related_chapter_ids")
+            if not isinstance(related_chapter_ids, list) or not related_chapter_ids:
+                raise PipelineError(
+                    f"{rel} findings[{idx}] related_chapter_ids must be a non-empty array"
+                )
+            for rel_idx, related_id in enumerate(related_chapter_ids, start=1):
+                normalized_related = str(related_id).strip()
+                if normalized_related not in chapter_ids:
+                    raise PipelineError(
+                        f"{rel} findings[{idx}] related_chapter_ids[{rel_idx}] invalid chapter_id"
+                    )
+            requirements = self._local_window_category_requirements(category)
+            if "related_chapter_ids" in requirements and not finding.get("related_chapter_ids"):
+                raise PipelineError(
+                    f"{rel} findings[{idx}] category {category} requires related_chapter_ids"
+                )
+            if "boundary_span" in requirements and not str(
+                finding.get("boundary_span", "")
+            ).strip():
+                raise PipelineError(
+                    f"{rel} findings[{idx}] category {category} requires boundary_span"
+                )
+            if "counterpart_evidence" in requirements and not counterpart_evidence:
+                raise PipelineError(
+                    f"{rel} findings[{idx}] category {category} requires counterpart_evidence"
+                )
+
+    def _repair_local_window_audit_data(
+        self,
+        data: dict[str, Any],
+        cycle: int,
+        chapter_ids: set[str],
+    ) -> tuple[dict[str, Any], list[str]]:
+        if not isinstance(data, dict):
+            return data, []
+
+        repairs: list[str] = []
+        raw_cycle = data.get("cycle")
+        if isinstance(raw_cycle, str):
+            stripped = raw_cycle.strip()
+            if stripped.isdigit():
+                data["cycle"] = int(stripped)
+                repairs.append("cycle coerced to integer")
+
+        chapters_reviewed = data.get("chapters_reviewed")
+        if not isinstance(chapters_reviewed, list):
+            legacy_chapters = data.get("chapters")
+            if isinstance(legacy_chapters, list):
+                data["chapters_reviewed"] = legacy_chapters
+                chapters_reviewed = legacy_chapters
+                repairs.append("chapters_reviewed mapped from chapters")
+        if isinstance(chapters_reviewed, list):
+            normalized_reviewed: list[str] = []
+            for idx, chapter_id in enumerate(chapters_reviewed, start=1):
+                normalized_id, changed = self._coerce_full_award_chapter_id(
+                    chapter_id,
+                    chapter_ids,
+                )
+                if changed:
+                    repairs.append(f"chapters_reviewed[{idx}] normalized")
+                normalized_reviewed.append(normalized_id)
+            data["chapters_reviewed"] = normalized_reviewed
+
+        window_id = str(data.get("window_id", "")).strip()
+        if not window_id:
+            window_suffix = re.search(r"(\d+)", str(data.get("window", "")).strip())
+            if window_suffix:
+                data["window_id"] = self._window_id_for_index(int(window_suffix.group(1)))
+                repairs.append("window_id synthesized from window")
+                window_id = str(data.get("window_id", "")).strip()
+
+        findings = data.get("findings")
+        if isinstance(findings, list):
+            seen_ids: dict[str, int] = {}
+            for idx, finding in enumerate(findings, start=1):
+                if not isinstance(finding, dict):
+                    continue
+                finding_id = str(finding.get("finding_id", "")).strip()
+                if not finding_id:
+                    suffix = window_id or "window"
+                    finding_id = f"{suffix}_{idx:03d}"
+                    finding["finding_id"] = finding_id
+                    repairs.append(f"findings[{idx}].finding_id synthesized")
+                raw_category = str(finding.get("category", "")).strip()
+                normalized_category = self._normalize_local_window_category(raw_category)
+                if normalized_category and normalized_category != raw_category:
+                    finding["category"] = normalized_category
+                    repairs.append(f"findings[{idx}].category normalized")
+                if not str(finding.get("subcategory", "")).strip():
+                    finding["subcategory"] = "unspecified"
+                    repairs.append(f"findings[{idx}].subcategory synthesized")
+                severity = str(finding.get("severity", "")).strip()
+                normalized_severity = severity.upper()
+                if normalized_severity and normalized_severity != severity:
+                    finding["severity"] = normalized_severity
+                    repairs.append(f"findings[{idx}].severity normalized")
+                normalized_chapter_id, changed = self._coerce_full_award_chapter_id(
+                    finding.get("chapter_id", ""),
+                    chapter_ids,
+                )
+                if changed:
+                    finding["chapter_id"] = normalized_chapter_id
+                    repairs.append(f"findings[{idx}].chapter_id normalized")
+                if not str(finding.get("problem", "")).strip():
+                    description = str(finding.get("description", "")).strip()
+                    if description:
+                        finding["problem"] = description
+                        repairs.append(f"findings[{idx}].problem mapped from description")
+                evidence = self._normalize_evidence_field(finding.get("evidence", ""))
+                if evidence and evidence != finding.get("evidence"):
+                    finding["evidence"] = evidence
+                    repairs.append(f"findings[{idx}].evidence flattened")
+                counterpart_evidence = self._normalize_evidence_field(
+                    finding.get("counterpart_evidence", "")
+                )
+                if counterpart_evidence and counterpart_evidence != finding.get(
+                    "counterpart_evidence"
+                ):
+                    finding["counterpart_evidence"] = counterpart_evidence
+                    repairs.append(f"findings[{idx}].counterpart_evidence flattened")
+                if not str(finding.get("rewrite_direction", "")).strip():
+                    revision_directive = str(
+                        finding.get("revision_directive", "")
+                    ).strip()
+                    if revision_directive:
+                        finding["rewrite_direction"] = revision_directive
+                        repairs.append(
+                            f"findings[{idx}].rewrite_direction mapped from revision_directive"
+                        )
+                if not str(finding.get("pass_hint", "")).strip() or str(
+                    finding.get("pass_hint", "")
+                ).strip() not in REVISION_PASS_KEYS:
+                    pass_hint = self._default_local_window_pass_hint(
+                        str(finding.get("category", "")),
+                        str(finding.get("subcategory", "")),
+                    )
+                    if pass_hint:
+                        finding["pass_hint"] = pass_hint
+                        repairs.append(f"findings[{idx}].pass_hint synthesized from category")
+                related_chapter_ids = finding.get("related_chapter_ids")
+                if isinstance(related_chapter_ids, list):
+                    normalized_related: list[str] = []
+                    changed_related = False
+                    for rel_idx, chapter_id in enumerate(related_chapter_ids, start=1):
+                        normalized_related_id, related_changed = self._coerce_full_award_chapter_id(
+                            chapter_id,
+                            chapter_ids,
+                        )
+                        normalized_related.append(normalized_related_id)
+                        if related_changed:
+                            repairs.append(
+                                f"findings[{idx}].related_chapter_ids[{rel_idx}] normalized"
+                            )
+                            changed_related = True
+                    if changed_related:
+                        finding["related_chapter_ids"] = normalized_related
+                elif not related_chapter_ids:
+                    boundary_span = str(finding.get("boundary_span", "")).strip()
+                    if "/" in boundary_span:
+                        parsed = [part.strip() for part in boundary_span.split("/") if part.strip()]
+                        if parsed:
+                            finding["related_chapter_ids"] = parsed
+                            repairs.append(
+                                f"findings[{idx}].related_chapter_ids synthesized from boundary_span"
+                            )
+                requirements = self._local_window_category_requirements(
+                    normalized_category or str(finding.get("category", ""))
+                )
+                if (
+                    "boundary_span" in requirements
+                    and not str(finding.get("boundary_span", "")).strip()
+                ):
+                    related = finding.get("related_chapter_ids")
+                    chapter_id = str(finding.get("chapter_id", "")).strip()
+                    if isinstance(related, list) and related:
+                        lead = str(related[0]).strip()
+                        if lead and lead != chapter_id:
+                            finding["boundary_span"] = f"{lead}/{chapter_id}"
+                            repairs.append(
+                                f"findings[{idx}].boundary_span synthesized from related_chapter_ids"
+                            )
+                if not str(finding.get("fix_owner_reason", "")).strip():
+                    finding["fix_owner_reason"] = "Repair synthesized during validation salvage."
+                    repairs.append(f"findings[{idx}].fix_owner_reason synthesized")
+                base_id = str(finding.get("finding_id", "")).strip()
+                if base_id:
+                    dup_count = seen_ids.get(base_id, 0)
+                    if dup_count:
+                        finding["finding_id"] = f"{base_id}_{dup_count + 1}"
+                        repairs.append(f"findings[{idx}].finding_id deduplicated")
+                    seen_ids[base_id] = dup_count + 1
+
+        summary = data.get("summary")
+        if not isinstance(summary, str) or not summary.strip():
+            finding_count = len(data.get("findings", [])) if isinstance(
+                data.get("findings"), list
+            ) else 0
+            data["summary"] = (
+                f"Local-window audit for cycle {cycle}. Findings: {finding_count}."
+            )
+            repairs.append("summary synthesized from finding count")
+        return data, repairs
+
+    def _load_repaired_local_window_audit(
+        self,
+        rel: str,
+        cycle: int,
+        chapter_ids: set[str],
+        novel_file: str,
+    ) -> dict[str, Any]:
+        data = self._read_json(rel)
+        repaired_data, repairs = self._repair_local_window_audit_data(
+            data,
+            cycle,
+            chapter_ids,
+        )
+        if repairs:
+            preserved_rel = self._preserve_invalid_artifact(rel)
+            self._write_json(rel, repaired_data)
+            detail_blob = " | ".join(repairs[:8])
+            if len(repairs) > 8:
+                detail_blob += f" | ... (+{len(repairs) - 8} more)"
+            preserve_note = f" preserved={preserved_rel}" if preserved_rel else ""
+            self._log(
+                f"local_window_audit_repair artifact={rel}"
+                f"{preserve_note} details={detail_blob}"
+            )
+            data = repaired_data
+        self._validate_local_window_audit_json(
+            data,
+            cycle,
+            chapter_ids,
+            rel,
+            novel_file,
+        )
+        return data
+
+    def _repair_aggregation_decisions(
+        self,
+        data: dict[str, Any],
+        input_finding_ids: set[str],
+    ) -> tuple[dict[str, Any], list[str]]:
+        if not isinstance(data, dict):
+            return data, []
+
+        repairs: list[str] = []
+        valid_ids = {
+            str(finding_id).strip()
+            for finding_id in input_finding_ids
+            if str(finding_id).strip()
+        }
+        valid_chapters = {spec.chapter_id for spec in self.chapter_specs}
+
+        def normalize_id_list(raw: Any, label: str) -> list[str]:
+            out: list[str] = []
+            seen: set[str] = set()
+            if not isinstance(raw, list):
+                return out
+            for idx, item in enumerate(raw, start=1):
+                finding_id = str(item).strip()
+                if not finding_id:
+                    continue
+                if finding_id not in valid_ids:
+                    repairs.append(f"{label}[{idx}] dropped unknown finding_id")
+                    continue
+                if finding_id in seen:
+                    repairs.append(f"{label}[{idx}] deduplicated")
+                    continue
+                seen.add(finding_id)
+                out.append(finding_id)
+            return out
+
+        def normalize_chapter_list(raw: Any, label: str) -> list[str]:
+            out: list[str] = []
+            seen: set[str] = set()
+            if not isinstance(raw, list):
+                return out
+            for idx, item in enumerate(raw, start=1):
+                chapter_id = str(item).strip()
+                if not chapter_id:
+                    continue
+                if chapter_id not in valid_chapters:
+                    repairs.append(f"{label}[{idx}] dropped unknown chapter_id")
+                    continue
+                if chapter_id in seen:
+                    repairs.append(f"{label}[{idx}] deduplicated")
+                    continue
+                seen.add(chapter_id)
+                out.append(chapter_id)
+            return out
+
+        for key in AGGREGATION_DECISION_KEYS:
+            raw_value = data.get(key)
+            if raw_value is None:
+                data[key] = []
+                repairs.append(f"{key} synthesized as empty array")
+            elif not isinstance(raw_value, list):
+                data[key] = []
+                repairs.append(f"{key} coerced to empty array")
+
+        data["unchanged"] = normalize_id_list(data.get("unchanged", []), "unchanged")
+
+        normalized_merges: list[dict[str, Any]] = []
+        for idx, row in enumerate(data.get("merges", []), start=1):
+            if not isinstance(row, dict):
+                repairs.append(f"merges[{idx}] dropped non-object entry")
+                continue
+            target_finding = str(row.get("target_finding", "")).strip()
+            if target_finding not in valid_ids:
+                repairs.append(f"merges[{idx}] dropped unknown target_finding")
+                continue
+            absorbed_findings = normalize_id_list(
+                row.get("absorbed_findings", []),
+                f"merges[{idx}].absorbed_findings",
+            )
+            absorbed_findings = [
+                finding_id
+                for finding_id in absorbed_findings
+                if finding_id != target_finding
+            ]
+            merged_rewrite_direction = str(
+                row.get("merged_rewrite_direction", "")
+            ).strip()
+            reason = str(row.get("reason", "")).strip()
+            if not absorbed_findings or not merged_rewrite_direction or not reason:
+                repairs.append(f"merges[{idx}] dropped incomplete merge entry")
+                continue
+            normalized_merges.append(
+                {
+                    "target_finding": target_finding,
+                    "absorbed_findings": absorbed_findings,
+                    "merged_rewrite_direction": merged_rewrite_direction,
+                    "reason": reason,
+                }
+            )
+        data["merges"] = normalized_merges
+
+        normalized_canonical_choices: list[dict[str, Any]] = []
+        for idx, row in enumerate(data.get("canonical_choices", []), start=1):
+            if not isinstance(row, dict):
+                repairs.append(f"canonical_choices[{idx}] dropped non-object entry")
+                continue
+            choice_id = str(row.get("choice_id", "")).strip()
+            value = str(row.get("value", "")).strip()
+            grounding = str(row.get("grounding", "")).strip()
+            affected_findings = normalize_id_list(
+                row.get("affected_findings", []),
+                f"canonical_choices[{idx}].affected_findings",
+            )
+            affected_chapters = normalize_chapter_list(
+                row.get("affected_chapters", []),
+                f"canonical_choices[{idx}].affected_chapters",
+            )
+            if not (
+                choice_id
+                and value
+                and grounding
+                and affected_findings
+                and affected_chapters
+            ):
+                repairs.append(
+                    f"canonical_choices[{idx}] dropped incomplete canonical choice"
+                )
+                continue
+            normalized_canonical_choices.append(
+                {
+                    "choice_id": choice_id,
+                    "value": value,
+                    "grounding": grounding,
+                    "affected_findings": affected_findings,
+                    "affected_chapters": affected_chapters,
+                }
+            )
+        data["canonical_choices"] = normalized_canonical_choices
+
+        normalized_consistency_directives: list[dict[str, Any]] = []
+        for idx, row in enumerate(data.get("consistency_directives", []), start=1):
+            if not isinstance(row, dict):
+                repairs.append(
+                    f"consistency_directives[{idx}] dropped non-object entry"
+                )
+                continue
+            directive_id = str(row.get("directive_id", "")).strip()
+            rule = str(row.get("rule", "")).strip()
+            reason = str(row.get("reason", "")).strip()
+            source_findings = normalize_id_list(
+                row.get("source_findings", []),
+                f"consistency_directives[{idx}].source_findings",
+            )
+            if not (directive_id and rule and reason and source_findings):
+                repairs.append(
+                    f"consistency_directives[{idx}] dropped incomplete directive"
+                )
+                continue
+            normalized_consistency_directives.append(
+                {
+                    "directive_id": directive_id,
+                    "rule": rule,
+                    "source_findings": source_findings,
+                    "reason": reason,
+                }
+            )
+        data["consistency_directives"] = normalized_consistency_directives
+
+        normalized_context_injections: list[dict[str, Any]] = []
+        for idx, row in enumerate(data.get("context_injections", []), start=1):
+            if not isinstance(row, dict):
+                repairs.append(f"context_injections[{idx}] dropped non-object entry")
+                continue
+            target_finding = str(row.get("target_finding", "")).strip()
+            cross_chapter_context = str(
+                row.get("cross_chapter_context", "")
+            ).strip()
+            if target_finding not in valid_ids or not cross_chapter_context:
+                repairs.append(
+                    f"context_injections[{idx}] dropped incomplete context injection"
+                )
+                continue
+            normalized_context_injections.append(
+                {
+                    "target_finding": target_finding,
+                    "cross_chapter_context": cross_chapter_context,
+                }
+            )
+        data["context_injections"] = normalized_context_injections
+
+        for bucket_key in ("suppressions", "unfixable"):
+            normalized_bucket: list[dict[str, Any]] = []
+            for idx, row in enumerate(data.get(bucket_key, []), start=1):
+                if not isinstance(row, dict):
+                    repairs.append(f"{bucket_key}[{idx}] dropped non-object entry")
+                    continue
+                finding_id = str(row.get("finding_id", "")).strip()
+                reason = str(row.get("reason", "")).strip()
+                attempted_partial_fix = str(
+                    row.get("attempted_partial_fix", "")
+                ).strip()
+                if bucket_key == "unfixable":
+                    if finding_id not in valid_ids or not reason or not attempted_partial_fix:
+                        repairs.append(f"{bucket_key}[{idx}] dropped incomplete entry")
+                        continue
+                    normalized_bucket.append(
+                        {
+                            "finding_id": finding_id,
+                            "attempted_partial_fix": attempted_partial_fix,
+                            "reason": reason,
+                        }
+                    )
+                    continue
+                if finding_id not in valid_ids or not reason:
+                    repairs.append(f"{bucket_key}[{idx}] dropped incomplete entry")
+                    continue
+                normalized_bucket.append(
+                    {
+                        "finding_id": finding_id,
+                        "reason": reason,
+                    }
+                )
+            data[bucket_key] = normalized_bucket
+
+        normalized_reassignments: list[dict[str, Any]] = []
+        for idx, row in enumerate(data.get("pass_reassignments", []), start=1):
+            if not isinstance(row, dict):
+                repairs.append(f"pass_reassignments[{idx}] dropped non-object entry")
+                continue
+            finding_id = str(row.get("finding_id", "")).strip()
+            from_pass = str(row.get("from_pass", "")).strip()
+            to_pass = str(row.get("to_pass", "")).strip()
+            reason = str(row.get("reason", "")).strip()
+            if (
+                finding_id not in valid_ids
+                or from_pass not in REVISION_PASS_KEYS
+                or to_pass not in REVISION_PASS_KEYS
+                or from_pass == to_pass
+                or not reason
+            ):
+                repairs.append(
+                    f"pass_reassignments[{idx}] dropped incomplete pass reassignment"
+                )
+                continue
+            normalized_reassignments.append(
+                {
+                    "finding_id": finding_id,
+                    "from_pass": from_pass,
+                    "to_pass": to_pass,
+                    "reason": reason,
+                }
+            )
+        data["pass_reassignments"] = normalized_reassignments
+
+        return data, repairs
+
+    def _validate_aggregation_decisions(
+        self,
+        data: dict[str, Any],
+        input_finding_ids: set[str],
+        rel: str,
+    ) -> None:
+        if not isinstance(data, dict):
+            raise PipelineError(f"{rel} must be a JSON object")
+        for key in AGGREGATION_DECISION_KEYS:
+            if not isinstance(data.get(key), list):
+                raise PipelineError(f"{rel} {key} must be an array")
+
+        valid_ids = {
+            str(finding_id).strip()
+            for finding_id in input_finding_ids
+            if str(finding_id).strip()
+        }
+        valid_chapters = {spec.chapter_id for spec in self.chapter_specs}
+        accounted_for: dict[str, str] = {}
+
+        def account(finding_id: str, bucket: str) -> None:
+            if finding_id not in valid_ids:
+                raise PipelineError(f"{rel} references unknown finding_id {finding_id}")
+            prior_bucket = accounted_for.get(finding_id)
+            if prior_bucket is not None:
+                raise PipelineError(
+                    f"{rel} finding_id {finding_id} appears in both {prior_bucket} and {bucket}"
+                )
+            accounted_for[finding_id] = bucket
+
+        for idx, finding_id in enumerate(data.get("unchanged", []), start=1):
+            if not isinstance(finding_id, str) or not finding_id.strip():
+                raise PipelineError(f"{rel} unchanged[{idx}] must be a finding_id string")
+            account(finding_id.strip(), "unchanged")
+
+        for idx, row in enumerate(data.get("merges", []), start=1):
+            if not isinstance(row, dict):
+                raise PipelineError(f"{rel} merges[{idx}] must be object")
+            target_finding = str(row.get("target_finding", "")).strip()
+            absorbed_findings = row.get("absorbed_findings")
+            merged_rewrite_direction = str(
+                row.get("merged_rewrite_direction", "")
+            ).strip()
+            reason = str(row.get("reason", "")).strip()
+            if not target_finding or not merged_rewrite_direction or not reason:
+                raise PipelineError(f"{rel} merges[{idx}] missing required fields")
+            if not isinstance(absorbed_findings, list) or not absorbed_findings:
+                raise PipelineError(
+                    f"{rel} merges[{idx}].absorbed_findings must be non-empty array"
+                )
+            account(target_finding, "merges")
+            seen_absorbed: set[str] = set()
+            for absorb_idx, absorbed_id in enumerate(absorbed_findings, start=1):
+                if not isinstance(absorbed_id, str) or not absorbed_id.strip():
+                    raise PipelineError(
+                        f"{rel} merges[{idx}].absorbed_findings[{absorb_idx}] must be finding_id string"
+                    )
+                normalized_absorbed = absorbed_id.strip()
+                if normalized_absorbed == target_finding:
+                    raise PipelineError(
+                        f"{rel} merges[{idx}] target_finding cannot also appear in absorbed_findings"
+                    )
+                if normalized_absorbed in seen_absorbed:
+                    raise PipelineError(
+                        f"{rel} merges[{idx}] absorbed_findings contains duplicate {normalized_absorbed}"
+                    )
+                seen_absorbed.add(normalized_absorbed)
+                account(normalized_absorbed, "merges")
+
+        for idx, row in enumerate(data.get("canonical_choices", []), start=1):
+            if not isinstance(row, dict):
+                raise PipelineError(f"{rel} canonical_choices[{idx}] must be object")
+            choice_id = str(row.get("choice_id", "")).strip()
+            value = str(row.get("value", "")).strip()
+            grounding = str(row.get("grounding", "")).strip()
+            affected_findings = row.get("affected_findings")
+            affected_chapters = row.get("affected_chapters")
+            if not choice_id or not value or not grounding:
+                raise PipelineError(
+                    f"{rel} canonical_choices[{idx}] missing choice_id, value, or grounding"
+                )
+            if not isinstance(affected_findings, list) or not affected_findings:
+                raise PipelineError(
+                    f"{rel} canonical_choices[{idx}].affected_findings must be non-empty array"
+                )
+            if not isinstance(affected_chapters, list) or not affected_chapters:
+                raise PipelineError(
+                    f"{rel} canonical_choices[{idx}].affected_chapters must be non-empty array"
+                )
+            for finding_idx, finding_id in enumerate(affected_findings, start=1):
+                if not isinstance(finding_id, str) or finding_id.strip() not in valid_ids:
+                    raise PipelineError(
+                        f"{rel} canonical_choices[{idx}].affected_findings[{finding_idx}] must reference an input finding_id"
+                    )
+            for chapter_idx, chapter_id in enumerate(affected_chapters, start=1):
+                if not isinstance(chapter_id, str) or chapter_id.strip() not in valid_chapters:
+                    raise PipelineError(
+                        f"{rel} canonical_choices[{idx}].affected_chapters[{chapter_idx}] must reference a valid chapter_id"
+                    )
+
+        for idx, row in enumerate(data.get("consistency_directives", []), start=1):
+            if not isinstance(row, dict):
+                raise PipelineError(
+                    f"{rel} consistency_directives[{idx}] must be object"
+                )
+            directive_id = str(row.get("directive_id", "")).strip()
+            rule = str(row.get("rule", "")).strip()
+            reason = str(row.get("reason", "")).strip()
+            source_findings = row.get("source_findings")
+            if not directive_id or not rule or not reason:
+                raise PipelineError(
+                    f"{rel} consistency_directives[{idx}] missing directive_id, rule, or reason"
+                )
+            if not isinstance(source_findings, list) or not source_findings:
+                raise PipelineError(
+                    f"{rel} consistency_directives[{idx}].source_findings must be non-empty array"
+                )
+            for finding_idx, finding_id in enumerate(source_findings, start=1):
+                if not isinstance(finding_id, str) or finding_id.strip() not in valid_ids:
+                    raise PipelineError(
+                        f"{rel} consistency_directives[{idx}].source_findings[{finding_idx}] must reference an input finding_id"
+                    )
+
+        for idx, row in enumerate(data.get("context_injections", []), start=1):
+            if not isinstance(row, dict):
+                raise PipelineError(f"{rel} context_injections[{idx}] must be object")
+            target_finding = str(row.get("target_finding", "")).strip()
+            cross_chapter_context = str(
+                row.get("cross_chapter_context", "")
+            ).strip()
+            if target_finding not in valid_ids or not cross_chapter_context:
+                raise PipelineError(
+                    f"{rel} context_injections[{idx}] missing target_finding or cross_chapter_context"
+                )
+
+        for bucket_key in ("suppressions", "unfixable"):
+            for idx, row in enumerate(data.get(bucket_key, []), start=1):
+                if not isinstance(row, dict):
+                    raise PipelineError(f"{rel} {bucket_key}[{idx}] must be object")
+                finding_id = str(row.get("finding_id", "")).strip()
+                reason = str(row.get("reason", "")).strip()
+                attempted_partial_fix = str(
+                    row.get("attempted_partial_fix", "")
+                ).strip()
+                if bucket_key == "unfixable":
+                    if finding_id not in valid_ids or not reason or not attempted_partial_fix:
+                        raise PipelineError(
+                            f"{rel} {bucket_key}[{idx}] missing finding_id, attempted_partial_fix, or reason"
+                        )
+                    account(finding_id, bucket_key)
+                    continue
+                if finding_id not in valid_ids or not reason:
+                    raise PipelineError(
+                        f"{rel} {bucket_key}[{idx}] missing finding_id or reason"
+                    )
+                account(finding_id, bucket_key)
+
+        for idx, row in enumerate(data.get("pass_reassignments", []), start=1):
+            if not isinstance(row, dict):
+                raise PipelineError(
+                    f"{rel} pass_reassignments[{idx}] must be object"
+                )
+            finding_id = str(row.get("finding_id", "")).strip()
+            from_pass = str(row.get("from_pass", "")).strip()
+            to_pass = str(row.get("to_pass", "")).strip()
+            reason = str(row.get("reason", "")).strip()
+            if finding_id not in valid_ids or not reason:
+                raise PipelineError(
+                    f"{rel} pass_reassignments[{idx}] missing finding_id or reason"
+                )
+            if from_pass not in REVISION_PASS_KEYS or to_pass not in REVISION_PASS_KEYS:
+                raise PipelineError(
+                    f"{rel} pass_reassignments[{idx}] must use valid revision pass keys"
+                )
+            if from_pass == to_pass:
+                raise PipelineError(
+                    f"{rel} pass_reassignments[{idx}] from_pass must differ from to_pass"
+                )
+            account(finding_id, "pass_reassignments")
+
+        if set(accounted_for.keys()) != valid_ids:
+            missing = sorted(valid_ids - set(accounted_for.keys()))
+            extra = sorted(set(accounted_for.keys()) - valid_ids)
+            details: list[str] = []
+            if missing:
+                details.append(f"missing={', '.join(missing[:8])}")
+            if extra:
+                details.append(f"extra={', '.join(extra[:8])}")
+            raise PipelineError(
+                f"{rel} accounting rule violated ({'; '.join(details)})"
+            )
+
+    def _load_repaired_aggregation_decisions(
+        self, rel: str, input_finding_ids: set[str]
+    ) -> dict[str, Any]:
+        self._materialize_output_alias(
+            base_dir=self.run_dir,
+            required_rel=rel,
+            stage="llm_aggregator",
+            cycle=None,
+            chapter_id=None,
+        )
+        data = self._read_json(rel)
+        repaired_data, repairs = self._repair_aggregation_decisions(
+            data,
+            input_finding_ids,
+        )
+        if repairs:
+            preserved_rel = self._preserve_invalid_artifact(rel)
+            self._write_json(rel, repaired_data)
+            detail_blob = " | ".join(repairs[:8])
+            if len(repairs) > 8:
+                detail_blob += f" | ... (+{len(repairs) - 8} more)"
+            preserve_note = f" preserved={preserved_rel}" if preserved_rel else ""
+            self._log(
+                f"aggregation_decisions_repair artifact={rel}"
+                f"{preserve_note} details={detail_blob}"
+            )
+            data = repaired_data
+        self._validate_aggregation_decisions(
+            data,
+            input_finding_ids,
+            rel,
+        )
+        return data
+
+    def _local_window_audit_input_paths(
+        self,
+        cycle: int,
+        chapters_reviewed: list[str],
+    ) -> list[Path]:
+        cpad = self._cpad(cycle)
+        continuity_snapshot_rel = self._cycle_continuity_snapshot_rel(cycle)
+        input_paths = [
+            self.run_dir / f"snapshots/cycle_{cpad}/FINAL_NOVEL.md",
+            self.run_dir / self._chapter_line_index_rel(cycle),
+            self.run_dir / continuity_snapshot_rel,
+            self.run_dir / "outline" / "style_bible.json",
+            self.run_dir / "config" / "constitution.md",
+            self.run_dir / "config" / "prompts" / "local_window_audit_prompt.md",
+        ]
+        input_paths.extend(
+            self.run_dir / "outline" / "chapter_specs" / f"{chapter_id}.json"
+            for chapter_id in chapters_reviewed
+        )
+        return input_paths
+
+    def _local_window_audit_unit_state(
+        self,
+        cycle: int,
+        window_id: str,
+        chapters_reviewed: list[str],
+    ) -> dict[str, Any]:
+        rel = self._local_window_audit_rel(cycle, window_id)
+        self._materialize_output_alias(
+            base_dir=self.run_dir,
+            required_rel=rel,
+            stage="local_window_audit",
+            cycle=cycle,
+            chapter_id=None,
+        )
+        path = self.run_dir / rel
+        if not path.is_file():
+            return {
+                "status": "missing",
+                "validated": False,
+                "fresh": False,
+                "reason": "missing_output",
+            }
+        cpad = self._cpad(cycle)
+        novel_file = f"snapshots/cycle_{cpad}/FINAL_NOVEL.md"
+        try:
+            data = self._load_repaired_local_window_audit(
+                rel,
+                cycle,
+                {spec.chapter_id for spec in self.chapter_specs},
+                novel_file,
+            )
+            self._validate_local_window_window_output(
+                data,
+                rel=rel,
+                window_id=window_id,
+                chapters_reviewed=chapters_reviewed,
+            )
+        except PipelineError as exc:
+            return {
+                "status": "failed",
+                "validated": False,
+                "fresh": False,
+                "reason": str(exc),
+            }
+        input_paths = self._local_window_audit_input_paths(cycle, chapters_reviewed)
+        if not self._artifact_fresh_against_inputs(path, input_paths):
+            return {
+                "status": "stale",
+                "validated": True,
+                "fresh": False,
+                "reason": "inputs_newer_than_output",
+            }
+        return {
+            "status": "reused",
+            "validated": True,
+            "fresh": True,
+            "artifact": rel,
+            "chapter_count": len(chapters_reviewed),
+        }
 
     def _validate_revision_report_json(
         self,
@@ -9173,6 +13351,16 @@ class NovelPipelineRunner:
             notes = row.get("notes")
             if not isinstance(notes, str):
                 raise PipelineError(f"{rel} finding_results #{idx} notes must be string")
+            revision_note = row.get("revision_note")
+            if revision_note is not None and not isinstance(revision_note, str):
+                raise PipelineError(
+                    f"{rel} finding_results #{idx} revision_note must be string when present"
+                )
+            if status in {"PARTIAL", "UNRESOLVED"}:
+                if not isinstance(revision_note, str) or not revision_note.strip():
+                    raise PipelineError(
+                        f"{rel} finding_results #{idx} missing revision_note for {status}"
+                    )
             seen_ids.add(finding_id)
 
         # Log coverage gaps but do NOT reject the whole report over them.
@@ -9202,11 +13390,24 @@ class NovelPipelineRunner:
             return data, []
 
         repairs: list[str] = []
+        finding_results = data.get("finding_results")
+        if isinstance(finding_results, list):
+            for idx, row in enumerate(finding_results, start=1):
+                if not isinstance(row, dict):
+                    continue
+                status = str(row.get("status_after_revision", "")).strip().upper()
+                revision_note = str(row.get("revision_note", "")).strip()
+                notes = str(row.get("notes", "")).strip()
+                if status in {"PARTIAL", "UNRESOLVED"} and not revision_note and notes:
+                    row["revision_note"] = notes
+                    repairs.append(
+                        f"finding_results[{idx}].revision_note synthesized from notes"
+                    )
+
         summary = data.get("summary")
         if isinstance(summary, str) and summary.strip():
             return data, repairs
 
-        finding_results = data.get("finding_results")
         if not isinstance(finding_results, list):
             return data, repairs
 
@@ -9250,107 +13451,6 @@ class NovelPipelineRunner:
         )
         return data
 
-    def _validate_seam_report_json(
-        self, data: dict[str, Any], chapter_id: str, rel: str
-    ) -> None:
-        if not isinstance(data, dict):
-            raise PipelineError(f"{rel} must be a JSON object")
-        if data.get("chapter_id") != chapter_id:
-            raise PipelineError(f"{rel} chapter_id mismatch (expected {chapter_id})")
-        seam_changes_made = data.get("seam_changes_made")
-        if seam_changes_made not in {"YES", "NO"}:
-            raise PipelineError(f"{rel} seam_changes_made must be YES or NO")
-        summary = data.get("summary")
-        if not isinstance(summary, str) or not summary.strip():
-            raise PipelineError(f"{rel} summary must be non-empty string")
-        edits = data.get("edits")
-        if not isinstance(edits, list):
-            raise PipelineError(f"{rel} edits must be an array")
-        if not all(isinstance(x, str) and x.strip() for x in edits):
-            raise PipelineError(f"{rel} edits must contain non-empty strings")
-        if seam_changes_made == "YES" and not edits:
-            raise PipelineError(f"{rel} seam_changes_made is YES but edits is empty")
-        if seam_changes_made == "NO" and edits:
-            raise PipelineError(f"{rel} seam_changes_made is NO but edits is non-empty")
-
-    def _repair_seam_report_data(
-        self, data: dict[str, Any], chapter_id: str
-    ) -> tuple[dict[str, Any], list[str]]:
-        if not isinstance(data, dict):
-            return data, []
-
-        repairs: list[str] = []
-        expected_ids = {chapter_id}
-        normalized_chapter_id, changed = self._coerce_full_award_chapter_id(
-            data.get("chapter_id", ""),
-            expected_ids,
-        )
-        if changed:
-            data["chapter_id"] = normalized_chapter_id
-            repairs.append("chapter_id normalized")
-
-        seam_changes = data.get("seam_changes_made")
-        if isinstance(seam_changes, str):
-            normalized = seam_changes.strip().upper()
-            if normalized in {"YES", "NO"} and normalized != seam_changes:
-                data["seam_changes_made"] = normalized
-                repairs.append("seam_changes_made normalized")
-
-        edits = data.get("edits")
-        if isinstance(edits, str):
-            stripped = edits.strip()
-            data["edits"] = [stripped] if stripped else []
-            repairs.append("edits wrapped from string")
-            edits = data["edits"]
-        elif edits is None:
-            data["edits"] = []
-            repairs.append("edits defaulted to empty array")
-            edits = data["edits"]
-
-        if isinstance(edits, list):
-            normalized_edits = [str(item).strip() for item in edits if str(item).strip()]
-            if normalized_edits != edits:
-                data["edits"] = normalized_edits
-                repairs.append("edits normalized")
-                edits = data["edits"]
-
-        if data.get("seam_changes_made") not in {"YES", "NO"} and isinstance(edits, list):
-            data["seam_changes_made"] = "YES" if edits else "NO"
-            repairs.append("seam_changes_made derived from edits")
-
-        summary = data.get("summary")
-        if not isinstance(summary, str) or not summary.strip():
-            seam_changes_made = str(data.get("seam_changes_made", "")).strip().upper()
-            if seam_changes_made == "YES":
-                data["summary"] = "Seam polish made local continuity edits."
-            else:
-                data["summary"] = "No seam edits were needed."
-            repairs.append("summary synthesized")
-
-        return data, repairs
-
-    def _load_repaired_seam_report(
-        self,
-        rel: str,
-        chapter_id: str,
-    ) -> dict[str, Any]:
-        data = self._read_json(rel)
-        repaired_data, repairs = self._repair_seam_report_data(data, chapter_id)
-        if repairs:
-            preserved_rel = self._preserve_invalid_artifact(rel)
-            self._write_json(rel, repaired_data)
-            detail_blob = " | ".join(repairs[:8])
-            if len(repairs) > 8:
-                detail_blob += f" | ... (+{len(repairs) - 8} more)"
-            preserve_note = f" preserved={preserved_rel}" if preserved_rel else ""
-            self._log(
-                f"seam_report_repair chapter={chapter_id} artifact={rel}"
-                f"{preserve_note} details={detail_blob}"
-            )
-            data = repaired_data
-        self._validate_seam_report_json(data, chapter_id, rel)
-        return data
-
     def _severity_allowed_for_source(self, severity: str, source: str) -> bool:
         if severity in SEVERITY_VALUES:
             return True
@@ -9382,6 +13482,15 @@ class NovelPipelineRunner:
             "status": "UNRESOLVED",
             "cycle": cycle,
         }
+        if source == "elevation":
+            _, normalized_severity = self._normalize_full_award_finding_source_and_severity(
+                source,
+                finding["severity"],
+            )
+            finding["severity"] = normalized_severity
+        pass_hint = str(raw.get("pass_hint", "")).strip()
+        if pass_hint:
+            finding["pass_hint"] = pass_hint
         if not self._severity_allowed_for_source(finding["severity"], source):
             raise PipelineError(f"invalid finding severity: {finding}")
         if finding["chapter_id"] not in {spec.chapter_id for spec in self.chapter_specs}:
@@ -9444,6 +13553,13 @@ class NovelPipelineRunner:
                         incoming_id = str(finding.get("finding_id", "")).strip()
                         if incoming_id:
                             merged["finding_id"] = incoming_id
+                        incoming_pass_hint = str(finding.get("pass_hint", "")).strip()
+                        if incoming_pass_hint:
+                            merged["pass_hint"] = incoming_pass_hint
+                if not str(merged.get("pass_hint", "")).strip():
+                    incoming_pass_hint = str(finding.get("pass_hint", "")).strip()
+                    if incoming_pass_hint:
+                        merged["pass_hint"] = incoming_pass_hint
                 continue
             by_semantic_key[key] = len(collapsed)
             collapsed.append(dict(finding))
@@ -9524,6 +13640,13 @@ class NovelPipelineRunner:
                 "out/chapter_review.json",
                 f"out/{name}",
             ]
+        if required_rel.startswith("outline/outline_review_cycle_") and required_rel.endswith(".json"):
+            name = Path(required_rel).name
+            return [
+                "out/outline_review.json",
+                "out/review.json",
+                f"out/{name}",
+            ]
         if required_rel.endswith("full_award.review.json"):
             return [
                 "out/full_award_review.json",
@@ -9534,17 +13657,28 @@ class NovelPipelineRunner:
                 "out/cross_chapter_audit.json",
                 "out/review.json",
             ]
+        if "/local_window_" in required_rel and required_rel.endswith(".json"):
+            name = Path(required_rel).name
+            return [
+                "out/local_window_audit.json",
+                "out/local_window_review.json",
+                "out/review.json",
+                f"out/{name}",
+            ]
+        if required_rel.endswith("aggregation_decisions.json"):
+            return [
+                "out/aggregation_decisions.json",
+                "out/review.json",
+            ]
         if required_rel.endswith(".revision_report.json"):
             name = Path(required_rel).name
             return [
                 "out/revision_report.json",
                 f"out/{name}",
             ]
-        if required_rel.endswith(".seam_report.json"):
-            name = Path(required_rel).name
+        if required_rel.endswith("outline/spatial_layout.json"):
             return [
-                "out/seam_report.json",
-                f"out/{name}",
+                "out/spatial_layout.json",
             ]
         return []
 
@@ -9663,6 +13797,10 @@ class NovelPipelineRunner:
                     "status_after_revision": "UNRESOLVED",
                     "evidence": f"{chapter_file}:1",
                     "notes": f"Fallback revision report due to validator failure: {reason}",
+                    "revision_note": (
+                        f"Could not validate revision output automatically; manual follow-up "
+                        f"needed. Root validator reason: {reason}"
+                    ),
                 }
             )
         return {
@@ -9671,29 +13809,20 @@ class NovelPipelineRunner:
             "summary": "Fallback revision report generated after validation failure.",
         }
 
-    def _fallback_seam_report_payload(
-        self, chapter_id: str, reason: str
-    ) -> dict[str, Any]:
-        return {
-            "chapter_id": chapter_id,
-            "seam_changes_made": "NO",
-            "summary": f"Fallback seam report generated after validation failure: {reason}",
-            "edits": [],
-        }
-
     def _write_final_report(
         self, success_cycle: int | None, gate_records: list[dict[str, Any]]
     ) -> None:
         completed_at_utc = self._utc_now()
         status = "PASS" if success_cycle is not None else "FAIL"
         warning_count = len(self.validation_warnings)
+        gate_history = self._merged_gate_history(gate_records)
         terminal_reason = (
-            "gate_passed"
+            "max_cycles_reached"
             if success_cycle is not None
-            else "max_cycles_reached_without_gate_pass"
+            else "no_cycles_completed"
         )
         final_cycle = success_cycle if success_cycle is not None else (
-            gate_records[-1]["cycle"] if gate_records else None
+            gate_history[-1]["cycle"] if gate_history else None
         )
         final_novel_snapshot_file = (
             f"snapshots/cycle_{self._cpad(final_cycle)}/FINAL_NOVEL.post_revision.md"
@@ -9701,6 +13830,14 @@ class NovelPipelineRunner:
             else None
         )
         final_novel_file = "FINAL_NOVEL.md" if final_cycle is not None else None
+        cycle_status_files = sorted(
+            str(path.relative_to(self.run_dir))
+            for path in (self.run_dir / "status").glob("cycle_*/cycle_status.json")
+        )
+        quality_summary_files = sorted(
+            str(path.relative_to(self.run_dir))
+            for path in (self.run_dir / "status").glob("cycle_*/quality_summary.json")
+        )
         final_report = {
             "completed_at_utc": completed_at_utc,
             "status": status,
@@ -9712,7 +13849,9 @@ class NovelPipelineRunner:
                 "review": self.cfg.max_parallel_reviews,
                 "revision": self.cfg.max_parallel_revisions,
             },
-            "gate_history": gate_records,
+            "gate_history": gate_history,
+            "cycle_status_files": cycle_status_files,
+            "quality_summary_files": quality_summary_files,
             "chapter_count": len(self.chapter_specs),
             "final_novel_file": final_novel_file,
             "final_novel_snapshot_file": final_novel_snapshot_file,
@@ -9720,6 +13859,9 @@ class NovelPipelineRunner:
             "validation_warning_count": warning_count,
             "validation_warnings_file": "reports/validation_warnings.json",
             "run_dir": str(self.run_dir),
+            "add_cycles": self.cfg.add_cycles,
+            "base_completed_cycles": self.cfg.base_completed_cycles,
+            "final_cycle_global_only": self.cfg.final_cycle_global_only,
         }
         final_status = {
             "completed_at_utc": completed_at_utc,
@@ -9734,8 +13876,15 @@ class NovelPipelineRunner:
             "validation_mode": self.cfg.validation_mode,
             "validation_warning_count": warning_count,
             "completed_with_warnings": warning_count > 0,
-            "last_gate": gate_records[-1] if gate_records else None,
+            "last_gate": gate_history[-1] if gate_history else None,
+            "last_cycle_status_file": cycle_status_files[-1] if cycle_status_files else None,
+            "last_quality_summary_file": (
+                quality_summary_files[-1] if quality_summary_files else None
+            ),
             "run_dir": str(self.run_dir),
+            "add_cycles": self.cfg.add_cycles,
+            "base_completed_cycles": self.cfg.base_completed_cycles,
+            "final_cycle_global_only": self.cfg.final_cycle_global_only,
         }
         self._write_json(
             "reports/validation_warnings.json",
@@ -9747,6 +13896,31 @@ class NovelPipelineRunner:
         )
         self._write_json("reports/final_report.json", final_report)
         self._write_json("reports/final_status.json", final_status)
+
+    def _load_existing_gate_history(self) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for path in sorted((self.run_dir / "gate").glob("cycle_*/gate.json")):
+            rel = str(path.relative_to(self.run_dir))
+            try:
+                payload = self._read_json(rel)
+            except PipelineError:
+                continue
+            cycle = payload.get("cycle")
+            if isinstance(cycle, int) and cycle >= 1:
+                rows.append(payload)
+        return rows
+
+    def _merged_gate_history(self, gate_records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        by_cycle: dict[int, dict[str, Any]] = {}
+        for row in self._load_existing_gate_history():
+            cycle = row.get("cycle")
+            if isinstance(cycle, int) and cycle >= 1:
+                by_cycle[cycle] = row
+        for row in gate_records:
+            cycle = row.get("cycle")
+            if isinstance(cycle, int) and cycle >= 1:
+                by_cycle[cycle] = row
+        return [by_cycle[cycle] for cycle in sorted(by_cycle)]
 
     _COST_RATES: dict[str, dict[str, Any]] = {
         "gpt-5.4": {
@@ -10339,6 +14513,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Novel pipeline with premise generation, outlining, drafting, review, revision, and resume support."
     )
+    parser.set_defaults(final_cycle_global_only=True)
     premise_group = parser.add_mutually_exclusive_group(required=True)
     premise_group.add_argument("--premise", type=str, help="Premise text")
     premise_group.add_argument(
@@ -10411,6 +14586,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--max-cycles", type=int, default=2)
     parser.add_argument("--min-cycles", type=int, default=2)
+    parser.add_argument(
+        "--add-cycles",
+        type=int,
+        default=0,
+        help="Append this many new cycles after the last completed successful cycle in an existing run-dir.",
+    )
     parser.add_argument("--max-parallel-drafts", type=int, default=6)
     parser.add_argument("--max-parallel-reviews", type=int, default=6)
     parser.add_argument("--max-parallel-revisions", type=int, default=6)
@@ -10451,10 +14632,28 @@ def parse_args() -> argparse.Namespace:
         help="Optional provider override for full-book review jobs.",
     )
     parser.add_argument(
+        "--cross-chapter-audit-provider",
+        type=str,
+        default="",
+        help="Optional provider override for cross-chapter audit jobs.",
+    )
+    parser.add_argument(
+        "--local-window-audit-provider",
+        type=str,
+        default="",
+        help="Optional provider override for local-window audit jobs only.",
+    )
+    parser.add_argument(
         "--revision-provider",
         type=str,
         default="",
-        help="Optional provider override for revision, seam-polish, and continuity jobs.",
+        help="Optional provider override for revision and continuity jobs.",
+    )
+    parser.add_argument(
+        "--aggregation-provider",
+        type=str,
+        default="",
+        help="Optional provider override for LLM aggregation jobs only.",
     )
     parser.add_argument(
         "--revision-dialogue-provider",
@@ -10476,9 +14675,60 @@ def parse_args() -> argparse.Namespace:
         help="Validation strictness: strict | balanced | lenient (default: lenient)",
     )
     parser.add_argument(
+        "--outline-review-cycles",
+        type=int,
+        default=1,
+        help="How many outline review/revision passes to run before drafting (default: 1, max: 2).",
+    )
+    parser.add_argument(
+        "--final-cycle-global-only",
+        dest="final_cycle_global_only",
+        action="store_true",
+        help="On multi-cycle runs, skip chapter review on the final cycle and rely on full-book, cross-chapter, and local-window review only.",
+    )
+    parser.add_argument(
+        "--no-final-cycle-global-only",
+        dest="final_cycle_global_only",
+        action="store_false",
+        help="Disable global-only final-cycle mode and continue running chapter review on the last cycle.",
+    )
+    parser.add_argument(
+        "--skip-outline-review",
+        action="store_true",
+        help="Skip the outline review/revision loop and draft directly from the base outline.",
+    )
+    parser.add_argument(
+        "--outline-revision-provider",
+        type=str,
+        default="",
+        help="Optional provider override for outline revision jobs only.",
+    )
+    parser.add_argument(
         "--skip-cross-chapter-audit",
         action="store_true",
         help="Skip the cross-chapter audit stage during review/aggregation.",
+    )
+    parser.add_argument(
+        "--skip-local-window-audit",
+        action="store_true",
+        help="Skip the local-window audit stage when it is enabled.",
+    )
+    parser.add_argument(
+        "--require-local-window-for-revision",
+        action="store_true",
+        help="Require local-window audit artifacts before revision once the stage is enabled.",
+    )
+    parser.add_argument(
+        "--local-window-size",
+        type=int,
+        default=LOCAL_WINDOW_SIZE,
+        help=f"How many consecutive chapters each local-window audit reviews (default: {LOCAL_WINDOW_SIZE}).",
+    )
+    parser.add_argument(
+        "--local-window-overlap",
+        type=int,
+        default=LOCAL_WINDOW_OVERLAP,
+        help=f"How many chapters consecutive local-window audits overlap by (default: {LOCAL_WINDOW_OVERLAP}).",
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -10553,6 +14803,26 @@ def resolve_run_dir(repo_root: Path, run_dir_arg: str, slug_source: str) -> Path
     return (repo_root / "runs" / f"{ts}_{slugify(slug_source)}").resolve()
 
 
+def _load_existing_success_cycle(run_dir: Path) -> int:
+    for path in (
+        run_dir / "reports" / "final_status.json",
+        run_dir / "reports" / "final_report.json",
+    ):
+        if not path.is_file():
+            continue
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(loaded, dict):
+            continue
+        status = str(loaded.get("status", "")).strip().upper()
+        success_cycle = loaded.get("success_cycle")
+        if status == "PASS" and isinstance(success_cycle, int) and success_cycle >= 1:
+            return success_cycle
+    return 0
+
+
 def _resolve_provider(value: str) -> str:
     provider = str(value).strip().lower() or "codex"
     if provider not in PROVIDER_VALUES:
@@ -10584,15 +14854,43 @@ def _resolve_reasoning_effort(provider: str, effort_value: str) -> str:
 def _resolve_agent_bin(
     provider: str, agent_bin_value: str, *, allow_shared_overrides: bool = True
 ) -> str:
+    def resolve_candidate(candidate: str) -> str | None:
+        raw = str(candidate).strip()
+        if not raw:
+            return None
+        expanded = os.path.expanduser(raw)
+        if os.path.isfile(expanded):
+            return expanded
+        resolved = shutil.which(raw)
+        if resolved:
+            return resolved
+        return None
+
     explicit = str(agent_bin_value).strip()
     if allow_shared_overrides and explicit:
-        return explicit
+        return resolve_candidate(explicit) or explicit
     env_override = os.environ.get("AGENT_BIN", "").strip() if allow_shared_overrides else ""
     if env_override:
-        return env_override
+        return resolve_candidate(env_override) or env_override
     if provider == "codex":
-        return os.environ.get("CODEX_BIN", "").strip() or "codex"
-    return os.environ.get("CLAUDE_BIN", "").strip() or "claude"
+        for candidate in (
+            os.environ.get("CODEX_BIN", "").strip(),
+            "codex",
+            "/Applications/Codex.app/Contents/Resources/codex",
+        ):
+            resolved = resolve_candidate(candidate)
+            if resolved:
+                return resolved
+        return "codex"
+    for candidate in (
+        os.environ.get("CLAUDE_BIN", "").strip(),
+        "claude",
+        str(Path.home() / ".local" / "bin" / "claude"),
+    ):
+        resolved = resolve_candidate(candidate)
+        if resolved:
+            return resolved
+    return "claude"
 
 
 def _resolve_stage_profiles(
@@ -10627,6 +14925,22 @@ def _resolve_stage_profiles(
             model=_resolve_default_model(provider, ""),
             reasoning_effort=_resolve_reasoning_effort(provider, ""),
         )
+    for stage_name, (stage_group, arg_name) in STAGE_PROVIDER_OVERRIDE_SPECS.items():
+        raw = str(getattr(args, arg_name, "")).strip()
+        if not raw:
+            continue
+        provider = _resolve_provider(raw)
+        base_profile = profiles[stage_group]
+        if provider == base_profile.provider:
+            continue
+        profiles[stage_name] = ExecutionProfile(
+            provider=provider,
+            agent_bin=_resolve_agent_bin(
+                provider, "", allow_shared_overrides=False
+            ),
+            model=_resolve_default_model(provider, ""),
+            reasoning_effort=_resolve_reasoning_effort(provider, ""),
+        )
     return profiles
 
 
@@ -10654,6 +14968,8 @@ def _resolve_revision_pass_profiles(
 
 def build_config(repo_root: Path, args: argparse.Namespace) -> RunnerConfig:
     premise, premise_mode, premise_brief = load_premise_inputs(args)
+    if args.add_cycles < 0:
+        raise PipelineError("--add-cycles must be >= 0")
     if args.max_cycles < 1:
         raise PipelineError("--max-cycles must be >= 1")
     if args.min_cycles < 1:
@@ -10671,6 +14987,16 @@ def build_config(repo_root: Path, args: argparse.Namespace) -> RunnerConfig:
         raise PipelineError("--job-timeout-seconds must be >= 60")
     if args.job_idle_timeout_seconds < 0:
         raise PipelineError("--job-idle-timeout-seconds must be >= 0")
+    if args.outline_review_cycles < 1 or args.outline_review_cycles > 2:
+        raise PipelineError("--outline-review-cycles must be between 1 and 2")
+    if args.local_window_size < 2:
+        raise PipelineError("--local-window-size must be >= 2")
+    if args.local_window_overlap < 0:
+        raise PipelineError("--local-window-overlap must be >= 0")
+    if args.local_window_overlap >= args.local_window_size:
+        raise PipelineError(
+            "--local-window-overlap must be smaller than --local-window-size"
+        )
     if args.premise_reroll_max < 0:
         raise PipelineError("--premise-reroll-max must be >= 0")
     if args.premise_candidate_count < 1:
@@ -10713,6 +15039,25 @@ def build_config(repo_root: Path, args: argparse.Namespace) -> RunnerConfig:
 
     slug_source = premise or premise_brief or "auto-premise"
     run_dir = resolve_run_dir(repo_root, args.run_dir, slug_source)
+    add_cycles = int(args.add_cycles or 0)
+    base_completed_cycles = 0
+    max_cycles = args.max_cycles
+    if add_cycles:
+        if not run_dir.is_dir():
+            raise PipelineError(
+                "--add-cycles requires --run-dir to point to an existing completed run"
+            )
+        base_completed_cycles = _load_existing_success_cycle(run_dir)
+        if base_completed_cycles < 1:
+            raise PipelineError(
+                "--add-cycles requires reports/final_status.json (or final_report.json) with status=PASS and success_cycle >= 1"
+            )
+        max_cycles = base_completed_cycles + add_cycles
+        if max_cycles < args.min_cycles:
+            raise PipelineError(
+                "--add-cycles results in total --max-cycles smaller than --min-cycles; "
+                "lower --min-cycles or add more cycles"
+            )
     return RunnerConfig(
         premise=premise,
         premise_mode=premise_mode,
@@ -10725,7 +15070,7 @@ def build_config(repo_root: Path, args: argparse.Namespace) -> RunnerConfig:
         premise_min_unique_clusters=args.premise_min_unique_clusters,
         premise_shortlist_size=args.premise_shortlist_size,
         run_dir=run_dir,
-        max_cycles=args.max_cycles,
+        max_cycles=max_cycles,
         min_cycles=args.min_cycles,
         max_parallel_drafts=args.max_parallel_drafts,
         max_parallel_reviews=args.max_parallel_reviews,
@@ -10741,7 +15086,16 @@ def build_config(repo_root: Path, args: argparse.Namespace) -> RunnerConfig:
         job_timeout_seconds=args.job_timeout_seconds,
         job_idle_timeout_seconds=args.job_idle_timeout_seconds,
         validation_mode=validation_mode,
+        outline_review_cycles=args.outline_review_cycles,
+        final_cycle_global_only=bool(args.final_cycle_global_only),
+        skip_outline_review=bool(args.skip_outline_review),
         skip_cross_chapter_audit=bool(args.skip_cross_chapter_audit),
+        skip_local_window_audit=bool(args.skip_local_window_audit),
+        require_local_window_for_revision=bool(args.require_local_window_for_revision),
+        local_window_size=args.local_window_size,
+        local_window_overlap=args.local_window_overlap,
+        add_cycles=add_cycles,
+        base_completed_cycles=base_completed_cycles,
     )
 
 
