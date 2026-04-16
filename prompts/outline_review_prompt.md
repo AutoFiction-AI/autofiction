@@ -48,6 +48,11 @@ Evaluate the outline against both the premise-driven criteria and these checks:
 13. Character count manageability: is the cast size manageable for distinct voice maintenance across parallel drafting, and is the style bible likely to differentiate the major voices sufficiently?
 14. POV balance: for multi-POV novels, does chapter distribution match the premise's intended character emphasis?
 15. Premise instruction sustainability: if the premise requests something repeatedly, does the outline vary execution enough to create escalation rather than fatigue?
+16. Chapter-edge integrity: do `opening_situation`, `closing_state`, `chronology_anchor`, `entry_obligation`, and `exit_pressure` create a coherent boundary contract for each chapter? Flag chapters whose `opening_situation` materially duplicates the prior chapter's `closing_state`, whose `chronology_anchor` leaves elapsed time unreconstructable, or whose `exit_pressure` repeats the same tension shape across consecutive middle chapters.
+17. Cross-artifact consistency: do the edge fields agree with the chapter's prose summary in `outline/outline.md`, its `must_land_beats`, and its `scene_plan.tsv` rows? These edge fields are additive metadata, not a second contradictory outline.
+18. Dramatic function variety: among any 3 consecutive middle-third chapters, flag when any pair shares the same `chapter_engine` AND the same `state_shift` shape or `exit_pressure` shape. Matching engine labels alone are not sufficient; the real question is whether the chapters are structurally interchangeable.
+19. Secondary character scene independence: verify that significant secondary characters have direct moments where the reader witnesses them act, speak, or reveal themselves independently rather than only through protagonist interpretation. For ensemble novels, at least 3 significant secondary characters should have such moments. For smaller-cast novels, enough non-protagonist presence should exist that the world does not collapse into protagonist-only perception.
+20. Dialogue-subtext scaffolding when needed: if the premise depends on secrecy, insider shorthand, specialized knowledge, compressed relationship exchange, or other dialogue that a cold reader could struggle to parse on surface content alone, check whether the outline package provides enough support for drafting. Are optional style-bible depth fields like `interpretive_lens` or `formative_experiences` specific and genuinely differentiating when used? Are scene-plan `undercurrent` entries, when used, concrete enough to tell the drafter what is being worked around beneath the surface exchange? Do not require this machinery for every book or every scene. Flag it only when the novel clearly needs it and the current planning artifacts leave dialogue scenes under-architected.
 
 Novelty warning:
 1. LLMs default to the most probable version of any genre.
@@ -58,6 +63,9 @@ Novelty warning:
 Step 3: Emit findings.
 1. Findings should use the output contract below.
 2. `rewrite_direction` may be sweeping. You are allowed to recommend major structural reshaping, chapter redistribution, reveal repacing, or subplot redesign.
+2b. For dramatic-function-variety findings, the `rewrite_direction` should name a better alternative function for the repeated chapter (for example consequence, betrayal, loss, revelation, or alliance shift) rather than merely saying "make it less repetitive."
+2c. For secondary-character scene-independence findings, the `rewrite_direction` should suggest where in the chapter sequence the direct moment should live and what form it could take (direct action, dialogue exchange, overheard conversation, brief POV shift, or witnessed failure/success).
+2d. For dialogue-subtext scaffolding findings, the `rewrite_direction` should say whether the fix belongs in chapter planning, a specific scene-plan `undercurrent`, a focalizer's optional depth field, or some combination. Prefer adding only the minimum scaffolding the book actually needs.
 3. `elevation_suggestions` are for opportunities that go beyond fixing problems. They are optional creative opportunities, not mandatory blockers.
 
 Output requirements:

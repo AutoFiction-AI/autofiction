@@ -15,6 +15,7 @@ Context isolation requirement:
 2. Use the chapter line index to jump directly to the relevant spans in `{{FULL_NOVEL_FILE}}` rather than scanning the full manuscript sequentially.
 3. Judge what it feels like to read these consecutive chapters back-to-back. This is the reading-experience auditor.
 4. Do not let the continuity sheet or style bible excuse missing on-page clarity. Use them to detect contradiction and drift, not to rescue unclear prose.
+5. Read the listed chapter spec files for this window. Use their edge fields (`opening_situation`, `closing_state`, `chronology_anchor`, `entry_obligation`, `exit_pressure`) as planning contracts you may validate against, not as excuses for prose the manuscript failed to render on the page.
 
 Task:
 1. Evaluate this window only. Your scope is the local reading experience across these consecutive chapters.
@@ -24,7 +25,7 @@ Task:
 
 Mandatory pre-scan — complete this BEFORE evaluating structural and momentum issues:
 
-Scan for description-level and continuity problems across the chapters in this window. These are among the most reader-visible problems in parallel-drafted novels and must not be deprioritized.
+Scan for description-level, continuity, and immediate boundary-level repetition problems across the chapters in this window. These are among the most reader-visible problems in parallel-drafted novels and must not be deprioritized.
 
 Use category `pre_scan` with the appropriate subcategory:
 
@@ -38,6 +39,8 @@ P7. `pov_clarity`: in a multi-POV novel, a new chapter's POV is not clear within
 P8. `dangling_thread`: a character promises, threatens, or commits to something at the end of one chapter and the adjacent chapter silently ignores it.
 P9. `tonal_mismatch`: the emotional register shifts so abruptly at a chapter boundary that the transition feels like two different novels spliced together.
 P10. `reader_confusion`: anything that would make a reader pause in unintentional confusion. Deliberate mystery and ambiguity are fine; accidental opacity is not.
+P11. `composed_seam_prose`: at a chapter boundary, the exit or entry sentence uses narrator performance, thematic summary, aphoristic contrast, or over-composed prose that would read better as transparent scene description. If a chapter ends with "Pain taught better when it wasn't being watched" or opens with "By noon he had learned another road fact: injury made distance dishonest," flag it here as a seam problem rather than letting the prose performance slide past the boundary.
+P12. `conversation_redundancy`: at a chapter boundary, a moral argument, emotional reckoning, revealed wound, or relational confrontation in the later chapter substantially restages one already landed in the earlier chapter — same characters examining the same ground, same emotional weight — without materially new evidence, consequence, or changed power relationship that alters the reader's understanding of the wound. Flag the later chapter.
 
 After the pre-scan, evaluate structural and momentum issues using these ten categories:
 
@@ -52,6 +55,7 @@ After the pre-scan, evaluate structural and momentum issues using these ten cate
 5h. `repetitive_scene_dynamics`: adjacent chapters restaging the same interpersonal dynamic, appeal/response shape, or obstacle pattern without changed terms.
 5i. `character_decision_coherence`: decisions or behavior that contradict adjacent-chapter knowledge, personality, or goals without explanation.
 5j. `reading_momentum`: the specific chapter where the window fails to create new pressure, new information, changed leverage, cumulative intensification, or a distinct terminal state.
+5k. Composed seam prose: this boundary-specific failure must already have been checked in the mandatory pre-scan. If you emit an additional structural finding, do so only when the seam-level prose performance also creates a second distinct problem. Use existing categories rather than inventing a new one: `cross_chapter_prose_patterns` for performed prose at the seam, `boundary_local_voice_drift` when the seam abruptly changes narration register, and `reading_momentum` when a thematic summary sentence weakens exit or entry pressure.
 
 What this stage does not emit:
 1. Density or count findings.
@@ -71,7 +75,7 @@ Severity guidance:
 3. `MEDIUM`: qualitative drift that hurts the reading experience without breaking the story.
 
 Pass-hint defaults:
-1. `pre_scan` (all subcategories), `factual_coherence`, `pacing_rhythm`, `emotional_continuity`, `information_flow`, `redundant_scene_functions`, `repetitive_scene_dynamics`, `character_decision_coherence`, and `reading_momentum` default to `p1_structural_craft`.
+1. `pre_scan` defaults to `p1_structural_craft`, including `pre_scan/conversation_redundancy`, except `pre_scan/composed_seam_prose`, which defaults to `p3_prose_copyedit`. `factual_coherence`, `pacing_rhythm`, `emotional_continuity`, `information_flow`, `redundant_scene_functions`, `repetitive_scene_dynamics`, `character_decision_coherence`, and `reading_momentum` default to `p1_structural_craft`.
 2. `boundary_local_voice_drift` defaults to `p2_dialogue_idiolect_cadence`.
 3. `cross_chapter_prose_patterns` defaults to `p3_prose_copyedit`.
 4. Override the default only when the finding is primarily about dialogue register or prose-level wording.

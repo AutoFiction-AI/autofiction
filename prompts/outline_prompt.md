@@ -29,6 +29,7 @@ Task:
 9e. For any major reveal, capability, reversal, interpretive breakthrough, or crisis-solving move that lands in the back half of the novel, seed it earlier in the chapter plan. Record the earlier seed in that chapter's optional `setups_to_plant` field and the later landing in the payoff chapter's optional `payoffs_to_land` field. Use `must_land_beats` when the seed or payoff must visibly register as part of the chapter's local dramatic work, but do not rely on `must_land_beats` alone for major cross-chapter setup/payoff obligations.
 10. Build genuine vulnerability into the protagonist(s): they must pay real costs — emotional, relational, economic, or physical — make mistakes with lasting consequences, and face situations where competence alone is not enough. Avoid the pattern of a protagonist who succeeds at every challenge.
 10b. Identify 3-6 supporting characters who need independent pressure, desire, fear, obligation, or appetite outside their plot function. In `outline/outline.md`, note what each of those characters is carrying that does not reduce to serving the protagonist, and ensure at least two chapters let that pressure materially touch the page.
+10c. Store secondary-character depth in forms the pipeline will preserve: scenes, dialogue, independent action, and chapter-local beats. Do not rely on the protagonist's narration about what secondary characters are feeling, representing, or privately carrying as the primary container for their depth. If a secondary character matters, give them at least one moment the reader can witness directly rather than only through protagonist interpretation.
 11. Build emotional range into the chapter plan. A novel that operates at sustained crisis pitch from early chapters onward produces diminishing returns on its biggest moments. At least 2-3 chapters should contain genuine quiet: a meal that isn't strategic, a conversation about something other than the central conflict, a moment of beauty or humor that isn't immediately instrumentalized. These scenes build the human baseline that makes the novel's highest-stakes moments land. If every chapter is an emergency, no chapter is.
 
 Required outputs:
@@ -61,18 +62,52 @@ Required outputs:
 9. `texture_mode` (string): e.g. hot, quiet, suspended, tender, humiliating, uncanny, formal, comic, grief-heavy
 10. `scene_count_target` (integer from 1 to 4)
 11. `must_land_beats` (array of strings)
-12. `secondary_character_beats` (optional array of strings): chapter-local instructions for how supporting characters should carry independent pressure or humanity on the page in this chapter
-13. `setups_to_plant` (optional array of objects): use only for major cross-chapter seeds that later review/revision should be able to track explicitly. Each object requires `setup_id` (stable short identifier), `description` (what must become legible on the page here), and may include `payoff_window` (chapter or chapter range where it should plausibly land) and `visibility` (e.g. `light`, `moderate`, `heavy`)
-14. `payoffs_to_land` (optional array of objects): use only for major cross-chapter landings. Each object requires `setup_id` (matching an earlier setup), `description` (what resolves or pays off here), and may include `seeded_by` (array of `chapter_XX` strings) and `payoff_type` (e.g. `reveal`, `reversal`, `object use`, `emotional payoff`, `capability`)
+12. `opening_situation` (non-empty string): one sentence stating where we are, what pressure is already live, and what changed from the prior chapter's exit
+13. `closing_state` (non-empty string): one sentence stating the concrete new condition the reader leaves with
+14. `chronology_anchor` (non-empty string): a short human-readable phrase describing how this chapter relates in time to the previous one
+15. `entry_obligation` (non-empty string): one sentence stating what the opening movement (roughly the first 3-5 paragraphs) must accomplish besides reorienting
+16. `exit_pressure` (non-empty string): one sentence stating what must still feel active and unresolved at the cut
+17. `secondary_character_beats` (optional array of strings): chapter-local instructions for how supporting characters should carry independent pressure or humanity on the page in this chapter. When possible, phrase these as direct on-page beats the reader can witness, not as protagonist reflection about the character.
+18. `setups_to_plant` (optional array of objects): use only for major cross-chapter seeds that later review/revision should be able to track explicitly. Each object requires `setup_id` (stable short identifier), `description` (what must become legible on the page here), and may include `payoff_window` (chapter or chapter range where it should plausibly land) and `visibility` (e.g. `light`, `moderate`, `heavy`)
+19. `payoffs_to_land` (optional array of objects): use only for major cross-chapter landings. Each object requires `setup_id` (matching an earlier setup), `description` (what resolves or pays off here), and may include `seeded_by` (array of `chapter_XX` strings) and `payoff_type` (e.g. `reveal`, `reversal`, `object use`, `emotional payoff`, `capability`)
 
 Keep `setups_to_plant` and `payoffs_to_land` sparse. Do not turn every minor echo into tracked metadata; reserve these fields for setups and payoffs whose presence or absence would materially affect later review or revision.
 
+These edge fields are additive metadata. They do not replace the chapter's internal content planning in `outline/outline.md`, `must_land_beats`, `secondary_character_beats`, setups/payoffs, or `outline/scene_plan.tsv`. They define what the reader should already know at entry and what should still be live at exit.
+
+Canonical full-row example:
+
+```json
+{
+  "chapter_id": "chapter_08",
+  "chapter_number": 8,
+  "projected_min_words": 4200,
+  "chapter_engine": "consequence",
+  "pressure_source": "the previous failed transfer has exposed a new vulnerability in Dex's route",
+  "state_shift": "Mara realizes the anomaly is inside their own workflow, not outside it",
+  "texture_mode": "tight, suspicious, aftermath-heavy",
+  "scene_count_target": 2,
+  "must_land_beats": [
+    "Mara sees the altered threshold",
+    "Dex conceals that he has already noticed it"
+  ],
+  "opening_situation": "The morning after the failed transfer, Mara is back in the rented office with Dex, reviewing logs that should have matched overnight behavior.",
+  "closing_state": "Mara has seen enough to know the anomaly is real, but she still does not know Dex is the one hiding part of it.",
+  "chronology_anchor": "next morning",
+  "entry_obligation": "The opening movement must make clear that the failed transfer changed the team's confidence and that the logs now contain something newly wrong.",
+  "exit_pressure": "Dex must still be withholding the routing truth when the chapter cuts."
+}
+```
+
 `outline/scene_plan.tsv` contract:
 1. Header exactly:
-2. `scene_id\tchapter_id\tscene_order\tobjective\topposition\tturn\tconsequence_cost\ttension_peak`
+2. `scene_id\tchapter_id\tscene_order\tobjective\topposition\tturn\tconsequence_cost\ttension_peak\tundercurrent`
 3. Use the `scene_count_target` from each chapter spec.
 4. Single-scene chapters are allowed when compression increases force. Do not split a chapter into multiple scenes merely to satisfy format.
 5. `tension_peak` values must be `YES` or `NO`.
+6. `undercurrent` is optional scene-level subtext architecture, not a required ornament. Use a specific string only when the scene depends on hidden wants, knowledge asymmetry, testing, evasion, or dialogue pressure that operates beneath the spoken exchange. Use `null` when the surface conversation or action is enough; not every scene and not every novel needs undercurrent machinery.
+7. A useful `undercurrent` names what specific speaker wants, fears, hides, or probes in THIS scene. A useless one names only atmosphere ("tension," "mistrust," "complicated feelings"). Prefer `null` to generic mood labels.
+8. When writing `undercurrent`, name what each speaking character wants or is hiding in the scene, not the chapter's general mood. Example of useful specificity: "Nessa is deciding whether to trust strangers before the vote; Vel is measuring how much to reveal about why she is heading north." Example of useless vagueness: "hidden agendas and distrust."
 
 `outline/style_bible.json` contract:
 1. Must be valid JSON object.
@@ -97,9 +132,12 @@ Keep `setups_to_plant` and `payoffs_to_land` sparse. Do not turn every minor ech
 20. `repetition_tolerance` (string guidance: how much purposeful repetition fits this character before it feels false or mechanical)
 21. `evasion_style` (string guidance: how this character dodges, redirects, narrows, or withholds when cornered)
 22. `sentence_completion_style` (string guidance: whether this character finishes, trails off, restarts, or repairs sentences under pressure)
+22b. `interpretive_lens` (optional string): how this character tends to frame new situations or read other people. Use when it materially helps differentiate focalizers or major recurring characters. Omit rather than invent generic worldview language.
+22c. `formative_experiences` (optional array of 1-3 short strings): specific memories or prior events that shape how this character reads present scenes. Use only when the material is concrete enough to inform focalizer interiority; omit rather than pad every profile with pseudo-depth.
 23. `example_lines` (optional array of strings): if provided, these are CALIBRATION-ONLY samples showing this character's voice. They must NEVER be copied, paraphrased, or echoed in any draft. They exist solely to anchor register, rhythm, and tone for the drafting agent. Label them explicitly as non-copyable reference material. IMPORTANT: do NOT make every example line a character's "best" or most quotable moment. Include at least one example that is mundane, messy, or half-formed — a line where the character fumbles, says something obvious, trails off, repeats themselves, or produces ordinary connective speech. The calibration set should represent the character's full range, including their unremarkable moments, not just their most literary ones. If every example line is sharp, compressed, and perfectly landed, the drafting agent will calibrate to that register and produce dialogue that sounds composed rather than spoken.
 24. The spoken-texture fields above should protect productive roughness, not force gimmicks. They should describe how the character sounds when speech gets messy — interruption, evasion, topic-slippage, self-repair, unfinished turns — without turning those features into repeated trademarks.
 24b. Write voice profiles that allow characters to be unremarkable. Most real speech is functional, not literary. If every field describes the character at their most intense, sharpest, or most distinctive, the drafting agent will produce hyperactive characterization where every line performs voiceness. Include how the character sounds when they are bored, agreeable, tired, or simply filling social space. A character who is always "on" is a character who never feels real.
+24c. Apply the optional depth fields sparingly. They are there to support focalizer interiority and scene-specific recognition, not to turn every character profile into a miniature therapy dossier. Prefer one sharp interpretive habit or one concrete formative memory over generalized psychological prose.
 25. `aesthetic_risk_policy` must explicitly state whether profanity and dark content are allowed when narratively warranted.
 26. `dialogue_rules` must include:
 27. `anti_transcript_cadence` (boolean): prevents expository ping-pong dialogue. Does NOT mean every exchange must shift leverage — organic texture, small talk, and circling are valid dialogue modes.
@@ -107,9 +145,11 @@ Keep `setups_to_plant` and `payoffs_to_land` sparse. Do not turn every minor ech
 29. `max_consecutive_low_info_replies` (integer >= 2): limits consecutive low-info replies in expository or briefing-style exchanges only. This rule does NOT restrict organic small talk, social texture, meal conversation, aftermath exchanges, or any scene where characters are circling, stalling, or producing ordinary connective speech. Set to 2 or higher. Organic low-info exchanges ("Yeah." / "I know." / "So." / "Right.") are a feature of natural dialogue, not a defect.
 30. `idiolect_separation_required` (boolean)
 31. `default_contraction_use` (string describing baseline contraction policy for all dialogue — e.g. "high — contractions are the norm; uncontracted forms reserved for emphasis or character-specific formality")
+31b. `focalizer_dialogue_interiority` (string: `high`, `moderate`, or `low`): how actively the focalizer's mind should work between dialogue lines across the novel. `high` means the focalizer's recognition, worry, and social reading are often the reader's primary channel during dialogue. `moderate` means interiority should punctuate dialogue regularly while the exchange remains mostly followable on its own. `low` means the book can rely more on surface conversation, but dialogue scenes still must not become opaque. Default to `moderate` unless the narration mode or world opacity clearly calls for a different setting.
 32. `prose_style_profile` must include:
-33. `narrative_tense` (string: the tense used consistently across the entire novel — typically "past tense" or "present tense"; all chapters must use the same tense), `narrative_distance`, `rhythm_target`, `sensory_bias` (array of non-empty strings naming the dominant sensory channels or scene-pressure domains), `diction`, `forbidden_drift_patterns` (array of non-empty strings naming prose drifts to avoid)
+33. `narrative_tense` (string: the tense used consistently across the entire novel — typically "past tense" or "present tense"; all chapters must use the same tense), `narrative_distance`, `rhythm_target`, `sensory_bias` (array of non-empty strings naming the dominant sensory channels or scene-pressure domains), `diction`, `forbidden_drift_patterns` (array of non-empty strings naming prose drifts to avoid), `default_narrator_mode` (string: `transparent` for most novels; `literary` only when the premise genuinely demands conspicuous prose as a baseline register)
 34. `chapter_texture_variance` (string guidance on varying chapter rhythm, pacing, and structural texture across the book so no two consecutive chapters feel structurally identical)
+34b. Set `diction` and `rhythm_target` for the novel's default baseline register: how the prose sounds between the big moments, not at its peaks. Most paragraphs should be plain, concrete, and scene-serving. Exceptional pressure, variation, and sentence-level showiness belong in `chapter_texture_variance`, not in `diction` or `rhythm_target`. If you make `diction` itself compressed, imagistic, or conspicuously literary, the draft agent will try to write every line that way.
 35. `aesthetic_risk_policy` must include:
 36. `sanitization_disallowed` (boolean)
 37. `dark_content_allowed_when_character_true` (boolean)

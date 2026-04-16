@@ -58,12 +58,13 @@ Elevation categories to scan for when they are genuinely high-leverage in this s
 18. `E18` Earned peaks.
 19. `E19` Soft-middle energy curve.
 20. `E20` Spatial establishment and mental-map legibility.
-21. `E21` Prose and scene-level novelty.
+21. `E21` Prose and scene-level specificity. Flag scenes where the writing defaults to generic description when something concrete and particular to this world, this character, or this body would serve. The goal is specificity and surprise through detail, not through conspicuous literary craft.
 
 Elevation routing defaults:
 1. `E1`, `E6`, and `E8` route to `pass_hint: p1_structural_craft`.
 2. `E3`, `E5`, and `E16` route to `pass_hint: p2_dialogue_idiolect_cadence`.
-3. `E2`, `E4`, `E7`, `E9`, `E10`, `E11`, `E12`, `E13`, `E14`, `E15`, `E17`, `E18`, `E19`, `E20`, and `E21` route to `pass_hint: p1_structural_craft`.
+3. `E2`, `E4`, `E7`, `E9`, `E10`, `E11`, `E12`, `E13`, `E14`, `E15`, `E17`, `E18`, `E19`, and `E20` route to `pass_hint: p1_structural_craft`.
+4. `E21` routes to `pass_hint: p3_prose_copyedit` by default. Override to `p1_structural_craft` only when the specificity problem truly requires scene restructuring rather than sentence-level or paragraph-level revision.
 5. Include cross-chapter voice and style consistency judgment against `outline/style_bible.json`.
 5b. Check narrative tense consistency across all chapters against `prose_style_profile.narrative_tense` in the style bible. If any chapter uses a different tense from the declared canonical tense, flag as HIGH. Tense drift between chapters is a fundamental coherence failure — parallel drafting makes it likely, so it must be explicitly checked.
 5c. If `{{SPATIAL_LAYOUT_FILE}}` contains a non-null layout, evaluate not only factual consistency with that document but reader legibility: does the manuscript make the spatial relationships intelligible on the page, or does it rely on hidden planner knowledge?
@@ -88,6 +89,7 @@ Elevation routing defaults:
 11c. Penalize the cleaner failure instead: chapters that convert pressure into neatly balanced debate lines, explanatory mini-speeches, explicit emotional thesis statements, compressed insights, mic-drop rhetorical questions, aphoristic dialogue, or lines that sound written-to-land rather than spoken. Narrator admiration of how a line "landed," "cut," or "silenced the room" is corroborating evidence, not a separate requirement. Emit a separate finding per affected chapter with specific line citations. Mark as MEDIUM per chapter, HIGH if it is the book's dominant dialogue register.
 11d. Flag dialogue-template recurrence across chapters. If a pair or class of scenes keeps reusing the same conversational ladder — question-correction-explanation, accusation-technical deflection-human rejoinder, offer-refusal-restatement, or similar — emit separate findings for the weaker or more repetitive chapters. Repeated speech habits are only a defect when they stop carrying new dramatic pressure and begin sounding generated.
 11e. When auditing composed dialogue, explicitly scan for the distinct sub-modes named above — mini-speech diagnosis, aphorism, rhetorical mic-drop, balanced debate line, and narrator admiration — even if you consolidate them into one chapter finding. Consolidation should reduce duplicate findings, not reduce the thoroughness of the scan.
+11f. Flag book-level dialogue-interiority suppression. If multiple chapters contain dialogue scenes where the focalizer's mind goes quiet — no recognition, relational worry, experience-based context, or social-dynamic tracking between lines of exchange — and the reader is left parsing jargon, insider shorthand, or compressed loaded exchange without the focalizer's interiority to follow alongside, emit a separate finding per affected chapter. This is the inverse of composed dialogue: where composed dialogue is too written, suppressed-interiority dialogue is too bare. Mark as MEDIUM per chapter. Mark as HIGH if it is the book's dominant dialogue texture. In `rewrite_direction`, explicitly tell the reviser to restore focalizer interiority between lines of exchange rather than merely making the dialogue more explicit or explanatory.
 Dialogue register audit:
 1. Check characters' `contraction_level` fields in the style bible. Flag unjustified full-form dialogue whenever it makes a line or exchange read stiffer than the character, scene, period, and world support; do not wait for chapter-scale collapse before noticing it. Do not flag deliberate formality, ritual language, legalistic speech, historical cadence, or emphatic full-form diction when character-true. If the mismatch recurs across multiple chapters, emit a separate finding per affected chapter with chapter-specific line citations.
 2. Flag scenes where two or more characters sound interchangeable in register, syntax, and rhythm.
@@ -98,12 +100,14 @@ Required output:
 1. `{{FULL_AWARD_OUTPUT_FILE}}`
 2. The `summary` must describe the manuscript's principal failure modes in order of consequence. Do not summarize only the first decisive fail if deeper or broader blockers remain.
 3. If the listed findings are few, the `summary` must make clear why fixing only those findings would plausibly change the verdict.
+3b. If you emit any item in `findings` or any actionable `pattern_findings.chapter_hits`, the `verdict` must be `FAIL`. `PASS` is allowed only when there are no findings at all.
 
 `{{FULL_AWARD_OUTPUT_FILE}}` contract:
 1. `cycle` (int; write `{{CYCLE_INT}}`, not `"{{CYCLE_PADDED}}"`)
 2. `verdict` (`PASS|FAIL`)
 3. `summary` (string)
 4. `findings` (array of objects) for one-off blockers. This array may be empty only if every blocker is represented in `pattern_findings`.
+4a. If `findings` is non-empty, `verdict` must be `FAIL`.
 4b. Use current field names only. For ordinary findings, use `problem`, not `description`. For pattern findings, use `global_problem`, not `description`.
 5. Each `findings[]` object must include:
 6. `finding_id`
@@ -116,6 +120,7 @@ Required output:
 13. `acceptance_test` (concrete and verifiable by reading the revised passage, with pass/fail criteria tied to specific lines/spans)
 13. Optional `pattern_findings` (array of objects) for recurring book-wide patterns that affect multiple chapters. Each object should include:
 13b. `pattern_findings` is required, not optional, when the same baseline-reorientation or reader-knowledge continuity failure materially affects 3 or more chapters. In that case, include one `chapter_hits[]` entry per affected chapter rather than summarizing the pattern only at book level.
+13c. If any `pattern_findings` object contains actionable `chapter_hits`, `verdict` must be `FAIL`.
 14. `pattern_id` (short stable identifier, e.g. `PROSE_AUTOCOMM`)
 15. `severity` (`LOW|MEDIUM|HIGH|CRITICAL|ELEVATION_MEDIUM|ELEVATION_HIGH`)
 16. `global_problem` (brief shared diagnosis for the whole pattern)

@@ -12,7 +12,7 @@ Inputs:
 9. Constitution: `config/constitution.md`
 
 Task:
-1. Expand only `{{CHAPTER_INPUT_FILE}}` to meet `projected_min_words` target.
+1. Expand only `{{CHAPTER_INPUT_FILE}}`. Treat `projected_min_words` as an advisory scale signal for whether the chapter may be underbuilt, not as a quota to hit.
 2. Preserve the chapter's existing engine, pressure source, state shift, texture mode, voice, and continuity.
 3. Add scene-level pressure, consequence, and embodied texture.
 3b. Before expanding, identify what the chapter already proves, changes, or makes legible. Expansion must add new dramatic payload — new pressure, new consequence, new social texture, new operational difficulty, new emotional leverage, or new embodied specificity — rather than restating an already-landed insight. Deliberate accumulative variation is allowed: the same kind of test may recur when conditions, stakes, audience, power balance, or consequence materially change and the new pass teaches something the earlier material could not.
@@ -25,7 +25,9 @@ Task:
 3i. If this chapter spec includes `setups_to_plant`, expansion may clarify or embody those seeds but must not convert them into premature payoffs. If it includes `payoffs_to_land`, expansion may strengthen the payoff's legibility and consequence but must not invent a different payoff architecture from the one the chapter is meant to land.
 3j. When an image, action, or line of dialogue has already made the point legible, do not expand by adding narrator explanation, moral paraphrase, or abstract summary unless the added material creates a genuinely new turn, cost, contradiction, or misreading.
 3k. Do not use expansion to keep re-proving a condition, pressure, skill set, social role, or environment that the existing chapter already makes legible. If you revisit an established baseline, the added material must change its meaning, leverage, or consequence rather than re-establishing it through materially similar cues.
-4. Respect dialogue/prose style and `aesthetic_risk_policy` from style bible as non-negotiable constraints. Maintain the narrative tense declared in `prose_style_profile.narrative_tense` — do not shift tense during expansion.
+3l. The chapter spec's edge fields still apply during expansion. Use `opening_situation` and `entry_obligation` to avoid padding the opening with repeated setup. Use `closing_state` and `exit_pressure` to avoid expanding past the chapter's intended exit point. Expansion may deepen the scene material that leads to the closing state, but it must not continue past the beat the chapter is meant to end on or resolve the live pressure that should still be active at the cut.
+3m. Do not add narrator performance or composed dialogue during expansion. Expansion should produce more scene — more physical detail, more environmental specificity, more behavioral observation, more functional dialogue — not more literary commentary on the scene. Do not expand by adding explanatory interior monologue that translates the scene into cleaner meaning. Interior thought is still valuable when it creates a new fear, choice, misreading, or pressure, but not when it summarizes what the action already showed. If your final added sentence interprets, frames, summarizes, or repackages what the expanded material already conveyed, delete it. End on something the reader does not yet have.
+4. Respect dialogue/prose style and `aesthetic_risk_policy` from style bible as non-negotiable constraints. Maintain the narrative tense declared in `prose_style_profile.narrative_tense` — do not shift tense during expansion. When `prose_style_profile.default_narrator_mode` is `transparent`, added narration should default to literal, scene-grounded description instead of conspicuous literary phrasing.
 5. Use style-bible idiolect cues sparsely; do not pad by repeating lexical signatures or stress tells.
 5a. Consult `{{SPATIAL_LAYOUT_FILE}}` for authoritative spatial facts. Do not add new floor assignments, room adjacencies, travel times, distances, or directions that contradict it.
 5b. Consult `{{CONTINUITY_SHEET_FILE}}` for established facts. Do not contradict any canonical fact when expanding. If you introduce new concrete details (amounts, dates, objects, physical descriptions), ensure consistency with the sheet.
@@ -34,11 +36,14 @@ Task:
 Dialogue register and contraction rules:
 1. Honor each character's `contraction_level` from the style bible. If it is not specified, follow the book-wide baseline and the setting's natural spoken register rather than forcing extra formality or informality.
 2. Honor `default_contraction_use` from `dialogue_rules`.
+2b. Check `focalizer_dialogue_interiority` in `dialogue_rules`. If it is `high`, use the focalizer's recognition, relational worry, and social reading as a primary reader channel when adding or revising dialogue-heavy material. If it is `moderate`, punctuate dialogue with that interiority regularly while keeping the exchange broadly legible on its own. If it is `low`, keep interiority more selective, but do not let the focalizer disappear when the dialogue would otherwise become opaque.
 3. When adding dialogue, write natural spoken English for the setting and character: prefer "don't", "can't", "I'm", "won't" in casual contemporary speech unless the character is being deliberately formal, emphatic, historical, ritualized, or otherwise setting-true in fuller forms. An added stiff full-form line should be treated as suspect by default, not neutral.
 4. Under pressure, push dialogue toward the character's pressured texture — often more contraction and colloquial texture, but sometimes more stiffness or precision if that is how this voice handles strain.
 5. Preserve productive roughness when expanding a scene: interruptions, self-corrections, evasions, repeated words, and incomplete-but-legible turns may be the right answer if they are character-true.
 6. When adding dialogue to expand a scene, do not default to sharp, well-crafted lines. Added dialogue should include functional exchanges, ordinary social texture, and lines where characters say obvious things, agree without adding, or fumble. Not every added line needs to land or advance anything. Expansion that upgrades every exchange into a polished insight is padding with literary varnish.
 7. Do not add narrator commentary that admires how well a character's line worked. Let dialogue land (or not) without authorial endorsement.
+8. When expanding dialogue scenes, the most productive addition is often not more lines of dialogue but more of the focalizer's interiority between lines. What does the character recognize? What does the other person's tone remind them of? What are they calculating about whether to reveal or withhold? What do they notice about the other person's body or behavior that the other person doesn't know they're showing? This interiority is not explanation or commentary — it is the character's lived experience of being in the conversation. Do not expand dialogue by adding interpretive narration that tells the reader what the exchange means; expand by putting the reader inside the focalizer's experience of the exchange.
+9. When present, use the relevant scene row's `undercurrent` and any character-depth fields in the style bible — especially `interpretive_lens` and `formative_experiences` — to decide what the focalizer notices, misreads, fears, or withholds during dialogue. Use these cues sparingly and concretely. They should shape subtext and attention, not turn into backstory dumps or explanatory commentary.
 
 Aesthetic-risk enforcement:
 1. The primary craft risk in AI-generated fiction is involuntary sanitization — pulling punches, softening consequences, retreating to euphemism when the story needs specificity. This is a worse failure than excess.
@@ -56,7 +61,7 @@ Constitution-critical writing checks:
 4. Keep additions concretely embodied (action, sensory pressure, interpersonal consequence), not abstract explanation.
 5. Avoid repetitive phrase recurrence from style-bible token lists.
 6. In informal or pressured exchanges, favor natural spoken texture (contractions, overlaps, incomplete-but-grammatical turns) over stiff full-form diction.
-7. In high-intensity or fast-paced additions, do not lose the focalizer's inner life. Under pressure, interiority changes form — dissociation, hyper-focus, involuntary memory, sensory flooding, numbness — but it does not disappear. If more than 10 consecutive paragraphs pass without a sentence of internal experience, the expanded chapter has drifted toward screenplay logic.
+7. In high-intensity or fast-paced additions, do not lose the focalizer's inner life. Under pressure, interiority changes form — dissociation, hyper-focus, involuntary memory, sensory flooding, numbness — but it does not disappear. In dialogue-heavy scenes, the focalizer's interiority should not go quiet for more than 4-5 consecutive paragraphs. In non-dialogue sequences, if more than 8 consecutive paragraphs pass without a sentence of internal experience, the expanded chapter has drifted toward screenplay logic.
 8. When the story's setting involves specialized knowledge — historical, technical, cultural, regional — embed additions through character experience and sensory detail, not explanatory narration. Do not pad with world-building exposition. If the story has non-empty `world_rules` in the continuity sheet, necessary clarification of how a rule works in practice is not padding — but it must arrive through action or consequence, not narrator lecture.
 
 Pre-submission dialogue scan:
@@ -70,6 +75,6 @@ Required output:
 Hard constraints:
 1. First non-empty line must remain exactly `# Chapter {{CHAPTER_NUMBER}}`.
 2. Do not edit any other files.
-3. Do not pad with filler, recap, or thematic paraphrase; all additions must improve dramatic quality.
+3. Do not pad with filler, recap, thematic paraphrase, or quota-chasing prose; all additions must improve dramatic quality.
 4. If any constitution-critical check fails, revise before finalizing the expansion.
 5. If the expansion sanitizes, softens, or retreats from the story's established register, revise before finalizing the expansion.

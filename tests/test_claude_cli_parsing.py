@@ -915,6 +915,52 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 "fallback_full_award_contract",
             )
 
+    def test_load_repaired_full_award_review_coerces_pass_with_findings_to_fail(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_full_award_pass_with_findings_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            chapter_ids = {"chapter_01"}
+            run_dir = runner.cfg.run_dir
+            (run_dir / "reviews" / "cycle_01").mkdir(parents=True, exist_ok=True)
+
+            review_rel = "reviews/cycle_01/full_award.review.json"
+            (run_dir / review_rel).write_text(
+                json.dumps(
+                    {
+                        "cycle": 1,
+                        "verdict": "PASS",
+                        "summary": "Strong book with a couple of remaining notes.",
+                        "findings": [
+                            {
+                                "finding_id": "F01",
+                                "source": "award_global",
+                                "severity": "MEDIUM",
+                                "chapter_id": "chapter_01",
+                                "evidence": "snapshots/cycle_01/FINAL_NOVEL.md:12",
+                                "problem": "A remaining blocker is still present.",
+                                "rewrite_direction": "Revise snapshots/cycle_01/FINAL_NOVEL.md:12-20 to remove the blocker.",
+                                "acceptance_test": "Pass if snapshots/cycle_01/FINAL_NOVEL.md:12-20 no longer contains the blocker.",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            repaired = runner._load_repaired_full_award_review(
+                review_rel,
+                1,
+                chapter_ids,
+                "snapshots/cycle_01/FINAL_NOVEL.md",
+            )
+
+            self.assertEqual(repaired["verdict"], "FAIL")
+            self.assertTrue(
+                (
+                    run_dir / "reviews" / "cycle_01" / "full_award.review.invalid.original.json"
+                ).is_file()
+            )
+
     def test_run_full_award_review_stage_accepts_low_severity_without_retry(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_full_award_low_", dir="/tmp") as tmp:
             runner = make_runner(Path(tmp))
@@ -1198,6 +1244,9 @@ class ClaudeCliParsingTests(unittest.TestCase):
             legacy = {
                 "cycle": "01",
                 "summary": "",
+                "not_x_y_count": "45",
+                "personified_abstraction_count": "12",
+                "abstract_noun_subject_count": "7",
                 "redundancy_findings": [
                     {
                         "finding_id": "DUPLICATE_ID",
@@ -1236,6 +1285,9 @@ class ClaudeCliParsingTests(unittest.TestCase):
 
             self.assertEqual(repaired["cycle"], 1)
             self.assertTrue(repaired["summary"])
+            self.assertEqual(repaired["not_x_y_count"], 45)
+            self.assertEqual(repaired["personified_abstraction_count"], 12)
+            self.assertEqual(repaired["abstract_noun_subject_count"], 7)
             self.assertEqual(repaired["redundancy_findings"][0]["category"], "redundancy")
             self.assertEqual(repaired["redundancy_findings"][0]["chapter_id"], "chapter_01")
             self.assertEqual(
@@ -1603,6 +1655,12 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 "p1_structural_craft",
             )
             self.assertEqual(
+                runner._default_local_window_pass_hint(
+                    "pre_scan", "composed_seam_prose"
+                ),
+                "p3_prose_copyedit",
+            )
+            self.assertEqual(
                 runner._default_local_window_pass_hint("pre-scan"),
                 "p1_structural_craft",
             )
@@ -1625,6 +1683,74 @@ class ClaudeCliParsingTests(unittest.TestCase):
             self.assertEqual(
                 runner._default_local_window_pass_hint("decision_coherence"),
                 "p1_structural_craft",
+            )
+
+    def test_local_window_repair_routes_composed_seam_prescan_to_prose_pass(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_local_window_seam_prescan_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1,
+                    chapter_engine="engine",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                ),
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_02",
+                    chapter_number=2,
+                    projected_min_words=1,
+                    chapter_engine="engine",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                ),
+            ]
+
+            run_dir = runner.cfg.run_dir
+            (run_dir / "reviews" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            rel = "reviews/cycle_01/local_window_01.json"
+            payload = {
+                "cycle": 1,
+                "window_id": "window_01",
+                "chapters_reviewed": ["chapter_01", "chapter_02"],
+                "summary": "Seam prose issue.",
+                "findings": [
+                    {
+                        "finding_id": "LW01-001",
+                        "category": "pre_scan",
+                        "subcategory": "composed_seam_prose",
+                        "severity": "MEDIUM",
+                        "chapter_id": "chapter_02",
+                        "related_chapter_ids": ["chapter_01"],
+                        "evidence": "snapshots/cycle_01/FINAL_NOVEL.md:12",
+                        "problem": "The chapter boundary resolves into transparent-theme prose instead of scene pressure.",
+                        "rewrite_direction": "Replace the seam summary with concrete action or perception.",
+                        "acceptance_test": "The boundary reads as transparent prose rather than a thesis capper.",
+                        "fix_owner_reason": "Later chapter owns the over-composed seam.",
+                    }
+                ],
+            }
+            (run_dir / rel).write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+            repaired = runner._load_repaired_local_window_audit(
+                rel,
+                1,
+                {"chapter_01", "chapter_02"},
+                "snapshots/cycle_01/FINAL_NOVEL.md",
+            )
+
+            self.assertEqual(
+                repaired["findings"][0]["pass_hint"],
+                "p3_prose_copyedit",
             )
 
     def test_materialize_output_alias_supports_local_window_review_outputs(self) -> None:
@@ -1688,6 +1814,29 @@ class ClaudeCliParsingTests(unittest.TestCase):
             run_dir = runner.cfg.run_dir
             runner._prepare_run_dir()
             (run_dir / "outline" / "style_bible.json").write_text("{}\n", encoding="utf-8")
+            (run_dir / "outline" / "chapter_specs").mkdir(parents=True, exist_ok=True)
+            (run_dir / "outline" / "chapter_specs" / "chapter_01.json").write_text(
+                json.dumps(
+                    {
+                        "chapter_id": "chapter_01",
+                        "chapter_number": 1,
+                        "projected_min_words": 1,
+                        "chapter_engine": "engine",
+                        "pressure_source": "pressure",
+                        "state_shift": "shift",
+                        "texture_mode": "hot",
+                        "scene_count_target": 2,
+                        "opening_situation": "Opening",
+                        "closing_state": "Closing",
+                        "chronology_anchor": "immediate",
+                        "entry_obligation": "Entry",
+                        "exit_pressure": "Pressure",
+                        "must_land_beats": ["beat"],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             (run_dir / "context" / "cycle_01").mkdir(parents=True, exist_ok=True)
             (run_dir / "context" / "cycle_01" / "continuity_sheet.json").write_text(
                 "{}\n",
@@ -1826,6 +1975,29 @@ class ClaudeCliParsingTests(unittest.TestCase):
             runner._prepare_run_dir()
             run_dir = runner.cfg.run_dir
             (run_dir / "outline" / "style_bible.json").write_text("{}\n", encoding="utf-8")
+            (run_dir / "outline" / "chapter_specs").mkdir(parents=True, exist_ok=True)
+            (run_dir / "outline" / "chapter_specs" / "chapter_01.json").write_text(
+                json.dumps(
+                    {
+                        "chapter_id": "chapter_01",
+                        "chapter_number": 1,
+                        "projected_min_words": 1,
+                        "chapter_engine": "engine",
+                        "pressure_source": "pressure",
+                        "state_shift": "shift",
+                        "texture_mode": "hot",
+                        "scene_count_target": 2,
+                        "opening_situation": "Opening",
+                        "closing_state": "Closing",
+                        "chronology_anchor": "immediate",
+                        "entry_obligation": "Entry",
+                        "exit_pressure": "Pressure",
+                        "must_land_beats": ["beat"],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             (run_dir / "outline" / "continuity_sheet.json").write_text("{}\n", encoding="utf-8")
             runner._ensure_cycle_continuity_snapshot(1)
             (run_dir / "outline" / "chapter_specs").mkdir(parents=True, exist_ok=True)
@@ -2693,6 +2865,11 @@ class ClaudeCliParsingTests(unittest.TestCase):
                     "state_shift": "shift",
                     "texture_mode": "hot",
                     "scene_count_target": 2,
+                    "opening_situation": f"Opening situation {chapter_number}",
+                    "closing_state": f"Closing state {chapter_number}",
+                    "chronology_anchor": "immediate",
+                    "entry_obligation": f"Entry obligation {chapter_number}",
+                    "exit_pressure": f"Exit pressure {chapter_number}",
                     "must_land_beats": [f"beat {chapter_number}"],
                 }
                 if chapter_number == 1:
@@ -2780,11 +2957,24 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 chapter_spec_json["secondary_character_beats"],
                 ["Let the desk clerk's private panic leak through her efficiency."],
             )
+            self.assertEqual(chapter_spec_json["opening_situation"], "Opening situation 1")
+            self.assertEqual(chapter_spec_json["closing_state"], "Closing state 1")
+            self.assertEqual(chapter_spec_json["chronology_anchor"], "immediate")
+            self.assertEqual(chapter_spec_json["entry_obligation"], "Entry obligation 1")
+            self.assertEqual(chapter_spec_json["exit_pressure"], "Exit pressure 1")
 
             static_story_context = json.loads(
                 (run_dir / "outline" / "static_story_context.json").read_text(
                     encoding="utf-8"
                 )
+            )
+            self.assertEqual(
+                static_story_context["chapter_spine"][0]["opening_situation"],
+                "Opening situation 1",
+            )
+            self.assertEqual(
+                static_story_context["chapter_spine"][0]["entry_obligation"],
+                "Entry obligation 1",
             )
             self.assertEqual(
                 static_story_context["chapter_spine"][0]["secondary_character_beats"],
@@ -2830,7 +3020,84 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 boundary_context["secondary_character_beats"],
                 ["Let the desk clerk's private panic leak through her efficiency."],
             )
+            self.assertEqual(boundary_context["opening_situation"], "Opening situation 1")
+            self.assertEqual(boundary_context["closing_state"], "Closing state 1")
+            self.assertEqual(boundary_context["chronology_anchor"], "immediate")
+            self.assertEqual(boundary_context["entry_obligation"], "Entry obligation 1")
+            self.assertEqual(boundary_context["exit_pressure"], "Exit pressure 1")
             self.assertEqual(boundary_context["open_hooks_to_carry"], ["beat 1"])
+
+    def test_load_and_validate_chapter_specs_requires_edge_fields(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_edge_fields_required_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            run_dir = runner.cfg.run_dir
+            (run_dir / "outline").mkdir(parents=True, exist_ok=True)
+
+            rows = []
+            for chapter_number in range(1, 17):
+                row = {
+                    "chapter_id": f"chapter_{chapter_number:02d}",
+                    "chapter_number": chapter_number,
+                    "projected_min_words": 1000,
+                    "chapter_engine": "discovery",
+                    "pressure_source": "pressure",
+                    "state_shift": "shift",
+                    "texture_mode": "hot",
+                    "scene_count_target": 2,
+                    "must_land_beats": [f"beat {chapter_number}"],
+                    "opening_situation": f"Opening {chapter_number}",
+                    "closing_state": f"Closing {chapter_number}",
+                    "chronology_anchor": "immediate",
+                    "entry_obligation": f"Entry {chapter_number}",
+                    "exit_pressure": f"Pressure {chapter_number}",
+                }
+                rows.append(row)
+            del rows[0]["chronology_anchor"]
+
+            (run_dir / "outline" / "chapter_specs.jsonl").write_text(
+                "\n".join(json.dumps(row) for row in rows) + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(runner_module.PipelineError) as exc:
+                runner._load_and_validate_chapter_specs()
+            self.assertIn("missing required edge fields", str(exc.exception))
+
+    def test_load_and_validate_chapter_specs_rejects_blank_edge_fields(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_edge_fields_blank_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            run_dir = runner.cfg.run_dir
+            (run_dir / "outline").mkdir(parents=True, exist_ok=True)
+
+            rows = []
+            for chapter_number in range(1, 17):
+                row = {
+                    "chapter_id": f"chapter_{chapter_number:02d}",
+                    "chapter_number": chapter_number,
+                    "projected_min_words": 1000,
+                    "chapter_engine": "discovery",
+                    "pressure_source": "pressure",
+                    "state_shift": "shift",
+                    "texture_mode": "hot",
+                    "scene_count_target": 2,
+                    "must_land_beats": [f"beat {chapter_number}"],
+                    "opening_situation": f"Opening {chapter_number}",
+                    "closing_state": f"Closing {chapter_number}",
+                    "chronology_anchor": "immediate",
+                    "entry_obligation": f"Entry {chapter_number}",
+                    "exit_pressure": f"Pressure {chapter_number}",
+                }
+                rows.append(row)
+            rows[0]["exit_pressure"] = "   "
+
+            (run_dir / "outline" / "chapter_specs.jsonl").write_text(
+                "\n".join(json.dumps(row) for row in rows) + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(runner_module.PipelineError) as exc:
+                runner._load_and_validate_chapter_specs()
+            self.assertIn("missing required edge fields", str(exc.exception))
 
     def test_chapter_review_stage_reports_reused_units(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_review_units_reused_", dir="/tmp") as tmp:
@@ -2853,6 +3120,29 @@ class ClaudeCliParsingTests(unittest.TestCase):
 
             run_dir = runner.cfg.run_dir
             (run_dir / "outline" / "style_bible.json").write_text("{}\n", encoding="utf-8")
+            (run_dir / "outline" / "chapter_specs").mkdir(parents=True, exist_ok=True)
+            (run_dir / "outline" / "chapter_specs" / "chapter_01.json").write_text(
+                json.dumps(
+                    {
+                        "chapter_id": "chapter_01",
+                        "chapter_number": 1,
+                        "projected_min_words": 1,
+                        "chapter_engine": "engine",
+                        "pressure_source": "pressure",
+                        "state_shift": "shift",
+                        "texture_mode": "hot",
+                        "scene_count_target": 2,
+                        "opening_situation": "Opening",
+                        "closing_state": "Closing",
+                        "chronology_anchor": "immediate",
+                        "entry_obligation": "Entry",
+                        "exit_pressure": "Pressure",
+                        "must_land_beats": ["beat"],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             (run_dir / "outline" / "continuity_sheet.json").write_text("{}\n", encoding="utf-8")
             runner._ensure_cycle_continuity_snapshot(1)
             (run_dir / "snapshots" / "cycle_01" / "chapters").mkdir(parents=True, exist_ok=True)
@@ -2887,6 +3177,18 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
+            review_path = run_dir / "reviews" / "cycle_01" / "chapter_01.review.json"
+            newest_input_mtime = max(
+                (run_dir / "snapshots" / "cycle_01" / "chapters" / "chapter_01.md").stat().st_mtime,
+                (run_dir / "outline" / "chapter_specs" / "chapter_01.json").stat().st_mtime,
+                (run_dir / "context" / "cycle_01" / "global_cycle_context.json").stat().st_mtime,
+                (run_dir / "context" / "cycle_01" / "boundary" / "chapter_01.boundary.json").stat().st_mtime,
+                (run_dir / "outline" / "style_bible.json").stat().st_mtime,
+                (run_dir / "context" / "cycle_01" / "continuity_sheet.json").stat().st_mtime,
+                (run_dir / "config" / "constitution.md").stat().st_mtime,
+                (run_dir / "config" / "prompts" / "chapter_review_prompt.md").stat().st_mtime,
+            )
+            os.utime(review_path, (newest_input_mtime + 10, newest_input_mtime + 10))
 
             with mock.patch.object(runner, "_run_jobs_parallel") as jobs_mock:
                 summary = runner._run_chapter_review_stage(1)
@@ -2978,6 +3280,164 @@ class ClaudeCliParsingTests(unittest.TestCase):
             self.assertIn("outline/scene_plan.tsv", expand_job.allowed_inputs)
             self.assertIn("outline/spatial_layout.json", expand_job.allowed_inputs)
 
+    def test_draft_stage_does_not_expand_when_chapter_is_above_seventy_percent_threshold(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_expand_threshold_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1000,
+                    chapter_engine="discovery",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                )
+            ]
+
+            run_dir = runner.cfg.run_dir
+            (run_dir / "chapters").mkdir(parents=True, exist_ok=True)
+            (run_dir / "outline" / "chapter_specs").mkdir(parents=True, exist_ok=True)
+            (run_dir / "config" / "prompts").mkdir(parents=True, exist_ok=True)
+            (run_dir / "outline" / "outline.md").write_text(
+                "## Middle-Book Progression Map\n\nplaceholder\n",
+                encoding="utf-8",
+            )
+            (run_dir / "outline" / "scene_plan.tsv").write_text(
+                "scene_id\tchapter_id\tscene_order\tobjective\topposition\tturn\tconsequence_cost\ttension_peak\n"
+                "s1\tchapter_01\t1\tobj\topp\tturn\tcost\tYES\n",
+                encoding="utf-8",
+            )
+            (run_dir / "outline" / "spatial_layout.json").write_text(
+                json.dumps({"summary": "layout", "micro": None, "macro": None}) + "\n",
+                encoding="utf-8",
+            )
+            chapter_body = " ".join(["word"] * 750)
+            (run_dir / "chapters" / "chapter_01.md").write_text(
+                f"# Chapter 1\n\n{chapter_body}\n",
+                encoding="utf-8",
+            )
+            (run_dir / "config" / "prompts" / "chapter_expand_prompt.md").write_text(
+                (REPO_ROOT / "prompts" / "chapter_expand_prompt.md").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+            (run_dir / "config" / "prompts" / "chapter_draft_prompt.md").write_text(
+                (REPO_ROOT / "prompts" / "chapter_draft_prompt.md").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+
+            captured_job_groups: list[tuple[str, list[runner_module.JobSpec]]] = []
+
+            chapter_path = run_dir / "chapters" / "chapter_01.md"
+
+            def fake_fresh(output_path: Path, *_args, **_kwargs) -> bool:
+                return output_path != chapter_path
+
+            runner._artifact_fresh_against_inputs = fake_fresh
+
+            def capture_run_jobs_parallel(
+                jobs: list[runner_module.JobSpec], _max_parallel: int, label: str
+            ) -> None:
+                captured_job_groups.append((label, list(jobs)))
+
+            runner._run_jobs_parallel = capture_run_jobs_parallel
+
+            runner._run_draft_stage()
+
+            self.assertEqual(len(captured_job_groups), 1)
+            self.assertEqual(captured_job_groups[0][0], "draft")
+
+    def test_chapter_review_job_receives_chapter_spec_input(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_review_spec_input_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1000,
+                    chapter_engine="discovery",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                )
+            ]
+
+            runner._prepare_run_dir()
+            (runner.cfg.run_dir / "outline" / "continuity_sheet.json").write_text(
+                "{}\n",
+                encoding="utf-8",
+            )
+            job = runner._build_chapter_review_job(1, runner.chapter_specs[0])
+            self.assertIn("outline/chapter_specs/chapter_01.json", job.allowed_inputs)
+            self.assertIn("outline/chapter_specs/chapter_01.json", job.prompt_text)
+
+    def test_local_window_audit_job_receives_window_chapter_specs(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_local_window_spec_input_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id=f"chapter_{idx:02d}",
+                    chapter_number=idx,
+                    projected_min_words=1000,
+                    chapter_engine="discovery",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                )
+                for idx in range(1, 5)
+            ]
+
+            runner._prepare_run_dir()
+            run_dir = runner.cfg.run_dir
+            (run_dir / "outline" / "continuity_sheet.json").write_text(
+                "{}\n",
+                encoding="utf-8",
+            )
+            runner._write_chapter_spec_files()
+            runner._ensure_cycle_continuity_snapshot(1)
+            (run_dir / "snapshots" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            (run_dir / "snapshots" / "cycle_01" / "FINAL_NOVEL.md").write_text(
+                "# Chapter 1\n\ntext\n",
+                encoding="utf-8",
+            )
+            (run_dir / "context" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            (run_dir / "context" / "cycle_01" / "chapter_line_index.json").write_text(
+                json.dumps(
+                    {
+                        chapter.chapter_id: {"start_line": idx * 10, "end_line": idx * 10 + 9}
+                        for idx, chapter in enumerate(runner.chapter_specs, start=1)
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            job = runner._build_local_window_audit_job(
+                1,
+                ["chapter_01", "chapter_02", "chapter_03", "chapter_04"],
+                {},
+            )
+
+            self.assertIn("outline/chapter_specs/chapter_01.json", job.allowed_inputs)
+            self.assertIn("outline/chapter_specs/chapter_04.json", job.allowed_inputs)
+            self.assertIn("outline/chapter_specs/chapter_01.json", job.prompt_text)
+            self.assertIn("outline/chapter_specs/chapter_04.json", job.prompt_text)
+
     def test_run_outline_stage_dry_run_produces_outline_review_revision_and_spatial_layout(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_outline_preflight_", dir="/tmp") as tmp:
             runner = make_runner(Path(tmp))
@@ -3025,10 +3485,24 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 "outline/spatial_layout.json",
             )
 
-            cycle_status = runner._new_cycle_status(1)
-            self.assertEqual(cycle_status["stages"]["outline_review"]["status"], "complete")
-            self.assertEqual(cycle_status["stages"]["outline_revision"]["status"], "complete")
-            self.assertEqual(cycle_status["stages"]["spatial_layout"]["status"], "complete")
+    def test_outline_pre_revision_snapshot_helper_copies_core_outputs(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_outline_snapshot_helper_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            run_dir = runner.cfg.run_dir
+            (run_dir / "outline").mkdir(parents=True, exist_ok=True)
+            for rel in runner._outline_core_output_rels():
+                path = run_dir / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if path.suffix == ".json":
+                    path.write_text("{}\n", encoding="utf-8")
+                else:
+                    path.write_text(f"{rel}\n", encoding="utf-8")
+
+            snapshot_rels = runner._ensure_outline_pre_revision_snapshot(1)
+
+            self.assertEqual(len(snapshot_rels), len(runner._outline_core_output_rels()))
+            for snapshot_rel in snapshot_rels:
+                self.assertTrue((run_dir / snapshot_rel).is_file())
 
     def test_add_cycles_reuses_outline_spatial_and_draft_even_when_prompts_are_newer(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_add_cycles_precycle_reuse_", dir="/tmp") as tmp:
@@ -3304,7 +3778,136 @@ class ClaudeCliParsingTests(unittest.TestCase):
             self.assertEqual(
                 repaired["dialogue_rules"]["max_consecutive_low_info_replies"], 2
             )
+            self.assertEqual(
+                repaired["prose_style_profile"]["default_narrator_mode"], "transparent"
+            )
             runner._validate_style_bible_data(repaired, "outline/style_bible.json")
+
+    def test_style_bible_repair_supports_optional_character_depth_and_dialogue_interiority(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_style_bible_depth_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            style_bible = {
+                "character_voice_profiles": [
+                    {
+                        "character_id": "carmen",
+                        "public_register": "direct",
+                        "private_register": "guarded",
+                        "syntax_signature": "plainspoken",
+                        "lexical_signature": "plain",
+                        "forbidden_generic_lines": "none",
+                        "stress_tells": "tightens up",
+                        "profanity_profile": "moderate",
+                        "contraction_level": "moderate",
+                        "interruption_habit": "rare",
+                        "self_correction_tendency": "light",
+                        "indirectness": "mixed",
+                        "repetition_tolerance": "some",
+                        "evasion_style": "narrows",
+                        "sentence_completion_style": "finishes",
+                        "interpretive_lens": ["Reads delay as concealed risk"],
+                        "formative_experiences": "Ignored one warning sign too many in residency.",
+                    }
+                ],
+                "dialogue_rules": {
+                    "anti_transcript_cadence": True,
+                    "required_leverage_shifts_per_scene": 1,
+                    "max_consecutive_low_info_replies": 2,
+                    "idiolect_separation_required": True,
+                    "default_contraction_use": "high",
+                },
+                "prose_style_profile": {
+                    "narrative_tense": "past tense",
+                    "narrative_distance": "close",
+                    "rhythm_target": "mixed",
+                    "sensory_bias": ["touch"],
+                    "diction": "concrete",
+                    "forbidden_drift_patterns": ["generic cinematic phrasing"],
+                    "chapter_texture_variance": "vary chapter rhythm",
+                },
+                "aesthetic_risk_policy": {
+                    "sanitization_disallowed": True,
+                    "dark_content_allowed_when_character_true": True,
+                    "profanity_allowed_when_scene_pressure_warrants": True,
+                    "euphemism_penalty": "high",
+                    "creative_risk_policy": "push toward specificity",
+                },
+            }
+
+            repaired, _repairs = runner._repair_style_bible_data(style_bible)
+            profile = repaired["character_voice_profiles"][0]
+            self.assertEqual(
+                repaired["dialogue_rules"]["focalizer_dialogue_interiority"], "moderate"
+            )
+            self.assertEqual(
+                profile["interpretive_lens"], "Reads delay as concealed risk"
+            )
+            self.assertEqual(
+                profile["formative_experiences"],
+                ["Ignored one warning sign too many in residency."],
+            )
+            runner._validate_style_bible_data(repaired, "outline/style_bible.json")
+
+    def test_validate_scene_plan_accepts_legacy_header_without_undercurrent(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_scene_plan_legacy_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1000,
+                    chapter_engine="discovery",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                )
+            ]
+            outline_dir = runner.cfg.run_dir / "outline"
+            outline_dir.mkdir(parents=True, exist_ok=True)
+            (outline_dir / "scene_plan.tsv").write_text(
+                (
+                    "scene_id\tchapter_id\tscene_order\tobjective\topposition\tturn\t"
+                    "consequence_cost\ttension_peak\n"
+                    "scene_01_a\tchapter_01\t1\tSet pressure\tCountermove\tComplication\tLoss\tNO\n"
+                    "scene_01_b\tchapter_01\t2\tEscalate pressure\tHard opposition\tDecision\tIrreversible shift\tYES\n"
+                ),
+                encoding="utf-8",
+            )
+
+            runner._validate_scene_plan()
+
+    def test_validate_scene_plan_accepts_nullable_undercurrent_column(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_scene_plan_undercurrent_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1000,
+                    chapter_engine="discovery",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                )
+            ]
+            outline_dir = runner.cfg.run_dir / "outline"
+            outline_dir.mkdir(parents=True, exist_ok=True)
+            (outline_dir / "scene_plan.tsv").write_text(
+                (
+                    "scene_id\tchapter_id\tscene_order\tobjective\topposition\tturn\t"
+                    "consequence_cost\ttension_peak\tundercurrent\n"
+                    "scene_01_a\tchapter_01\t1\tSet pressure\tCountermove\tComplication\tLoss\tNO\tThe witness is testing whether Mara already knows about the missing report.\n"
+                    "scene_01_b\tchapter_01\t2\tEscalate pressure\tHard opposition\tDecision\tIrreversible shift\tYES\tnull\n"
+                ),
+                encoding="utf-8",
+            )
+
+            runner._validate_scene_plan()
 
     def test_revision_stage_retries_invalid_or_missing_pass_report_once(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_revision_retry_", dir="/tmp") as tmp:
@@ -4282,6 +4885,120 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 "p2_dialogue_idiolect_cadence",
             )
 
+    def test_high_prose_findings_route_to_prose_pass(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_prose_pass_route_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+
+            finding = {
+                "finding_id": "CH11_PROSE_CLIPPED_CLOCKWORK",
+                "source": "prose",
+                "severity": "HIGH",
+                "chapter_id": "chapter_11",
+                "evidence": "snapshots/cycle_02/chapters/chapter_11.md:18",
+                "problem": "The chapter keeps reaching for suspense through clipped clockwork narration and narrator performance.",
+                "rewrite_direction": "Replace the clipped scaffolds with transparent prose while preserving the process beat.",
+                "acceptance_test": "The revised passage no longer relies on clipped clockwork narration.",
+            }
+
+            self.assertEqual(
+                runner._assign_revision_pass_key(finding),
+                "p3_prose_copyedit",
+            )
+
+    def test_high_dialogue_findings_route_to_dialogue_pass(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_dialogue_pass_route_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+
+            finding = {
+                "finding_id": "CH09_DIALOGUE_COMPOSED_PRESSURE_SPEECH",
+                "source": "dialogue",
+                "severity": "HIGH",
+                "chapter_id": "chapter_09",
+                "evidence": "snapshots/cycle_02/chapters/chapter_09.md:41",
+                "problem": "Dialogue resolves into thesis-speech and quotable pressure lines.",
+                "rewrite_direction": "Break the line into rougher, scene-pressured speech.",
+                "acceptance_test": "The exchange no longer lands as composed thesis-speech.",
+            }
+
+            self.assertEqual(
+                runner._assign_revision_pass_key(finding),
+                "p2_dialogue_idiolect_cadence",
+            )
+
+    def test_craft_overstatement_findings_route_to_prose_pass(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_craft_prose_route_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+
+            finding = {
+                "finding_id": "CH18_ENDING_OVERSTATEMENT",
+                "source": "award_global",
+                "severity": "HIGH",
+                "chapter_id": "chapter_18",
+                "evidence": "snapshots/cycle_02/chapters/chapter_18.md:70",
+                "problem": "The closing movement tips into composed thesis-writing and repeated certification of the same point.",
+                "rewrite_direction": "Cut the overstatement and keep the ending in transparent narration.",
+                "acceptance_test": "The final movement no longer overstates the chapter's meaning.",
+            }
+
+            self.assertEqual(
+                runner._assign_revision_pass_key(finding),
+                "p3_prose_copyedit",
+            )
+
+    def test_award_global_dialogue_interiority_findings_route_to_dialogue_pass(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_award_dialogue_interiority_route_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+
+            finding = {
+                "finding_id": "AWARD_DIALOGUE_INTERIORITY_001",
+                "source": "award_global",
+                "severity": "HIGH",
+                "chapter_id": "chapter_12",
+                "evidence": "snapshots/cycle_02/chapters/chapter_12.md:44",
+                "problem": "The dialogue scene becomes opaque because the focalizer's mind goes quiet during compressed insider shorthand.",
+                "rewrite_direction": "Restore focalizer interiority between lines of exchange so the reader can track what the character recognizes and fears.",
+                "acceptance_test": "The dialogue remains compressed, but the reader can follow it through the focalizer's recognition between lines of exchange.",
+            }
+
+            self.assertEqual(
+                runner._assign_revision_pass_key(finding),
+                "p2_dialogue_idiolect_cadence",
+            )
+
+    def test_continuity_and_process_findings_stay_structural(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_structural_route_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+
+            continuity_finding = {
+                "finding_id": "CH14_EARPIECE_STATE_CONTRADICTION",
+                "source": "craft",
+                "severity": "HIGH",
+                "chapter_id": "chapter_14",
+                "evidence": "snapshots/cycle_02/chapters/chapter_14.md:75",
+                "problem": "The chapter contradicts itself about the location of Jules's comm earpiece.",
+                "rewrite_direction": "Make the earpiece state consistent from confrontation through aftermath.",
+                "acceptance_test": "The earpiece location remains consistent across the full chapter.",
+            }
+            process_finding = {
+                "finding_id": "CH11_CRAFT_WINDOW_MECHANICS",
+                "source": "craft",
+                "severity": "MEDIUM",
+                "chapter_id": "chapter_11",
+                "evidence": "snapshots/cycle_02/chapters/chapter_11.md:40",
+                "problem": "The chapter's central process beat is not legible enough on the page.",
+                "rewrite_direction": "Clarify the maintenance-window mechanics and causal sequence on the page.",
+                "acceptance_test": "A cold reader can state what changes when the port turns amber and what remains uncertain.",
+            }
+
+            self.assertEqual(
+                runner._assign_revision_pass_key(continuity_finding),
+                "p1_structural_craft",
+            )
+            self.assertEqual(
+                runner._assign_revision_pass_key(process_finding),
+                "p1_structural_craft",
+            )
+
     def test_revision_packet_enriches_full_book_citations_with_locator_excerpts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_locator_excerpt_", dir="/tmp") as tmp:
             runner = make_runner(Path(tmp))
@@ -4627,6 +5344,155 @@ class ClaudeCliParsingTests(unittest.TestCase):
             self.assertEqual(
                 chapter_rows[0]["prior_attempt_context"],
                 "Cycle 1 PARTIAL revision note: Trimmed the explanation, but the dossier name still has to stay visible here.",
+            )
+
+    def test_build_compact_aggregator_input_includes_cross_chapter_metrics(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_compact_aggregator_metrics_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1000,
+                    chapter_engine="discovery",
+                    pressure_source="inspection pressure",
+                    state_shift="A choice is made.",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                )
+            ]
+            runner.style_bible = {
+                "character_voice_profiles": [{"character_id": "joel"}],
+                "prose_style_profile": {"temperature": "high"},
+                "aesthetic_risk_policy": {"sanitize": "never"},
+            }
+
+            run_dir = runner.cfg.run_dir
+            (run_dir / "outline").mkdir(parents=True, exist_ok=True)
+            (run_dir / "outline" / "continuity_sheet.json").write_text(
+                json.dumps({"characters": [], "geography": {}}) + "\n",
+                encoding="utf-8",
+            )
+            (run_dir / "snapshots" / "cycle_01" / "chapters").mkdir(parents=True, exist_ok=True)
+            (run_dir / "snapshots" / "cycle_01" / "chapters" / "chapter_01.md").write_text(
+                "# Chapter 1\n\nCurrent chapter text.\n",
+                encoding="utf-8",
+            )
+            (run_dir / "snapshots" / "cycle_01" / "FINAL_NOVEL.md").write_text(
+                "# Title\n\n# Chapter 1\n\nalpha\nbeta\ngamma\ndelta\nepsilon\n",
+                encoding="utf-8",
+            )
+            (run_dir / "reviews" / "cycle_01").mkdir(parents=True, exist_ok=True)
+            (run_dir / "reviews" / "cycle_01" / "cross_chapter_audit.json").write_text(
+                json.dumps(
+                    {
+                        "cycle": 1,
+                        "summary": "Cross-chapter prose counts recorded.",
+                        "not_x_y_count": 45,
+                        "personified_abstraction_count": 9,
+                        "abstract_noun_subject_count": 18,
+                        "redundancy_findings": [],
+                        "consistency_findings": [],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            finding = runner._normalize_finding(
+                {
+                    "finding_id": "award_001",
+                    "source": "award_global",
+                    "severity": "HIGH",
+                    "chapter_id": "chapter_01",
+                    "evidence": "snapshots/cycle_01/FINAL_NOVEL.md:5",
+                    "problem": "The beat is too polished.",
+                    "rewrite_direction": "Roughen the turn.",
+                    "acceptance_test": "The turn lands with more jagged pressure.",
+                },
+                1,
+            )
+            runner._build_revision_packets(1, {"chapter_01": [finding]})
+
+            compact_input = runner._build_compact_aggregator_input(1, ["chapter_01"])
+
+            self.assertEqual(
+                compact_input["shared_context"]["cross_chapter_metrics"],
+                {
+                    "not_x_y_count": 45,
+                    "personified_abstraction_count": 9,
+                    "abstract_noun_subject_count": 18,
+                },
+            )
+
+    def test_build_compact_aggregator_input_includes_dialogue_rules(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_compact_aggregator_dialogue_rules_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1000,
+                    chapter_engine="discovery",
+                    pressure_source="inspection pressure",
+                    state_shift="A choice is made.",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                )
+            ]
+            runner.style_bible = {
+                "character_voice_profiles": [{"character_id": "joel"}],
+                "dialogue_rules": {
+                    "default_contraction_use": "high",
+                    "focalizer_dialogue_interiority": "high",
+                },
+                "prose_style_profile": {"temperature": "high"},
+                "aesthetic_risk_policy": {"sanitize": "never"},
+            }
+
+            run_dir = runner.cfg.run_dir
+            (run_dir / "outline").mkdir(parents=True, exist_ok=True)
+            (run_dir / "outline" / "continuity_sheet.json").write_text(
+                json.dumps({"characters": [], "geography": {}}) + "\n",
+                encoding="utf-8",
+            )
+            (run_dir / "snapshots" / "cycle_01" / "chapters").mkdir(parents=True, exist_ok=True)
+            (run_dir / "snapshots" / "cycle_01" / "chapters" / "chapter_01.md").write_text(
+                "# Chapter 1\n\nCurrent chapter text.\n",
+                encoding="utf-8",
+            )
+            (run_dir / "snapshots" / "cycle_01" / "FINAL_NOVEL.md").write_text(
+                "# Title\n\n# Chapter 1\n\nalpha\nbeta\ngamma\ndelta\nepsilon\n",
+                encoding="utf-8",
+            )
+
+            finding = runner._normalize_finding(
+                {
+                    "finding_id": "award_001",
+                    "source": "award_global",
+                    "severity": "HIGH",
+                    "chapter_id": "chapter_01",
+                    "evidence": "snapshots/cycle_01/FINAL_NOVEL.md:5",
+                    "problem": "The exchange is too polished.",
+                    "rewrite_direction": "Roughen the exchange.",
+                    "acceptance_test": "The exchange lands with more pressure.",
+                },
+                1,
+            )
+            runner._build_revision_packets(1, {"chapter_01": [finding]})
+
+            compact_input = runner._build_compact_aggregator_input(1, ["chapter_01"])
+
+            self.assertEqual(
+                compact_input["shared_context"]["style_bible"]["dialogue_rules"],
+                {
+                    "default_contraction_use": "high",
+                    "focalizer_dialogue_interiority": "high",
+                },
             )
 
     def test_apply_aggregation_decisions_materializes_packets_and_tags_metadata(self) -> None:

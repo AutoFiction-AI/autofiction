@@ -41,6 +41,13 @@ SEVERITY_VALUES = {"MEDIUM", "HIGH", "CRITICAL"}
 FULL_AWARD_SEVERITY_VALUES = {"LOW", *SEVERITY_VALUES}
 VALIDATION_MODES = {"strict", "balanced", "lenient"}
 PROVIDER_VALUES = {"codex", "claude"}
+SCENE_PLAN_HEADER_LEGACY = (
+    "scene_id\tchapter_id\tscene_order\tobjective\topposition\tturn\tconsequence_cost\ttension_peak"
+)
+SCENE_PLAN_HEADER_WITH_UNDERCURRENT = (
+    "scene_id\tchapter_id\tscene_order\tobjective\topposition\tturn\tconsequence_cost\ttension_peak\tundercurrent"
+)
+FOCALIZER_DIALOGUE_INTERIORITY_VALUES = {"high", "moderate", "low"}
 STAGE_GROUP_VALUES = (
     "premise",
     "outline",
@@ -507,6 +514,11 @@ AGGREGATION_DECISION_KEYS = (
     "unfixable",
     "pass_reassignments",
 )
+CROSS_CHAPTER_AUDIT_METRIC_KEYS = (
+    "not_x_y_count",
+    "personified_abstraction_count",
+    "abstract_noun_subject_count",
+)
 LOCAL_WINDOW_PASS_HINT_BY_CATEGORY = {
     "pre_scan": "p1_structural_craft",
     "factual_coherence": "p1_structural_craft",
@@ -581,6 +593,11 @@ class ChapterSpec:
     scene_count_target: int
     scene_count_target_explicit: bool
     must_land_beats: list[str]
+    opening_situation: str = ""
+    closing_state: str = ""
+    chronology_anchor: str = ""
+    entry_obligation: str = ""
+    exit_pressure: str = ""
     secondary_character_beats: list[str] = field(default_factory=list)
     setups_to_plant: list[dict[str, Any]] = field(default_factory=list)
     payoffs_to_land: list[dict[str, Any]] = field(default_factory=list)
@@ -4017,9 +4034,12 @@ class NovelPipelineRunner:
             chapter_path = self.run_dir / "chapters" / f"{spec.chapter_id}.md"
             self._validate_chapter_heading(chapter_path, spec.chapter_number)
             words = self._count_words_file(chapter_path)
-            if words < spec.projected_min_words:
+            expand_trigger_words = spec.projected_min_words * 0.7
+            if words < expand_trigger_words:
                 self._log(
-                    f"draft_expand chapter={spec.chapter_id} words={words} target={spec.projected_min_words}"
+                    "draft_expand "
+                    f"chapter={spec.chapter_id} words={words} "
+                    f"trigger={expand_trigger_words:.1f} projected_min_words={spec.projected_min_words}"
                 )
                 chapter_file = f"chapters/{spec.chapter_id}.md"
                 chapter_spec_file = f"outline/chapter_specs/{spec.chapter_id}.json"
@@ -4084,6 +4104,7 @@ class NovelPipelineRunner:
         for spec in self.chapter_specs:
             chapter_input = f"snapshots/cycle_{cpad}/chapters/{spec.chapter_id}.md"
             review_output = f"reviews/cycle_{cpad}/{spec.chapter_id}.review.json"
+            chapter_spec_file = f"outline/chapter_specs/{spec.chapter_id}.json"
             self._materialize_output_alias(
                 base_dir=self.run_dir,
                 required_rel=review_output,
@@ -4101,6 +4122,7 @@ class NovelPipelineRunner:
                     )
                     review_inputs = [
                         self.run_dir / chapter_input,
+                        self.run_dir / chapter_spec_file,
                         self.run_dir / f"context/cycle_{cpad}/global_cycle_context.json",
                         self.run_dir / f"context/cycle_{cpad}/boundary/{spec.chapter_id}.boundary.json",
                         self.run_dir / "outline" / "style_bible.json",
@@ -4248,6 +4270,7 @@ class NovelPipelineRunner:
         cpad = self._cpad(cycle)
         chapter_input = f"snapshots/cycle_{cpad}/chapters/{spec.chapter_id}.md"
         review_output = f"reviews/cycle_{cpad}/{spec.chapter_id}.review.json"
+        chapter_spec_file = f"outline/chapter_specs/{spec.chapter_id}.json"
         global_context_file = f"context/cycle_{cpad}/global_cycle_context.json"
         boundary_context_file = f"context/cycle_{cpad}/boundary/{spec.chapter_id}.boundary.json"
         continuity_sheet_file = self._ensure_cycle_continuity_snapshot(cycle)
@@ -4256,6 +4279,7 @@ class NovelPipelineRunner:
             {
                 "CHAPTER_ID": spec.chapter_id,
                 "CHAPTER_INPUT_FILE": chapter_input,
+                "CHAPTER_SPEC_FILE": chapter_spec_file,
                 "GLOBAL_CYCLE_CONTEXT_FILE": global_context_file,
                 "CHAPTER_BOUNDARY_CONTEXT_FILE": boundary_context_file,
                 "CONTINUITY_SHEET_FILE": continuity_sheet_file,
@@ -4283,6 +4307,7 @@ class NovelPipelineRunner:
             chapter_id=spec.chapter_id,
             allowed_inputs=[
                 chapter_input,
+                chapter_spec_file,
                 global_context_file,
                 boundary_context_file,
                 "outline/style_bible.json",
@@ -5493,6 +5518,9 @@ class NovelPipelineRunner:
         except PipelineError:
             raw_index = {}
         chapter_line_index = raw_index if isinstance(raw_index, dict) else {}
+        cross_chapter_metrics = self._cross_chapter_metrics_for_aggregator(
+            cycle, set(chapter_ids)
+        )
         prior_attempts_by_chapter = self._load_prior_revision_attempts(cycle, chapter_ids)
         chapters_payload: dict[str, dict[str, list[dict[str, Any]]]] = {}
         for chapter_id in chapter_ids:
@@ -5556,15 +5584,39 @@ class NovelPipelineRunner:
                     "character_voice_profiles": style_bible.get(
                         "character_voice_profiles", []
                     ),
+                    "dialogue_rules": style_bible.get("dialogue_rules", {}),
                     "prose_style_profile": style_bible.get("prose_style_profile", {}),
                     "aesthetic_risk_policy": style_bible.get(
                         "aesthetic_risk_policy", {}
                     ),
                 },
+                "cross_chapter_metrics": cross_chapter_metrics,
                 "chapter_count": len(self.chapter_specs),
             },
             "chapters": chapters_payload,
         }
+
+    def _cross_chapter_metrics_for_aggregator(
+        self, cycle: int, chapter_ids: set[str]
+    ) -> dict[str, int]:
+        metrics = {key: 0 for key in CROSS_CHAPTER_AUDIT_METRIC_KEYS}
+        rel = self._cross_chapter_audit_rel(cycle)
+        if not (self.run_dir / rel).exists():
+            return metrics
+        try:
+            audit = self._load_repaired_cross_chapter_audit(
+                rel,
+                cycle,
+                chapter_ids,
+                f"snapshots/cycle_{self._cpad(cycle)}/FINAL_NOVEL.md",
+            )
+        except PipelineError:
+            return metrics
+        for key in CROSS_CHAPTER_AUDIT_METRIC_KEYS:
+            value = audit.get(key, 0)
+            if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                metrics[key] = value
+        return metrics
 
     def _compact_aggregator_input_finding_ids(
         self, compact_input: dict[str, Any]
@@ -6543,6 +6595,160 @@ class NovelPipelineRunner:
             buckets[key].append(finding)
         return buckets
 
+    def _finding_routing_text(self, finding: dict[str, Any]) -> str:
+        parts: list[str] = []
+        for key in (
+            "finding_id",
+            "source",
+            "problem",
+            "rewrite_direction",
+            "acceptance_test",
+        ):
+            value = finding.get(key)
+            if isinstance(value, str) and value.strip():
+                parts.append(value.strip().lower())
+        cross_context = finding.get("cross_chapter_context")
+        if isinstance(cross_context, str) and cross_context.strip():
+            parts.append(cross_context.strip().lower())
+        return "\n".join(parts)
+
+    def _finding_prefers_dialogue_pass(self, finding: dict[str, Any]) -> bool:
+        source = self._canonical_finding_source_name(finding.get("source", ""))
+        if source == "dialogue":
+            return True
+        if source in {"local_window", "elevation", "prose"}:
+            return False
+
+        text = self._finding_routing_text(finding)
+        finding_id = str(finding.get("finding_id", "")).strip().upper()
+
+        explicit_hints = (
+            "dialogue-interiority",
+            "dialogue interiority",
+            "dialogue-interiority suppression",
+            "dialogue interiority suppression",
+            "focalizer's mind goes quiet",
+            "focalizer mind goes quiet",
+            "between lines of exchange",
+            "dialogue scenes where the focalizer",
+        )
+        if any(hint in text for hint in explicit_hints):
+            return True
+
+        dialogue_hints = (
+            "dialogue scene",
+            "lines of exchange",
+            "insider shorthand",
+            "compressed loaded exchange",
+            "speaker",
+            "exchange",
+        )
+        interiority_hints = (
+            "focalizer",
+            "recognition",
+            "relational worry",
+            "social-dynamic",
+            "social dynamic",
+            "interiority suppression",
+            "interiority failure",
+        )
+        return (
+            any(hint in text for hint in dialogue_hints)
+            and any(hint in text for hint in interiority_hints)
+        ) or (
+            "DIALOGUE" in finding_id and "INTERIORITY" in finding_id
+        )
+
+    def _finding_prefers_prose_pass(self, finding: dict[str, Any]) -> bool:
+        source = self._canonical_finding_source_name(finding.get("source", ""))
+        if source == "prose":
+            return True
+        if source in {"dialogue", "local_window", "elevation"}:
+            return False
+
+        text = self._finding_routing_text(finding)
+        finding_id = str(finding.get("finding_id", "")).strip().upper()
+
+        structural_override_hints = (
+            "continuity",
+            "contradiction",
+            "causal",
+            "cause and effect",
+            "process beat",
+            "process legibility",
+            "operational legibility",
+            "decision coherence",
+            "underseeded payoff",
+            "late-arriving solution",
+            "late-arriving engine",
+            "convenience",
+            "handoff",
+            "bridge scene",
+            "structural recurrence",
+            "setup",
+            "payoff",
+            "timeline",
+            "timebase",
+            "uptake",
+            "proof chain",
+            "proof beat",
+            "window mechanics",
+            "transfer math",
+            "node count",
+            "earpiece state",
+        )
+        if any(hint in text for hint in structural_override_hints):
+            return False
+
+        prose_hints = (
+            "narration",
+            "narrator",
+            "prose",
+            "overstatement",
+            "composed writing",
+            "composed narration",
+            "narrator performance",
+            "calibration leakage",
+            "calibration-only",
+            "style-bible echo",
+            "style bible echo",
+            "style-bible-adjacent",
+            "copied style-bible",
+            "copied style bible",
+            "clipped narration",
+            "clipped clockwork",
+            "thematic underlining",
+            "editorial commentary",
+            "abstract noun",
+            "abstract nouns",
+            "parallel clause",
+            "parallel clauses",
+            "close-third",
+            "close third",
+            "interiority",
+            "screenplay-distance",
+            "screenplay distance",
+            "telemetry",
+            "thesis-writing",
+            "repeated certification",
+            "summary capper",
+            "narrative capper",
+        )
+        prose_id_hints = (
+            "PROSE",
+            "OVERSTATEMENT",
+            "STYLE_BIBLE",
+            "STYLEBIBLE",
+            "COMPOSED",
+            "CLIPPED",
+            "INTERIORITY",
+            "NARRATOR",
+            "TELEMETRY",
+        )
+        return any(hint in text for hint in prose_hints) or any(
+            hint in finding_id for hint in prose_id_hints
+        )
+
     def _assign_revision_pass_key(self, finding: dict[str, Any]) -> str:
         aggregated_pass_key = str(finding.get("aggregated_pass_key", "")).strip()
         if aggregated_pass_key in REVISION_PASS_KEYS:
@@ -6553,6 +6759,12 @@ class NovelPipelineRunner:
             if pass_hint in REVISION_PASS_KEYS:
                 return pass_hint
             return "p1_structural_craft"
+        if self._finding_prefers_dialogue_pass(finding):
+            return "p2_dialogue_idiolect_cadence"
+        if source == "dialogue":
+            return "p2_dialogue_idiolect_cadence"
+        if self._finding_prefers_prose_pass(finding):
+            return "p3_prose_copyedit"
         severity = str(finding.get("severity", "")).strip().upper()
         if severity in {"HIGH", "CRITICAL"}:
             return "p1_structural_craft"
@@ -6564,8 +6776,6 @@ class NovelPipelineRunner:
             "cross_chapter",
         }:
             return "p1_structural_craft"
-        if source == "dialogue":
-            return "p2_dialogue_idiolect_cadence"
         return "p3_prose_copyedit"
 
     def _revision_packet_rel(self, cycle: int, chapter_id: str) -> str:
@@ -7008,6 +7218,7 @@ class NovelPipelineRunner:
         }
 
     def _build_min_word_findings(self, cycle: int) -> list[dict[str, Any]]:
+        return []
         cpad = self._cpad(cycle)
         findings: list[dict[str, Any]] = []
         for spec in self.chapter_specs:
@@ -7689,12 +7900,11 @@ class NovelPipelineRunner:
         return [f"{prefix}/{Path(rel).name}" for rel in self._outline_core_output_rels()]
 
     def _ensure_outline_pre_revision_snapshot(self, cycle_num: int) -> list[str]:
+        outline_rels = self._outline_core_output_rels()
         snapshot_rels = self._outline_pre_revision_snapshot_rels(cycle_num)
-        for source_rel, snapshot_rel in zip(
-            self._outline_core_output_rels(),
-            snapshot_rels,
-            strict=True,
-        ):
+        if len(outline_rels) != len(snapshot_rels):
+            raise PipelineError("outline snapshot inputs/outputs length mismatch")
+        for source_rel, snapshot_rel in zip(outline_rels, snapshot_rels):
             source_path = self.run_dir / source_rel
             if not source_path.is_file():
                 raise PipelineError(
@@ -7871,6 +8081,11 @@ class NovelPipelineRunner:
                 "state_shift": spec.state_shift,
                 "texture_mode": spec.texture_mode,
                 "scene_count_target": spec.scene_count_target,
+                "opening_situation": spec.opening_situation,
+                "closing_state": spec.closing_state,
+                "chronology_anchor": spec.chronology_anchor,
+                "entry_obligation": spec.entry_obligation,
+                "exit_pressure": spec.exit_pressure,
                 "objective": spec.objective,
                 "conflict": spec.conflict,
                 "consequence": spec.consequence,
@@ -7886,11 +8101,32 @@ class NovelPipelineRunner:
             for row in style_bible.get("character_voice_profiles", [])
             if str(row.get("character_id", "")).strip()
         ]
+        character_depth = []
+        for row in style_bible.get("character_voice_profiles", []):
+            character_id = str(row.get("character_id", "")).strip()
+            if not character_id:
+                continue
+            payload_row = {"character_id": character_id}
+            interpretive_lens = str(row.get("interpretive_lens", "")).strip()
+            if interpretive_lens:
+                payload_row["interpretive_lens"] = interpretive_lens
+            formative_experiences = row.get("formative_experiences")
+            if isinstance(formative_experiences, list):
+                normalized_experiences = [
+                    str(item).strip()
+                    for item in formative_experiences
+                    if isinstance(item, str) and str(item).strip()
+                ]
+                if normalized_experiences:
+                    payload_row["formative_experiences"] = normalized_experiences
+            if len(payload_row) > 1:
+                character_depth.append(payload_row)
         payload = {
             "premise": self.selected_premise,
             "chapter_count": len(self.chapter_specs),
             "chapter_spine": chapter_spine,
             "character_ids": sorted(set(character_ids)),
+            "character_depth": character_depth,
             "dialogue_rules": style_bible.get("dialogue_rules", {}),
             "prose_style_profile": style_bible.get("prose_style_profile", {}),
             "aesthetic_risk_policy": style_bible.get("aesthetic_risk_policy", {}),
@@ -7946,6 +8182,11 @@ class NovelPipelineRunner:
                     "state_shift": spec.state_shift,
                     "texture_mode": spec.texture_mode,
                     "scene_count_target": spec.scene_count_target,
+                    "opening_situation": spec.opening_situation,
+                    "closing_state": spec.closing_state,
+                    "chronology_anchor": spec.chronology_anchor,
+                    "entry_obligation": spec.entry_obligation,
+                    "exit_pressure": spec.exit_pressure,
                     "objective": spec.objective,
                     "conflict": spec.conflict,
                     "consequence": spec.consequence,
@@ -7975,6 +8216,8 @@ class NovelPipelineRunner:
                     "sentence_completion_style": row.get(
                         "sentence_completion_style", ""
                     ),
+                    "interpretive_lens": row.get("interpretive_lens", ""),
+                    "formative_experiences": row.get("formative_experiences", []),
                 }
             )
 
@@ -8017,6 +8260,11 @@ class NovelPipelineRunner:
                 "prev_tail_excerpt": prev_tail_excerpt,
                 "next_head_excerpt": next_head_excerpt,
                 "open_hooks_to_carry": spec.must_land_beats,
+                "opening_situation": spec.opening_situation,
+                "closing_state": spec.closing_state,
+                "chronology_anchor": spec.chronology_anchor,
+                "entry_obligation": spec.entry_obligation,
+                "exit_pressure": spec.exit_pressure,
                 "secondary_character_beats": spec.secondary_character_beats,
                 "setups_to_plant": spec.setups_to_plant,
                 "payoffs_to_land": spec.payoffs_to_land,
@@ -8941,6 +9189,11 @@ class NovelPipelineRunner:
                 ),
                 "conflict": f"Pressure escalates in {chapter_id}",
                 "consequence": f"A decision closes options in {chapter_id}",
+                "opening_situation": f"The chapter opens with active pressure already live in {chapter_id}.",
+                "closing_state": f"A concrete condition has changed by the end of {chapter_id}.",
+                "chronology_anchor": "next morning" if i % 3 == 0 else "immediate",
+                "entry_obligation": f"The opening movement of {chapter_id} must introduce a new local pressure.",
+                "exit_pressure": f"An unresolved consequence remains active at the cut of {chapter_id}.",
                 "must_land_beats": [
                     f"Beat A for {chapter_id}",
                     f"Beat B for {chapter_id}",
@@ -8952,21 +9205,19 @@ class NovelPipelineRunner:
             workspace, "outline/chapter_specs.jsonl", chapter_specs_text
         )
 
-        scene_plan_lines = [
-            "scene_id\tchapter_id\tscene_order\tobjective\topposition\tturn\tconsequence_cost\ttension_peak"
-        ]
+        scene_plan_lines = [SCENE_PLAN_HEADER_WITH_UNDERCURRENT]
         for i in range(1, chapter_count + 1):
             chapter_id = f"chapter_{i:02d}"
             if i % 5 == 0:
                 scene_plan_lines.append(
-                    f"scene_{i:02d}_a\t{chapter_id}\t1\tHold pressure in place\tMemory, bureaucracy, or aftermath\tPerception shifts\tA path narrows\tYES"
+                    f"scene_{i:02d}_a\t{chapter_id}\t1\tHold pressure in place\tMemory, bureaucracy, or aftermath\tPerception shifts\tA path narrows\tYES\tnull"
                 )
             else:
                 scene_plan_lines.append(
-                    f"scene_{i:02d}_a\t{chapter_id}\t1\tSet pressure\tCountermove\tComplication\tLoss\tNO"
+                    f"scene_{i:02d}_a\t{chapter_id}\t1\tSet pressure\tCountermove\tComplication\tLoss\tNO\tOne person is testing what the other already knows before they commit."
                 )
                 scene_plan_lines.append(
-                    f"scene_{i:02d}_b\t{chapter_id}\t2\tEscalate pressure\tHard opposition\tDecision\tIrreversible shift\tYES"
+                    f"scene_{i:02d}_b\t{chapter_id}\t2\tEscalate pressure\tHard opposition\tDecision\tIrreversible shift\tYES\tnull"
                 )
         self._write_workspace_text(
             workspace, "outline/scene_plan.tsv", "\n".join(scene_plan_lines) + "\n"
@@ -8989,7 +9240,12 @@ class NovelPipelineRunner:
                     "indirectness": "Public speech stays guarded and angled; private speech becomes blunt only after resistance fails.",
                     "repetition_tolerance": "Allows light repetition under pressure, but never mantra-like reuse of the same phrase.",
                     "evasion_style": "Deflects by returning to logistics, procedure, or concrete task language instead of answering head-on.",
-                    "sentence_completion_style": "Can trail off or restart under pressure, but unfinished turns should remain legible and character-specific."
+                    "sentence_completion_style": "Can trail off or restart under pressure, but unfinished turns should remain legible and character-specific.",
+                    "interpretive_lens": "Reads every conversation for hidden leverage shifts and practical exposure.",
+                    "formative_experiences": [
+                        "Watched a handoff fail because someone reused a route that had already been seen.",
+                        "Learned early that procedural language is often how frightened people hide what they want."
+                    ]
                 },
                 {
                     "character_id": "antagonist",
@@ -9006,7 +9262,11 @@ class NovelPipelineRunner:
                     "indirectness": "Prefers direct institutional framing in public and cooler insinuation in private.",
                     "repetition_tolerance": "Low tolerance for repeated wording; pressure should sharpen rather than loop.",
                     "evasion_style": "Redirects through reframing, technicalities, or narrowed definitions rather than obvious dodge lines.",
-                    "sentence_completion_style": "Usually finishes sentences cleanly; any break in completion should signal loss of control or deliberate intimidation."
+                    "sentence_completion_style": "Usually finishes sentences cleanly; any break in completion should signal loss of control or deliberate intimidation.",
+                    "interpretive_lens": "Treats every interaction as a compliance problem to be managed before it becomes public.",
+                    "formative_experiences": [
+                        "Rose by learning that procedural certainty can override messy human testimony."
+                    ]
                 }
             ],
             "dialogue_rules": {
@@ -9017,7 +9277,8 @@ class NovelPipelineRunner:
                 "default_contraction_use": (
                     "high — contractions are the norm; uncontracted forms reserved "
                     "for emphasis or character-specific formality"
-                )
+                ),
+                "focalizer_dialogue_interiority": "moderate",
             },
             "prose_style_profile": {
                 "narrative_tense": "past tense",
@@ -9029,6 +9290,7 @@ class NovelPipelineRunner:
                     "bureaucratic briefing blocks",
                     "generic cinematic phrasing"
                 ],
+                "default_narrator_mode": "transparent",
                 "chapter_texture_variance": (
                     "Alternate high-intensity scenes with reflective interiority; vary scene count, "
                     "dialogue density, and pacing so no two consecutive chapters feel "
@@ -9310,6 +9572,9 @@ class NovelPipelineRunner:
         audit = {
             "cycle": job.cycle,
             "summary": "Dry-run cross-chapter audit pass.",
+            "not_x_y_count": 0,
+            "personified_abstraction_count": 0,
+            "abstract_noun_subject_count": 0,
             "redundancy_findings": [],
             "consistency_findings": [],
         }
@@ -9749,6 +10014,11 @@ class NovelPipelineRunner:
                 pressure_source = str(data.get("pressure_source", "")).strip()
                 state_shift = str(data.get("state_shift", "")).strip()
                 texture_mode = str(data.get("texture_mode", "")).strip()
+                opening_situation = str(data.get("opening_situation", "")).strip()
+                closing_state = str(data.get("closing_state", "")).strip()
+                chronology_anchor = str(data.get("chronology_anchor", "")).strip()
+                entry_obligation = str(data.get("entry_obligation", "")).strip()
+                exit_pressure = str(data.get("exit_pressure", "")).strip()
                 scene_count_target = data.get("scene_count_target")
                 scene_count_target_explicit = scene_count_target is not None
                 if not chapter_engine:
@@ -9798,6 +10068,16 @@ class NovelPipelineRunner:
                 ):
                     raise PipelineError(
                         f"missing required narrative fields in {rel}:{idx} for {chapter_id}"
+                    )
+                if not (
+                    opening_situation
+                    and closing_state
+                    and chronology_anchor
+                    and entry_obligation
+                    and exit_pressure
+                ):
+                    raise PipelineError(
+                        f"missing required edge fields in {rel}:{idx} for {chapter_id}"
                     )
                 if (
                     not isinstance(scene_count_target, int)
@@ -9896,6 +10176,11 @@ class NovelPipelineRunner:
                         scene_count_target=scene_count_target,
                         scene_count_target_explicit=scene_count_target_explicit,
                         must_land_beats=[x.strip() for x in beats_raw],
+                        opening_situation=opening_situation,
+                        closing_state=closing_state,
+                        chronology_anchor=chronology_anchor,
+                        entry_obligation=entry_obligation,
+                        exit_pressure=exit_pressure,
                         secondary_character_beats=[
                             x.strip() for x in secondary_beats_raw
                         ],
@@ -9926,20 +10211,22 @@ class NovelPipelineRunner:
         if not lines:
             raise PipelineError(f"scene plan file is empty: {rel}")
 
-        expected_header = (
-            "scene_id\tchapter_id\tscene_order\tobjective\topposition\tturn\tconsequence_cost\ttension_peak"
-        )
-        if lines[0].strip() != expected_header:
+        header = lines[0].strip()
+        if header not in {SCENE_PLAN_HEADER_LEGACY, SCENE_PLAN_HEADER_WITH_UNDERCURRENT}:
             raise PipelineError(f"scene plan header mismatch in {rel}")
+        has_undercurrent = header == SCENE_PLAN_HEADER_WITH_UNDERCURRENT
 
         scene_count_by_chapter: dict[str, int] = {}
         for i, line in enumerate(lines[1:], start=2):
             if not line.strip():
                 continue
             parts = line.split("\t")
-            if len(parts) != 8:
-                raise PipelineError(f"scene plan row must have 8 columns ({rel}:{i})")
-            scene_id, chapter_id, scene_order, *_rest, tension_peak = parts
+            expected_columns = 9 if has_undercurrent else 8
+            if len(parts) != expected_columns:
+                raise PipelineError(
+                    f"scene plan row must have {expected_columns} columns ({rel}:{i})"
+                )
+            scene_id, chapter_id, scene_order, *_rest, tension_peak = parts[:8]
             if not scene_id.strip():
                 raise PipelineError(f"empty scene_id in {rel}:{i}")
             if not CHAPTER_ID_RE.match(chapter_id):
@@ -9949,6 +10236,12 @@ class NovelPipelineRunner:
             tp = tension_peak.strip().upper()
             if tp not in {"YES", "NO"}:
                 raise PipelineError(f"invalid tension_peak in {rel}:{i}: {tension_peak}")
+            if has_undercurrent:
+                undercurrent = parts[8].strip()
+                if undercurrent and undercurrent.lower() == "null":
+                    undercurrent = ""
+                if undercurrent and not undercurrent.strip():
+                    raise PipelineError(f"invalid undercurrent in {rel}:{i}")
             scene_count_by_chapter[chapter_id] = scene_count_by_chapter.get(chapter_id, 0) + 1
 
         for spec in self.chapter_specs:
@@ -10085,6 +10378,74 @@ class NovelPipelineRunner:
                 else:
                     row["contraction_level"] = contraction_level.strip().lower()
 
+                interpretive_lens = row.get("interpretive_lens")
+                if isinstance(interpretive_lens, str):
+                    cleaned_lens = interpretive_lens.strip()
+                    if cleaned_lens:
+                        row["interpretive_lens"] = cleaned_lens
+                    elif "interpretive_lens" in row:
+                        row.pop("interpretive_lens", None)
+                        repairs.append(
+                            f"character_voice_profiles[{idx}].interpretive_lens removed because blank"
+                        )
+                elif isinstance(interpretive_lens, list):
+                    flattened_lens = "; ".join(
+                        item.strip()
+                        for item in interpretive_lens
+                        if isinstance(item, str) and item.strip()
+                    )
+                    if flattened_lens:
+                        row["interpretive_lens"] = flattened_lens
+                        repairs.append(
+                            f"character_voice_profiles[{idx}].interpretive_lens normalized from list"
+                        )
+                    elif "interpretive_lens" in row:
+                        row.pop("interpretive_lens", None)
+                        repairs.append(
+                            f"character_voice_profiles[{idx}].interpretive_lens removed because empty"
+                        )
+                elif interpretive_lens is not None:
+                    row.pop("interpretive_lens", None)
+                    repairs.append(
+                        f"character_voice_profiles[{idx}].interpretive_lens removed because invalid"
+                    )
+
+                formative_experiences = row.get("formative_experiences")
+                if isinstance(formative_experiences, str):
+                    cleaned_experience = formative_experiences.strip()
+                    if cleaned_experience:
+                        row["formative_experiences"] = [cleaned_experience]
+                        repairs.append(
+                            f"character_voice_profiles[{idx}].formative_experiences normalized from string"
+                        )
+                    elif "formative_experiences" in row:
+                        row.pop("formative_experiences", None)
+                        repairs.append(
+                            f"character_voice_profiles[{idx}].formative_experiences removed because blank"
+                        )
+                elif isinstance(formative_experiences, list):
+                    normalized_experiences = [
+                        item.strip()
+                        for item in formative_experiences
+                        if isinstance(item, str) and item.strip()
+                    ][:3]
+                    if normalized_experiences:
+                        if normalized_experiences != formative_experiences:
+                            repairs.append(
+                                f"character_voice_profiles[{idx}].formative_experiences normalized"
+                            )
+                        row["formative_experiences"] = normalized_experiences
+                    elif "formative_experiences" in row:
+                        row.pop("formative_experiences", None)
+                        repairs.append(
+                            f"character_voice_profiles[{idx}].formative_experiences removed because empty"
+                        )
+                elif formative_experiences is not None:
+                    row.pop("formative_experiences", None)
+                    repairs.append(
+                        f"character_voice_profiles[{idx}].formative_experiences removed because invalid"
+                    )
+
         dialogue_rules = data.get("dialogue_rules")
         if not isinstance(dialogue_rules, dict):
             dialogue_rules = {}
@@ -10142,6 +10503,27 @@ class NovelPipelineRunner:
                 "or character-specific formality"
             )
             repairs.append("dialogue_rules.default_contraction_use defaulted")
+
+        focalizer_dialogue_interiority = dialogue_rules.get(
+            "focalizer_dialogue_interiority"
+        )
+        normalized_interiority = ""
+        if isinstance(focalizer_dialogue_interiority, str) and focalizer_dialogue_interiority.strip():
+            candidate = re.sub(
+                r"[\s_-]+", " ", focalizer_dialogue_interiority.strip().lower()
+            ).strip()
+            if candidate in {"high", "dense", "active", "primary channel"}:
+                normalized_interiority = "high"
+            elif candidate in {"moderate", "balanced", "regular", "medium"}:
+                normalized_interiority = "moderate"
+            elif candidate in {"low", "light", "minimal", "sparse"}:
+                normalized_interiority = "low"
+        if not normalized_interiority:
+            dialogue_rules["focalizer_dialogue_interiority"] = "moderate"
+            repairs.append("dialogue_rules.focalizer_dialogue_interiority defaulted")
+        elif normalized_interiority != focalizer_dialogue_interiority:
+            dialogue_rules["focalizer_dialogue_interiority"] = normalized_interiority
+            repairs.append("dialogue_rules.focalizer_dialogue_interiority normalized")
 
         prose = data.get("prose_style_profile")
         if not isinstance(prose, dict):
@@ -10215,6 +10597,30 @@ class NovelPipelineRunner:
             else:
                 repairs.append("prose_style_profile.forbidden_drift_patterns mapped")
             prose["forbidden_drift_patterns"] = mapped
+
+        default_narrator_mode = prose.get("default_narrator_mode")
+        normalized_narrator_mode = ""
+        if isinstance(default_narrator_mode, str) and default_narrator_mode.strip():
+            candidate = re.sub(
+                r"[\s_-]+", " ", default_narrator_mode.strip().lower()
+            ).strip()
+            if candidate in {
+                "transparent",
+                "transparent scene description",
+                "literal",
+                "literal scene description",
+                "scene grounded",
+                "scene grounded literal",
+            }:
+                normalized_narrator_mode = "transparent"
+            elif candidate in {"literary", "heightened", "ornate", "conspicuous"}:
+                normalized_narrator_mode = "literary"
+        if not normalized_narrator_mode:
+            prose["default_narrator_mode"] = "transparent"
+            repairs.append("prose_style_profile.default_narrator_mode defaulted")
+        elif normalized_narrator_mode != default_narrator_mode:
+            prose["default_narrator_mode"] = normalized_narrator_mode
+            repairs.append("prose_style_profile.default_narrator_mode normalized")
 
         chapter_texture = prose.get("chapter_texture_variance")
         if not (isinstance(chapter_texture, str) and chapter_texture.strip()):
@@ -10766,6 +11172,14 @@ class NovelPipelineRunner:
             if repaired_patterns != pattern_findings:
                 data["pattern_findings"] = repaired_patterns
 
+        verdict = str(data.get("verdict", "")).strip().upper()
+        findings = data.get("findings")
+        has_findings = isinstance(findings, list) and bool(findings)
+        has_pattern_hits = self._full_award_has_pattern_hits(data)
+        if verdict == "PASS" and (has_findings or has_pattern_hits):
+            data["verdict"] = "FAIL"
+            repairs.append("verdict normalized from PASS to FAIL because findings are present")
+
         return data, repairs
 
     def _load_repaired_full_award_review(
@@ -10865,6 +11279,30 @@ class NovelPipelineRunner:
                     f"{rel} character_voice_profiles[{idx}] contraction_level must be "
                     f"one of: high, moderate, low, variable"
                 )
+            if "interpretive_lens" in row and (
+                not isinstance(row.get("interpretive_lens"), str)
+                or not str(row.get("interpretive_lens", "")).strip()
+            ):
+                raise PipelineError(
+                    f"{rel} character_voice_profiles[{idx}] interpretive_lens must be non-empty string when present"
+                )
+            if "formative_experiences" in row:
+                formative_experiences = row.get("formative_experiences")
+                if not isinstance(formative_experiences, list) or not formative_experiences:
+                    raise PipelineError(
+                        f"{rel} character_voice_profiles[{idx}] formative_experiences must be non-empty array when present"
+                    )
+                if len(formative_experiences) > 3:
+                    raise PipelineError(
+                        f"{rel} character_voice_profiles[{idx}] formative_experiences must have at most 3 entries"
+                    )
+                if not all(
+                    isinstance(item, str) and item.strip()
+                    for item in formative_experiences
+                ):
+                    raise PipelineError(
+                        f"{rel} character_voice_profiles[{idx}] formative_experiences entries must be non-empty strings"
+                    )
 
         dialogue_rules = data.get("dialogue_rules")
         if not isinstance(dialogue_rules, dict):
@@ -10875,6 +11313,7 @@ class NovelPipelineRunner:
             "max_consecutive_low_info_replies",
             "idiolect_separation_required",
             "default_contraction_use",
+            "focalizer_dialogue_interiority",
         ):
             if key not in dialogue_rules:
                 raise PipelineError(f"{rel} dialogue_rules missing {key}")
@@ -10907,6 +11346,15 @@ class NovelPipelineRunner:
             raise PipelineError(
                 f"{rel} dialogue_rules default_contraction_use must be non-empty string"
             )
+        focalizer_dialogue_interiority = dialogue_rules.get("focalizer_dialogue_interiority")
+        if (
+            not isinstance(focalizer_dialogue_interiority, str)
+            or focalizer_dialogue_interiority.strip().lower()
+            not in FOCALIZER_DIALOGUE_INTERIORITY_VALUES
+        ):
+            raise PipelineError(
+                f"{rel} dialogue_rules focalizer_dialogue_interiority must be one of: high, moderate, low"
+            )
 
         prose_style = data.get("prose_style_profile")
         if not isinstance(prose_style, dict):
@@ -10918,6 +11366,7 @@ class NovelPipelineRunner:
             "sensory_bias",
             "diction",
             "forbidden_drift_patterns",
+            "default_narrator_mode",
             "chapter_texture_variance",
         ):
             if key not in prose_style:
@@ -10927,6 +11376,14 @@ class NovelPipelineRunner:
                 raise PipelineError(
                     f"{rel} prose_style_profile {text_key} must be non-empty string"
                 )
+        default_narrator_mode = prose_style.get("default_narrator_mode")
+        if (
+            not isinstance(default_narrator_mode, str)
+            or default_narrator_mode.strip() not in {"transparent", "literary"}
+        ):
+            raise PipelineError(
+                f"{rel} prose_style_profile default_narrator_mode must be 'transparent' or 'literary'"
+            )
         for list_key in ("sensory_bias", "forbidden_drift_patterns"):
             value = prose_style[list_key]
             if not isinstance(value, list) or not value:
@@ -10979,6 +11436,11 @@ class NovelPipelineRunner:
                 "state_shift": spec.state_shift,
                 "texture_mode": spec.texture_mode,
                 "scene_count_target": spec.scene_count_target,
+                "opening_situation": spec.opening_situation,
+                "closing_state": spec.closing_state,
+                "chronology_anchor": spec.chronology_anchor,
+                "entry_obligation": spec.entry_obligation,
+                "exit_pressure": spec.exit_pressure,
                 "objective": spec.objective,
                 "conflict": spec.conflict,
                 "consequence": spec.consequence,
@@ -11654,6 +12116,16 @@ class NovelPipelineRunner:
         summary = data.get("summary")
         if not isinstance(summary, str) or not summary.strip():
             raise PipelineError(f"{rel} missing non-empty summary")
+        for metric_key in CROSS_CHAPTER_AUDIT_METRIC_KEYS:
+            metric_value = data.get(metric_key)
+            if (
+                not isinstance(metric_value, int)
+                or isinstance(metric_value, bool)
+                or metric_value < 0
+            ):
+                raise PipelineError(
+                    f"{rel} {metric_key} must be a non-negative integer"
+                )
 
         seen_ids: set[str] = set()
         for array_name, expected_category in (
@@ -11732,6 +12204,32 @@ class NovelPipelineRunner:
                 if coerced != raw_cycle:
                     data["cycle"] = coerced
                     repairs.append("cycle coerced to integer")
+
+        for metric_key in CROSS_CHAPTER_AUDIT_METRIC_KEYS:
+            raw_metric = data.get(metric_key)
+            normalized_metric: int | None = None
+            if (
+                isinstance(raw_metric, int)
+                and not isinstance(raw_metric, bool)
+                and raw_metric >= 0
+            ):
+                normalized_metric = raw_metric
+            elif isinstance(raw_metric, str):
+                stripped = raw_metric.strip()
+                if stripped.isdigit():
+                    normalized_metric = int(stripped)
+            elif (
+                isinstance(raw_metric, float)
+                and raw_metric.is_integer()
+                and raw_metric >= 0
+            ):
+                normalized_metric = int(raw_metric)
+            if normalized_metric is None:
+                data[metric_key] = 0
+                repairs.append(f"{metric_key} defaulted to 0")
+            elif normalized_metric != raw_metric:
+                data[metric_key] = normalized_metric
+                repairs.append(f"{metric_key} normalized")
 
         seen_ids: dict[str, int] = {}
         for array_name, expected_category in (
@@ -11859,6 +12357,9 @@ class NovelPipelineRunner:
         return {
             "cycle": cycle,
             "summary": "Cross-chapter audit could not be completed; fallback with no findings.",
+            "not_x_y_count": 0,
+            "personified_abstraction_count": 0,
+            "abstract_noun_subject_count": 0,
             "redundancy_findings": [],
             "consistency_findings": [],
         }
@@ -11872,6 +12373,18 @@ class NovelPipelineRunner:
         return (
             data.get("cycle") == expected["cycle"]
             and data.get("summary") == expected["summary"]
+            and data.get("not_x_y_count", expected["not_x_y_count"])
+            == expected["not_x_y_count"]
+            and data.get(
+                "personified_abstraction_count",
+                expected["personified_abstraction_count"],
+            )
+            == expected["personified_abstraction_count"]
+            and data.get(
+                "abstract_noun_subject_count",
+                expected["abstract_noun_subject_count"],
+            )
+            == expected["abstract_noun_subject_count"]
             and data.get("redundancy_findings") == expected["redundancy_findings"]
             and data.get("consistency_findings") == expected["consistency_findings"]
         )
@@ -11880,10 +12393,20 @@ class NovelPipelineRunner:
         normalized = re.sub(r"[^a-z0-9]+", "_", str(value).strip().lower()).strip("_")
         return LOCAL_WINDOW_CATEGORY_ALIASES.get(normalized, normalized)
 
-    def _default_local_window_pass_hint(self, category: str) -> str | None:
-        return LOCAL_WINDOW_PASS_HINT_BY_CATEGORY.get(
-            self._normalize_local_window_category(category)
-        )
+    def _normalize_local_window_subcategory(self, value: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "_", str(value).strip().lower()).strip("_")
+
+    def _default_local_window_pass_hint(
+        self, category: str, subcategory: str = ""
+    ) -> str | None:
+        normalized_category = self._normalize_local_window_category(category)
+        normalized_subcategory = self._normalize_local_window_subcategory(subcategory)
+        if (
+            normalized_category == "pre_scan"
+            and normalized_subcategory == "composed_seam_prose"
+        ):
+            return "p3_prose_copyedit"
+        return LOCAL_WINDOW_PASS_HINT_BY_CATEGORY.get(normalized_category)
 
     def _local_window_category_requirements(self, category: str) -> set[str]:
         normalized = self._normalize_local_window_category(category)
@@ -12121,7 +12644,8 @@ class NovelPipelineRunner:
                     finding.get("pass_hint", "")
                 ).strip() not in REVISION_PASS_KEYS:
                     pass_hint = self._default_local_window_pass_hint(
-                        str(finding.get("category", ""))
+                        str(finding.get("category", "")),
+                        str(finding.get("subcategory", "")),
                     )
                     if pass_hint:
                         finding["pass_hint"] = pass_hint
