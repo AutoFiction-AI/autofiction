@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import lint_chapter_text as lint_module
 import runner as runner_module
 
 
@@ -174,17 +175,59 @@ def _build_generation_metadata(
     }
 
 
+def _lint_cycle_number(final_status: dict[str, Any]) -> int:
+    success_cycle = final_status.get("success_cycle")
+    if isinstance(success_cycle, int) and success_cycle >= 1:
+        return success_cycle
+    return 1
+
+
+def _lint_report_path(run_dir: Path, cycle: int) -> Path:
+    return run_dir / "logs" / f"cycle_{cycle:02d}" / "lint_report.json"
+
+
+def _run_export_lint(run_dir: Path, final_status: dict[str, Any]) -> dict[str, Any] | None:
+    chapters_dir = run_dir / "chapters"
+    if not chapters_dir.is_dir():
+        return None
+    payload = lint_module.build_report_payload(
+        lint_module.lint_chapter_directory(chapters_dir, apply_fixes=False)
+    )
+    lint_module.write_report(
+        _lint_report_path(run_dir, _lint_cycle_number(final_status)),
+        payload,
+    )
+    return payload
+
+
+def _raise_on_blocking_lint(payload: dict[str, Any]) -> None:
+    blocked = lint_module.blocking_findings(payload)
+    if not blocked:
+        return
+    preview = ", ".join(
+        f"{row['chapter_id']}:{row['line']}" for row in blocked[:5]
+    )
+    raise runner_module.PipelineError(
+        "export blocked by lint warnings: interrogative dialogue is missing question marks "
+        f"at {preview}. Re-run with --allow-lint-warnings to override."
+    )
+
+
 def export_run_to_artifacts(
     run_dir: Path,
     artifacts_root: Path,
     *,
     book_slug: str = "",
     overwrite: bool = False,
+    allow_lint_warnings: bool = False,
 ) -> Path:
     run_dir = run_dir.resolve()
     artifacts_root = artifacts_root.resolve()
     final_status = _load_json(run_dir / "reports" / "final_status.json")
     run_config = _load_json(run_dir / "config" / "run_config.json")
+    lint_payload = _run_export_lint(run_dir, final_status)
+    if lint_payload is not None and not allow_lint_warnings:
+        _raise_on_blocking_lint(lint_payload)
     title = _read_title(run_dir)
     slug = _artifact_slug(book_slug or title)
     dest_dir = artifacts_root / "books" / slug
@@ -235,6 +278,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Replace the destination book directory if it already exists.",
     )
+    parser.add_argument(
+        "--allow-lint-warnings",
+        action="store_true",
+        help="Allow export to proceed even if the deterministic lint report still has question-mark blockers.",
+    )
     return parser.parse_args()
 
 
@@ -247,6 +295,7 @@ def main() -> int:
         artifacts_root,
         book_slug=args.book_slug,
         overwrite=bool(args.overwrite),
+        allow_lint_warnings=bool(args.allow_lint_warnings),
     )
     print(dest_dir)
     return 0

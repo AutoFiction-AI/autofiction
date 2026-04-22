@@ -52,6 +52,38 @@ class SmokeTests(unittest.TestCase):
             self.assertEqual(run_config["reasoning_effort"], "xhigh")
             gate = json.loads((run_dir / "gate" / "cycle_01" / "gate.json").read_text(encoding="utf-8"))
             self.assertIn(gate["decision"], {"PASS", "FAIL"})
+            outline_text = (run_dir / "outline" / "outline.md").read_text(encoding="utf-8")
+            self.assertIn("Reader Knowledge Plan", outline_text)
+            style_bible = json.loads(
+                (run_dir / "outline" / "style_bible.json").read_text(encoding="utf-8")
+            )
+            self.assertIn(
+                "exposition_density_policy",
+                style_bible["prose_style_profile"],
+            )
+            self.assertIn(
+                "first_appearance_tag",
+                style_bible["character_voice_profiles"][0],
+            )
+            chapter_specs = [
+                json.loads(line)
+                for line in (run_dir / "outline" / "chapter_specs.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()
+                if line.strip()
+            ]
+            self.assertTrue(
+                any("reader_introductions" in row for row in chapter_specs),
+                "expected at least one chapter spec row to include reader_introductions",
+            )
+            self.assertTrue(
+                all("plot_importance" in row and "beat_budget" in row for row in chapter_specs),
+                "expected every chapter spec row to include plot_importance and beat_budget",
+            )
+            continuity_sheet = json.loads(
+                (run_dir / "outline" / "continuity_sheet.json").read_text(encoding="utf-8")
+            )
+            self.assertIn("character_blocking", continuity_sheet)
 
     def test_claude_provider_dry_run_uses_provider_defaults(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_claude_", dir="/tmp") as tmp:
@@ -74,7 +106,7 @@ class SmokeTests(unittest.TestCase):
                 (run_dir / "config" / "run_config.json").read_text(encoding="utf-8")
             )
             self.assertEqual(run_config["provider"], "claude")
-            self.assertEqual(run_config["model"], "claude-opus-4-6")
+            self.assertEqual(run_config["model"], "claude-opus-4-7")
             self.assertEqual(run_config["reasoning_effort"], "max")
 
     def test_generated_premise_dry_run(self) -> None:
@@ -121,7 +153,7 @@ class SmokeTests(unittest.TestCase):
                 (run_dir / "config" / "run_config.json").read_text(encoding="utf-8")
             )
             self.assertEqual(run_config["provider"], "claude")
-            self.assertEqual(run_config["model"], "claude-opus-4-6")
+            self.assertEqual(run_config["model"], "claude-opus-4-7")
             self.assertEqual(run_config["reasoning_effort"], "max")
             self.assertTrue((run_dir / "premise" / "premise_search_plan.json").is_file())
             self.assertTrue((run_dir / "premise" / "premise_candidates.jsonl").is_file())
@@ -182,7 +214,7 @@ class SmokeTests(unittest.TestCase):
                 )
             )
             self.assertEqual(outline_manifest["provider"], "claude")
-            self.assertEqual(outline_manifest["model"], "claude-opus-4-6")
+            self.assertEqual(outline_manifest["model"], "claude-opus-4-7")
             self.assertEqual(draft_manifest["provider"], "claude")
             self.assertEqual(review_manifest["provider"], "codex")
             self.assertEqual(revision_manifest["provider"], "codex")

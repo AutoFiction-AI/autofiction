@@ -42,6 +42,7 @@ Required outputs:
 
 `outline/outline.md` should include a short section titled `Middle-Book Progression Map` that covers the middle-third chapters using the criteria above. Keep it brief but concrete.
 `outline/outline.md` should also include a short section titled `Supporting Character Pressure Map` covering the 3-6 key supporting characters identified above.
+`outline/outline.md` should also include a short section titled `Reader Knowledge Plan`. This section is REQUIRED. It must cover: (a) a genre-calibrated commonsense-detail policy — in literary realism, cars are cars unless the make or model matters; in speculative/LitRPG work, novel-specific rules must be introduced on-page when the reader cannot infer them; (b) a list of novel-specific world concepts with stable `concept_id`s and target introduction chapters; (c) a `speculative_premise_contract` list for every speculative conceit, giving `concept_id`, grounding chapter, and the minimum on-page establishment required before later chapters use that conceit for plot mechanics; and (d) a list of commonsense-domain items (mundane behaviors, ordinary object brands, routine procedural steps) that should stay generic unless narratively active.
 
 `outline/title.txt` contract:
 1. A single line containing the novel's title. No subtitle, no quotation marks, no attribution — just the title itself.
@@ -56,12 +57,14 @@ Required outputs:
 3. `chapter_id` (format: `chapter_XX`)
 4. `chapter_number` (int)
 5. `projected_min_words` (int, > 0)
+5b. `plot_importance` (`primary` | `secondary` | `bridge`): `primary` = major reveal/turn/decision; `secondary` = consequential but not chapter-defining; `bridge` = transitional or connective pressure
 6. `chapter_engine` (string): the dominant mode of movement in the chapter, e.g. confrontation, discovery, aftermath, preparation, seduction, comic escalation, ritual, humiliation, constraint-heavy ordeal, pursuit, concealment, drift-under-pressure
 7. `pressure_source` (string): what bears down on the chapter
 8. `state_shift` (string): what changes by the end of the chapter. State shifts may be physical, emotional, relational, informational, perceptual, or tonal.
 9. `texture_mode` (string): e.g. hot, quiet, suspended, tender, humiliating, uncanny, formal, comic, grief-heavy
 10. `scene_count_target` (integer from 1 to 4)
 11. `must_land_beats` (array of strings)
+11b. `beat_budget` (array of objects): each object requires `beat`, `target_words`, and `importance`; `beat` must match a `must_land_beats` entry or one of `secondary_character_beats`, `opening`, `closing`; `importance` must be `primary`, `secondary`, or `bridge`; and the total should add up to approximately `projected_min_words`
 12. `opening_situation` (non-empty string): one sentence stating where we are, what pressure is already live, and what changed from the prior chapter's exit
 13. `closing_state` (non-empty string): one sentence stating the concrete new condition the reader leaves with
 14. `chronology_anchor` (non-empty string): a short human-readable phrase describing how this chapter relates in time to the previous one
@@ -70,6 +73,7 @@ Required outputs:
 17. `secondary_character_beats` (optional array of strings): chapter-local instructions for how supporting characters should carry independent pressure or humanity on the page in this chapter. When possible, phrase these as direct on-page beats the reader can witness, not as protagonist reflection about the character.
 18. `setups_to_plant` (optional array of objects): use only for major cross-chapter seeds that later review/revision should be able to track explicitly. Each object requires `setup_id` (stable short identifier), `description` (what must become legible on the page here), and may include `payoff_window` (chapter or chapter range where it should plausibly land) and `visibility` (e.g. `light`, `moderate`, `heavy`)
 19. `payoffs_to_land` (optional array of objects): use only for major cross-chapter landings. Each object requires `setup_id` (matching an earlier setup), `description` (what resolves or pays off here), and may include `seeded_by` (array of `chapter_XX` strings) and `payoff_type` (e.g. `reveal`, `reversal`, `object use`, `emotional payoff`, `capability`)
+20. `reader_introductions` (optional array of objects): use when the reader needs a concept introduced or refreshed in this chapter. Each object requires `concept_id` (stable short identifier), `kind` (`world_rule` | `jargon` | `relationship` | `setting`), `first_or_refresh` (`first` | `refresh`), and `target_legibility` (`sketched` | `grounded` | `operational`). Use this field whenever the chapter must establish or refresh knowledge the cold reader cannot safely infer unaided.
 
 Keep `setups_to_plant` and `payoffs_to_land` sparse. Do not turn every minor echo into tracked metadata; reserve these fields for setups and payoffs whose presence or absence would materially affect later review or revision.
 
@@ -82,6 +86,7 @@ Canonical full-row example:
   "chapter_id": "chapter_08",
   "chapter_number": 8,
   "projected_min_words": 4200,
+  "plot_importance": "primary",
   "chapter_engine": "consequence",
   "pressure_source": "the previous failed transfer has exposed a new vulnerability in Dex's route",
   "state_shift": "Mara realizes the anomaly is inside their own workflow, not outside it",
@@ -91,11 +96,25 @@ Canonical full-row example:
     "Mara sees the altered threshold",
     "Dex conceals that he has already noticed it"
   ],
+  "beat_budget": [
+    {"beat": "opening", "target_words": 500, "importance": "bridge"},
+    {"beat": "Mara sees the altered threshold", "target_words": 1700, "importance": "primary"},
+    {"beat": "Dex conceals that he has already noticed it", "target_words": 1500, "importance": "primary"},
+    {"beat": "closing", "target_words": 500, "importance": "bridge"}
+  ],
   "opening_situation": "The morning after the failed transfer, Mara is back in the rented office with Dex, reviewing logs that should have matched overnight behavior.",
   "closing_state": "Mara has seen enough to know the anomaly is real, but she still does not know Dex is the one hiding part of it.",
   "chronology_anchor": "next morning",
   "entry_obligation": "The opening movement must make clear that the failed transfer changed the team's confidence and that the logs now contain something newly wrong.",
-  "exit_pressure": "Dex must still be withholding the routing truth when the chapter cuts."
+  "exit_pressure": "Dex must still be withholding the routing truth when the chapter cuts.",
+  "reader_introductions": [
+    {
+      "concept_id": "threshold_shift_protocol",
+      "kind": "world_rule",
+      "first_or_refresh": "refresh",
+      "target_legibility": "operational"
+    }
+  ]
 }
 ```
 
@@ -118,6 +137,7 @@ Canonical full-row example:
 6. `aesthetic_risk_policy` (object)
 7. Each `character_voice_profiles` row requires:
 8. `character_id`
+8b. `first_appearance_tag` (required string): the short relational phrase the narration must render on the character's first on-page appearance
 9. `public_register`
 10. `private_register`
 11. `syntax_signature`
@@ -149,6 +169,7 @@ Canonical full-row example:
 32. `prose_style_profile` must include:
 33. `narrative_tense` (string: the tense used consistently across the entire novel — typically "past tense" or "present tense"; all chapters must use the same tense), `narrative_distance`, `rhythm_target`, `sensory_bias` (array of non-empty strings naming the dominant sensory channels or scene-pressure domains), `diction`, `forbidden_drift_patterns` (array of non-empty strings naming prose drifts to avoid), `default_narrator_mode` (string: `transparent` for most novels; `literary` only when the premise genuinely demands conspicuous prose as a baseline register)
 34. `chapter_texture_variance` (string guidance on varying chapter rhythm, pacing, and structural texture across the book so no two consecutive chapters feel structurally identical)
+34a. `exposition_density_policy` (required object) with: `commonsense_detail_floor` (`sparse` | `moderate` | `dense`), `world_concept_explanation_mode` (`embedded-in-experience` | `brief-on-first-use` | `operational-on-first-use`), `genre_norm` (string describing the novel's reader-model baseline, e.g. "literary realism / minimal brand noise" or "LitRPG / rule-first legibility"), and `operational_rubric` (short practical rule covering both axes: what to leave generic, what must be explained on-page, and how much explanation belongs at first contact)
 34b. Set `diction` and `rhythm_target` for the novel's default baseline register: how the prose sounds between the big moments, not at its peaks. Most paragraphs should be plain, concrete, and scene-serving. Exceptional pressure, variation, and sentence-level showiness belong in `chapter_texture_variance`, not in `diction` or `rhythm_target`. If you make `diction` itself compressed, imagistic, or conspicuously literary, the draft agent will try to write every line that way.
 35. `aesthetic_risk_policy` must include:
 36. `sanitization_disallowed` (boolean)
@@ -173,10 +194,12 @@ Canonical full-row example:
 8. `primary_setting` (string), `key_locations` (array of objects with `name` and `details`), `distances` (array of strings: spatial relationships between key locations)
 9. `world_rules` (array of strings): constraints on what is possible — laws, social rules, technology, physics, magic systems. Include period-specific rules for historical fiction. Empty array for contemporary realistic fiction with no special constraints.
 10. `power_structure` (array of objects with `holder`, `over`, and `mechanism`): who has authority over whom and by what right
-11. `objects` (array of objects with `name`, `owner`, `origin`, `status`, `chapter_introduced`): only objects that are plot-significant or could cause continuity errors if described inconsistently
+11. `objects` (array of objects with `name`, `owner`, `origin`, `status`, `chapter_introduced`, and `per_chapter_state`): only objects that are plot-significant or could cause continuity errors if described inconsistently
+11b. Each `objects` row's `per_chapter_state` field is an array of objects with `chapter`, `state`, `holder`, and `location`
 12. `financial_state` (object with `debts` array and `income_sources` array): include only if economic stakes are part of the premise. Each debt has `creditor`, `amount`, `deadline`, `status`. Each income source has `source`, `amount`, `reliability`.
 13. `knowledge_state` (array of objects with `character`, `knows`, `learned_in`, `hidden_from`): secrets, lies, and information asymmetries that affect character behavior. Only track knowledge that could cause a continuity error if a parallel drafter gets it wrong.
 14. `environmental_constants` (array of strings): persistent sensory and environmental facts — recurring sounds, smells, weather patterns, architectural details that multiple chapters should reference consistently.
+14b. `character_blocking` (array of objects with `chapter`, `character`, `entrance`, `exit`, `carrying`, and `position`): use only for characters whose physical presence is plot-active enough to create continuity risk
 15. Aim for roughly 2000 words. Only consolidate entries if the sheet exceeds 3000 words. Populate only what the premise requires. A contemporary two-character story may need very few entries. A historical epic with complex finances and social hierarchy will need more.
 16. Every string field must be non-empty when populated. Omit optional entries rather than leaving them blank.
 

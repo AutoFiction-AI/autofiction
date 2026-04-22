@@ -62,7 +62,7 @@ Rules:
   - `claude`
 - Default execution settings:
   - Codex: `gpt-5.4` with `xhigh`
-  - Claude: `claude-opus-4-6` with `max`
+  - Claude: `claude-opus-4-7` with `max`
 - Optional stage-group overrides can mix providers within one run:
   - `premise`
   - `outline`
@@ -104,9 +104,12 @@ Active prompts:
 ### Outline
 
 - `outline/outline.md`
+- `outline/outline.md` must include `Middle-Book Progression Map`, `Supporting Character Pressure Map`, and `Reader Knowledge Plan`
 - `outline/chapter_specs.jsonl`
+- `outline/chapter_specs.jsonl` may include per-chapter `reader_introductions` objects for concept onboarding/refresh
 - `outline/scene_plan.tsv`
 - `outline/style_bible.json`
+- `outline/style_bible.json` `prose_style_profile` must include `exposition_density_policy`
 - `outline/static_story_context.json`
 - `outline/continuity_sheet.json`
 
@@ -158,6 +161,12 @@ Cross-chapter audit output:
 
 - top-level `cycle`
 - `summary`
+- `not_x_y_count`
+- `personified_abstraction_count`
+- `abstract_noun_subject_count`
+- `simile_count`
+- `as_if_count`
+- `the_way_x_count`
 - `redundancy_findings`
 - `consistency_findings`
 

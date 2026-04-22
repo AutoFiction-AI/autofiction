@@ -66,6 +66,8 @@ Findings that should proceed to revision as-is. A finding goes here when:
 ### merges
 Two or more findings that describe the same problem. Keep the most specific rewrite direction. The target finding survives; absorbed findings are removed from their packets.
 
+Do NOT merge `character_decision_coherence` or reader-legibility-calibration findings into sprawl, pacing, or composed-writing cleanup. If the same passage supports both a structural setup failure and a prose-level symptom, preserve the structural finding as distinct editorial work.
+
 {
   "target_finding": "LW02-001",
   "absorbed_findings": ["CCA-CON-003"],
@@ -96,7 +98,7 @@ These are constraints, not findings. They are added to every packet's `non_negot
 
 When composed-writing findings recur across 3 or more chapters, emit a consistency directive. Name the affected register (`dialogue`, `narration`, or `both`) and the tell(s) firing (`parallel clauses`, `abstract nouns`, `summarizing`, `narrator performance`, or the `"It wasn't X"` tic). For narration, the directive should push the book back toward transparent scene description; for dialogue, it should push lines toward conversational specificity rather than prepared-sounding polish.
 
-Also read `shared_context.cross_chapter_metrics`. Those manuscript-level recurrence counts are directive triggers, not background trivia. If `not_x_y_count` or `personified_abstraction_count` is far above threshold, or if `abstract_noun_subject_count` is unusually high in tandem with composed-writing findings, you should usually emit a narration-focused consistency directive even if only a subset of chapters received explicit findings. A count like `not_x_y_count = 45` is a strong signal that the pattern is book-wide and should not be handled as isolated chapter cleanup.
+Also read `shared_context.cross_chapter_metrics`. Those manuscript-level recurrence counts are directive triggers, not background trivia. If `not_x_y_count`, `personified_abstraction_count`, `simile_count`, `as_if_count`, or `the_way_x_count` is far above threshold, or if `abstract_noun_subject_count` is unusually high in tandem with composed-writing findings, you should usually emit a narration-focused consistency directive even if only a subset of chapters received explicit findings. A count like `not_x_y_count = 45` is a strong signal that the pattern is book-wide and should not be handled as isolated chapter cleanup.
 
 {
   "directive_id": "short_label",
@@ -137,6 +139,8 @@ Last resort. Before flagging unfixable, try to find a partial fix — a way to m
 
 ### pass_reassignments
 A finding routed to the wrong revision pass. Move it.
+
+Any finding whose real problem is character decision coherence or reader legibility calibration belongs in `p1_structural_craft`, even when the current wording also mentions sprawl, repetition, or composed writing. Those failures require motive/setup/explanation work that downstream prose polish cannot solve.
 
 {
   "finding_id": "...",

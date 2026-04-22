@@ -100,7 +100,7 @@ class ExportRunToArtifactsTests(unittest.TestCase):
                     "stage_profiles": {
                         "outline": {
                             "provider": "claude",
-                            "model": "claude-opus-4-6",
+                            "model": "claude-opus-4-7",
                             "reasoning_effort": "max",
                         },
                         "review": {
@@ -110,12 +110,12 @@ class ExportRunToArtifactsTests(unittest.TestCase):
                         },
                         "full_review": {
                             "provider": "claude",
-                            "model": "claude-opus-4-6",
+                            "model": "claude-opus-4-7",
                             "reasoning_effort": "max",
                         },
                         "cross_chapter_audit": {
                             "provider": "claude",
-                            "model": "claude-opus-4-6",
+                            "model": "claude-opus-4-7",
                             "reasoning_effort": "max",
                         },
                         "revision": {
@@ -125,14 +125,14 @@ class ExportRunToArtifactsTests(unittest.TestCase):
                         },
                         "llm_aggregator": {
                             "provider": "claude",
-                            "model": "claude-opus-4-6",
+                            "model": "claude-opus-4-7",
                             "reasoning_effort": "max",
                         },
                     },
                     "revision_pass_profiles": {
                         "p2_dialogue_idiolect_cadence": {
                             "provider": "claude",
-                            "model": "claude-opus-4-6",
+                            "model": "claude-opus-4-7",
                             "reasoning_effort": "max",
                         }
                     },
@@ -169,6 +169,60 @@ class ExportRunToArtifactsTests(unittest.TestCase):
                 metadata["revision_passes"]["p2_dialogue_idiolect_cadence"]["provider"],
                 "claude",
             )
+
+    def test_export_blocks_on_lint_question_mark_warning_unless_overridden(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="export_lint_", dir="/tmp") as tmp:
+            tmp_path = Path(tmp)
+            run_dir = tmp_path / "run"
+            artifacts_root = tmp_path / "artifacts"
+            (run_dir / "outline").mkdir(parents=True, exist_ok=True)
+            (run_dir / "outline" / "title.txt").write_text(
+                "Questionable Weather\n",
+                encoding="utf-8",
+            )
+            (run_dir / "chapters").mkdir(parents=True, exist_ok=True)
+            (run_dir / "chapters" / "chapter_01.md").write_text(
+                '# Chapter 1\n\n"What do you mean," she said.\n',
+                encoding="utf-8",
+            )
+            (run_dir / "FINAL_NOVEL.md").write_text(
+                "# Questionable Weather\n\n# Chapter 1\n\n\"What do you mean,\" she said.\n",
+                encoding="utf-8",
+            )
+            _write_json(
+                run_dir / "reports" / "final_status.json",
+                {
+                    "status": "PASS",
+                    "completed_at_utc": "2026-03-29T21:22:36Z",
+                    "terminal_reason": "max_cycles_reached",
+                    "final_novel_file": "FINAL_NOVEL.md",
+                    "chapter_count": 1,
+                    "success_cycle": 1,
+                    "min_cycles": 1,
+                    "max_cycles": 1,
+                    "validation_mode": "lenient",
+                },
+            )
+            _write_json(
+                run_dir / "config" / "run_config.json",
+                {
+                    "provider": "codex",
+                    "model": "gpt-5.4",
+                    "reasoning_effort": "xhigh",
+                    "premise_mode": "user",
+                },
+            )
+
+            with self.assertRaises(export_module.runner_module.PipelineError) as exc:
+                export_module.export_run_to_artifacts(run_dir, artifacts_root)
+            self.assertIn("export blocked by lint warnings", str(exc.exception))
+
+            dest_dir = export_module.export_run_to_artifacts(
+                run_dir,
+                artifacts_root,
+                allow_lint_warnings=True,
+            )
+            self.assertTrue(dest_dir.is_dir())
 
 
 if __name__ == "__main__":

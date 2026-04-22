@@ -17,14 +17,14 @@ import runner as runner_module
 
 
 CLAUDE_STREAM_JSON = """\
-{"type":"system","subtype":"init","cwd":"/tmp/project","session_id":"af1ca5c0-beb9-4ba6-b616-6f1f9e05a187","tools":["Task","TaskOutput","Bash","Glob","Grep","ExitPlanMode","Read","Edit","Write","NotebookEdit","WebFetch","TodoWrite","WebSearch","TaskStop","AskUserQuestion","Skill","EnterPlanMode","EnterWorktree","ExitWorktree","CronCreate","CronDelete","CronList","ToolSearch"],"mcp_servers":[],"model":"claude-opus-4-6","permissionMode":"bypassPermissions","slash_commands":["keybindings-help","debug","simplify","batch","loop","claude-api","compact","context","cost","heapdump","init","pr-comments","release-notes","review","security-review","extra-usage","insights"],"apiKeySource":"none","claude_code_version":"2.1.73","output_style":"default","agents":["general-purpose","statusline-setup","Explore","Plan"],"skills":["keybindings-help","debug","simplify","batch","loop","claude-api"],"plugins":[],"uuid":"94f3c246-d33b-47b9-a9e7-59d5fc1b3527","fast_mode_state":"off"}
-{"type":"assistant","message":{"model":"claude-opus-4-6","id":"msg_0172n5gp4M2814JV91mWvcJR","type":"message","role":"assistant","content":[{"type":"text","text":"OK"}],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":2,"cache_creation_input_tokens":8304,"cache_read_input_tokens":6371,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":8304},"output_tokens":1,"service_tier":"standard","inference_geo":"not_available"},"context_management":null},"parent_tool_use_id":null,"session_id":"af1ca5c0-beb9-4ba6-b616-6f1f9e05a187","uuid":"0f2fe5ca-03f3-42bc-a081-8c33d924dbf8"}
+{"type":"system","subtype":"init","cwd":"/tmp/project","session_id":"af1ca5c0-beb9-4ba6-b616-6f1f9e05a187","tools":["Task","TaskOutput","Bash","Glob","Grep","ExitPlanMode","Read","Edit","Write","NotebookEdit","WebFetch","TodoWrite","WebSearch","TaskStop","AskUserQuestion","Skill","EnterPlanMode","EnterWorktree","ExitWorktree","CronCreate","CronDelete","CronList","ToolSearch"],"mcp_servers":[],"model":"claude-opus-4-7","permissionMode":"bypassPermissions","slash_commands":["keybindings-help","debug","simplify","batch","loop","claude-api","compact","context","cost","heapdump","init","pr-comments","release-notes","review","security-review","extra-usage","insights"],"apiKeySource":"none","claude_code_version":"2.1.73","output_style":"default","agents":["general-purpose","statusline-setup","Explore","Plan"],"skills":["keybindings-help","debug","simplify","batch","loop","claude-api"],"plugins":[],"uuid":"94f3c246-d33b-47b9-a9e7-59d5fc1b3527","fast_mode_state":"off"}
+{"type":"assistant","message":{"model":"claude-opus-4-7","id":"msg_0172n5gp4M2814JV91mWvcJR","type":"message","role":"assistant","content":[{"type":"text","text":"OK"}],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":2,"cache_creation_input_tokens":8304,"cache_read_input_tokens":6371,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":8304},"output_tokens":1,"service_tier":"standard","inference_geo":"not_available"},"context_management":null},"parent_tool_use_id":null,"session_id":"af1ca5c0-beb9-4ba6-b616-6f1f9e05a187","uuid":"0f2fe5ca-03f3-42bc-a081-8c33d924dbf8"}
 {"type":"rate_limit_event","rate_limit_info":{"status":"allowed","resetsAt":1773288000,"rateLimitType":"five_hour","overageStatus":"rejected","overageDisabledReason":"org_level_disabled","isUsingOverage":false},"uuid":"795f7ca1-d600-4d9f-b718-477f0491e058","session_id":"af1ca5c0-beb9-4ba6-b616-6f1f9e05a187"}
-{"type":"result","subtype":"success","is_error":false,"duration_ms":1266,"duration_api_ms":1249,"num_turns":1,"result":"OK","stop_reason":"end_turn","session_id":"af1ca5c0-beb9-4ba6-b616-6f1f9e05a187","total_cost_usd":0.0551955,"usage":{"input_tokens":2,"cache_creation_input_tokens":8304,"cache_read_input_tokens":6371,"output_tokens":4,"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":"standard","cache_creation":{"ephemeral_1h_input_tokens":8304,"ephemeral_5m_input_tokens":0},"inference_geo":"","iterations":[],"speed":"standard"},"modelUsage":{"claude-opus-4-6":{"inputTokens":2,"outputTokens":4,"cacheReadInputTokens":6371,"cacheCreationInputTokens":8304,"webSearchRequests":0,"costUSD":0.0551955,"contextWindow":200000,"maxOutputTokens":32000}},"permission_denials":[],"fast_mode_state":"off","uuid":"40c57907-8a80-46ec-98b2-20058a8adfde"}
+{"type":"result","subtype":"success","is_error":false,"duration_ms":1266,"duration_api_ms":1249,"num_turns":1,"result":"OK","stop_reason":"end_turn","session_id":"af1ca5c0-beb9-4ba6-b616-6f1f9e05a187","total_cost_usd":0.0551955,"usage":{"input_tokens":2,"cache_creation_input_tokens":8304,"cache_read_input_tokens":6371,"output_tokens":4,"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":"standard","cache_creation":{"ephemeral_1h_input_tokens":8304,"ephemeral_5m_input_tokens":0},"inference_geo":"","iterations":[],"speed":"standard"},"modelUsage":{"claude-opus-4-7":{"inputTokens":2,"outputTokens":4,"cacheReadInputTokens":6371,"cacheCreationInputTokens":8304,"webSearchRequests":0,"costUSD":0.0551955,"contextWindow":200000,"maxOutputTokens":32000}},"permission_denials":[],"fast_mode_state":"off","uuid":"40c57907-8a80-46ec-98b2-20058a8adfde"}
 """
 
 CLAUDE_RATE_LIMIT_STREAM_JSON = """\
-{"type":"system","subtype":"init","cwd":"/tmp","session_id":"quota-session","model":"claude-opus-4-6"}
+{"type":"system","subtype":"init","cwd":"/tmp","session_id":"quota-session","model":"claude-opus-4-7"}
 {"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":2000000000,"rateLimitType":"five_hour","overageStatus":"rejected","overageDisabledReason":"org_level_disabled","isUsingOverage":false},"uuid":"rate-limit-1","session_id":"quota-session"}
 {"type":"assistant","message":{"id":"quota-msg","container":null,"model":"<synthetic>","role":"assistant","stop_reason":"stop_sequence","stop_sequence":"","type":"message","usage":{"input_tokens":0,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":null,"cache_creation":{"ephemeral_1h_input_tokens":0,"ephemeral_5m_input_tokens":0},"inference_geo":null,"iterations":null,"speed":null},"content":[{"type":"text","text":"You've hit your limit · resets 12am (America/New_York)"}],"context_management":null},"parent_tool_use_id":null,"session_id":"quota-session","uuid":"quota-assistant","error":"rate_limit"}
 {"type":"result","subtype":"success","is_error":true,"duration_ms":166,"duration_api_ms":0,"num_turns":1,"result":"You've hit your limit · resets 12am (America/New_York)","stop_reason":"stop_sequence","session_id":"quota-session","total_cost_usd":0,"usage":{"input_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":0,"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":"standard","cache_creation":{"ephemeral_1h_input_tokens":0,"ephemeral_5m_input_tokens":0},"inference_geo":"","iterations":[],"speed":"standard"},"modelUsage":{},"permission_denials":[],"fast_mode_state":"off","uuid":"quota-result"}
@@ -35,7 +35,7 @@ def make_runner(tmp_dir: Path) -> runner_module.NovelPipelineRunner:
     default_profile = runner_module.ExecutionProfile(
         provider="claude",
         agent_bin="claude",
-        model="claude-opus-4-6",
+        model="claude-opus-4-7",
         reasoning_effort="max",
     )
     cfg = runner_module.RunnerConfig(
@@ -57,7 +57,7 @@ def make_runner(tmp_dir: Path) -> runner_module.NovelPipelineRunner:
         max_parallel_revisions=1,
         provider="claude",
         agent_bin="claude",
-        model="claude-opus-4-6",
+        model="claude-opus-4-7",
         reasoning_effort="max",
         stage_profiles={
             stage_group: default_profile
@@ -1247,6 +1247,9 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 "not_x_y_count": "45",
                 "personified_abstraction_count": "12",
                 "abstract_noun_subject_count": "7",
+                "simile_count": "11",
+                "as_if_count": "4",
+                "the_way_x_count": "3",
                 "redundancy_findings": [
                     {
                         "finding_id": "DUPLICATE_ID",
@@ -1288,6 +1291,10 @@ class ClaudeCliParsingTests(unittest.TestCase):
             self.assertEqual(repaired["not_x_y_count"], 45)
             self.assertEqual(repaired["personified_abstraction_count"], 12)
             self.assertEqual(repaired["abstract_noun_subject_count"], 7)
+            self.assertEqual(repaired["simile_count"], 11)
+            self.assertEqual(repaired["as_if_count"], 4)
+            self.assertEqual(repaired["the_way_x_count"], 3)
+            self.assertEqual(repaired["pacing_mismatch_count"], 0)
             self.assertEqual(repaired["redundancy_findings"][0]["category"], "redundancy")
             self.assertEqual(repaired["redundancy_findings"][0]["chapter_id"], "chapter_01")
             self.assertEqual(
@@ -1306,6 +1313,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 repaired["consistency_findings"][0]["category"],
                 "consistency",
             )
+            self.assertEqual(repaired["pacing_mismatch_findings"], [])
             preserved = (
                 run_dir
                 / "reviews"
@@ -2873,8 +2881,19 @@ class ClaudeCliParsingTests(unittest.TestCase):
                     "must_land_beats": [f"beat {chapter_number}"],
                 }
                 if chapter_number == 1:
+                    row["plot_importance"] = "primary"
                     row["secondary_character_beats"] = [
                         "Let the desk clerk's private panic leak through her efficiency."
+                    ]
+                    row["beat_budget"] = [
+                        {"beat": "opening", "target_words": 180, "importance": "bridge"},
+                        {"beat": f"beat {chapter_number}", "target_words": 640, "importance": "primary"},
+                        {
+                            "beat": "Let the desk clerk's private panic leak through her efficiency.",
+                            "target_words": 120,
+                            "importance": "secondary",
+                        },
+                        {"beat": "closing", "target_words": 60, "importance": "bridge"},
                     ]
                     row["setups_to_plant"] = [
                         {
@@ -2890,6 +2909,14 @@ class ClaudeCliParsingTests(unittest.TestCase):
                             "description": "Reveal why the torn survey map matters now.",
                             "seeded_by": ["chapter_03"],
                             "payoff_type": "reveal",
+                        }
+                    ]
+                    row["reader_introductions"] = [
+                        {
+                            "concept_id": "town_quarantine_rule",
+                            "kind": "world_rule",
+                            "first_or_refresh": "first",
+                            "target_legibility": "grounded",
                         }
                     ]
                 rows.append(json.dumps(row))
@@ -2957,6 +2984,12 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 chapter_spec_json["secondary_character_beats"],
                 ["Let the desk clerk's private panic leak through her efficiency."],
             )
+            self.assertEqual(chapter_spec_json["plot_importance"], "primary")
+            self.assertEqual(chapter_spec_json["beat_budget"][1]["beat"], "beat 1")
+            self.assertEqual(
+                chapter_spec_json["reader_introductions"][0]["concept_id"],
+                "town_quarantine_rule",
+            )
             self.assertEqual(chapter_spec_json["opening_situation"], "Opening situation 1")
             self.assertEqual(chapter_spec_json["closing_state"], "Closing state 1")
             self.assertEqual(chapter_spec_json["chronology_anchor"], "immediate")
@@ -2981,6 +3014,20 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 ["Let the desk clerk's private panic leak through her efficiency."],
             )
             self.assertEqual(
+                static_story_context["chapter_spine"][0]["plot_importance"],
+                "primary",
+            )
+            self.assertEqual(
+                static_story_context["chapter_spine"][0]["beat_budget"][0]["beat"],
+                "opening",
+            )
+            self.assertEqual(
+                static_story_context["chapter_spine"][0]["reader_introductions"][0][
+                    "target_legibility"
+                ],
+                "grounded",
+            )
+            self.assertEqual(
                 static_story_context["chapter_spine"][0]["setups_to_plant"][0]["setup_id"],
                 "desk_clerk_panic",
             )
@@ -2997,6 +3044,16 @@ class ClaudeCliParsingTests(unittest.TestCase):
             self.assertEqual(
                 global_cycle_context["chapter_spine"][0]["setups_to_plant"][0]["setup_id"],
                 "desk_clerk_panic",
+            )
+            self.assertEqual(
+                global_cycle_context["chapter_spine"][0]["reader_introductions"][0][
+                    "first_or_refresh"
+                ],
+                "first",
+            )
+            self.assertEqual(
+                global_cycle_context["chapter_spine"][0]["beat_budget"][2]["importance"],
+                "secondary",
             )
 
             boundary_context = json.loads(
@@ -3015,6 +3072,12 @@ class ClaudeCliParsingTests(unittest.TestCase):
             self.assertEqual(
                 boundary_context["payoffs_to_land"][0]["setup_id"],
                 "old_map_tear",
+            )
+            self.assertEqual(boundary_context["plot_importance"], "primary")
+            self.assertEqual(boundary_context["beat_budget"][3]["beat"], "closing")
+            self.assertEqual(
+                boundary_context["reader_introductions"][0]["kind"],
+                "world_rule",
             )
             self.assertEqual(
                 boundary_context["secondary_character_beats"],
@@ -3775,11 +3838,20 @@ class ClaudeCliParsingTests(unittest.TestCase):
             }
 
             repaired, _repairs = runner._repair_style_bible_data(style_bible)
+            self.assertTrue(
+                repaired["character_voice_profiles"][0]["first_appearance_tag"]
+            )
             self.assertEqual(
                 repaired["dialogue_rules"]["max_consecutive_low_info_replies"], 2
             )
             self.assertEqual(
                 repaired["prose_style_profile"]["default_narrator_mode"], "transparent"
+            )
+            self.assertEqual(
+                repaired["prose_style_profile"]["exposition_density_policy"][
+                    "commonsense_detail_floor"
+                ],
+                "moderate",
             )
             runner._validate_style_bible_data(repaired, "outline/style_bible.json")
 
@@ -3837,6 +3909,13 @@ class ClaudeCliParsingTests(unittest.TestCase):
             profile = repaired["character_voice_profiles"][0]
             self.assertEqual(
                 repaired["dialogue_rules"]["focalizer_dialogue_interiority"], "moderate"
+            )
+            self.assertTrue(profile["first_appearance_tag"])
+            self.assertEqual(
+                repaired["prose_style_profile"]["exposition_density_policy"][
+                    "world_concept_explanation_mode"
+                ],
+                "brief-on-first-use",
             )
             self.assertEqual(
                 profile["interpretive_lens"], "Reads delay as concealed risk"
@@ -5393,6 +5472,9 @@ class ClaudeCliParsingTests(unittest.TestCase):
                         "not_x_y_count": 45,
                         "personified_abstraction_count": 9,
                         "abstract_noun_subject_count": 18,
+                        "simile_count": 14,
+                        "as_if_count": 5,
+                        "the_way_x_count": 6,
                         "redundancy_findings": [],
                         "consistency_findings": [],
                     }
@@ -5424,6 +5506,10 @@ class ClaudeCliParsingTests(unittest.TestCase):
                     "not_x_y_count": 45,
                     "personified_abstraction_count": 9,
                     "abstract_noun_subject_count": 18,
+                    "simile_count": 14,
+                    "as_if_count": 5,
+                    "the_way_x_count": 6,
+                    "pacing_mismatch_count": 0,
                 },
             )
 
@@ -6318,6 +6404,53 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 [row["cycle"] for row in final_report["gate_history"]],
                 [1, 2],
             )
+
+    def test_post_revision_lint_writes_report_and_refreshes_snapshot_after_autofix(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_post_revision_lint_", dir="/tmp") as tmp:
+            runner = make_runner(Path(tmp))
+            runner.chapter_specs = [
+                runner_module.ChapterSpec(
+                    chapter_id="chapter_01",
+                    chapter_number=1,
+                    projected_min_words=1000,
+                    chapter_engine="discovery",
+                    pressure_source="pressure",
+                    state_shift="shift",
+                    texture_mode="hot",
+                    scene_count_target=2,
+                    scene_count_target_explicit=True,
+                    must_land_beats=["beat"],
+                )
+            ]
+            run_dir = runner.cfg.run_dir
+            (run_dir / "chapters").mkdir(parents=True, exist_ok=True)
+            (run_dir / "chapters" / "chapter_01.md").write_text(
+                '# Chapter 1\n\n- Accidental bullet in prose.\n"What do you mean," she said.\n',
+                encoding="utf-8",
+            )
+
+            runner._assemble_post_revision_snapshot(1)
+            summary = runner._run_post_revision_lint(1)
+
+            self.assertEqual(summary["status"], "complete")
+            self.assertEqual(summary["auto_fix_count"], 1)
+            self.assertEqual(summary["blocking_finding_count"], 1)
+            lint_report = json.loads(
+                (run_dir / "logs" / "cycle_01" / "lint_report.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(
+                lint_report["summary"]["blocking_finding_count"],
+                1,
+            )
+            chapter_text = (run_dir / "chapters" / "chapter_01.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("Accidental bullet in prose.", chapter_text)
+            self.assertNotIn("- Accidental bullet in prose.", chapter_text)
+            compiled_text = (run_dir / "FINAL_NOVEL.md").read_text(encoding="utf-8")
+            self.assertIn("Accidental bullet in prose.", compiled_text)
 
     def test_write_quality_summary_persists_advisory_cycle_summary(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_quality_summary_", dir="/tmp") as tmp:
@@ -7252,7 +7385,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
         cfg = runner_module.build_config(REPO_ROOT, args)
         self.assertEqual(cfg.stage_profiles["review"].provider, "codex")
         self.assertEqual(cfg.stage_profiles["full_review"].provider, "claude")
-        self.assertEqual(cfg.stage_profiles["full_review"].model, "claude-opus-4-6")
+        self.assertEqual(cfg.stage_profiles["full_review"].model, "claude-opus-4-7")
         self.assertEqual(cfg.stage_profiles["full_review"].reasoning_effort, "max")
 
     def test_build_config_supports_stage_specific_provider_overrides(self) -> None:
@@ -7479,7 +7612,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
             claude_profile = runner_module.ExecutionProfile(
                 provider="claude",
                 agent_bin="claude",
-                model="claude-opus-4-6",
+                model="claude-opus-4-7",
                 reasoning_effort="max",
             )
             stage_profiles = {
@@ -7629,7 +7762,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 prompt_text="test",
                 provider="claude",
                 agent_bin="claude",
-                model="claude-opus-4-6",
+                model="claude-opus-4-7",
                 reasoning_effort="max",
             )
             cmd = runner._build_claude_exec_cmd(job)
@@ -7641,7 +7774,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
             self.assertIn("--no-session-persistence", cmd)
             self.assertIn("--dangerously-skip-permissions", cmd)
             self.assertIn("--model", cmd)
-            self.assertIn("claude-opus-4-6", cmd)
+            self.assertIn("claude-opus-4-7", cmd)
             self.assertIn("--effort", cmd)
             self.assertIn("max", cmd)
 
@@ -7707,7 +7840,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 max_parallel_revisions=runner.cfg.max_parallel_revisions,
                 provider="claude",
                 agent_bin="claude",
-                model="claude-opus-4-6",
+                model="claude-opus-4-7",
                 reasoning_effort="max",
                 stage_profiles=runner.cfg.stage_profiles,
                 revision_pass_profiles=runner.cfg.revision_pass_profiles,
@@ -7746,7 +7879,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 prompt_text="test prompt",
                 provider="claude",
                 agent_bin="claude",
-                model="claude-opus-4-6",
+                model="claude-opus-4-7",
                 reasoning_effort="max",
             )
             with mock.patch.object(runner_module.time, "sleep") as sleep_mock:
@@ -7766,7 +7899,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
             claude_profile = runner_module.ExecutionProfile(
                 provider="claude",
                 agent_bin="claude",
-                model="claude-opus-4-6",
+                model="claude-opus-4-7",
                 reasoning_effort="max",
             )
             runner.cfg = runner_module.RunnerConfig(
@@ -7828,7 +7961,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
             self.assertEqual(p1_job.provider, "codex")
             self.assertEqual(p1_job.model, "gpt-5.4")
             self.assertEqual(p2_job.provider, "claude")
-            self.assertEqual(p2_job.model, "claude-opus-4-6")
+            self.assertEqual(p2_job.model, "claude-opus-4-7")
 
 
 if __name__ == "__main__":

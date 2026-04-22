@@ -2,11 +2,12 @@ You are running CROSS-CHAPTER AUDIT for cycle `{{CYCLE_PADDED}}`.
 
 Inputs:
 1. Full manuscript snapshot: `{{FULL_NOVEL_FILE}}`
-2. Continuity sheet: `{{CONTINUITY_SHEET_FILE}}`
-3. Style bible: `outline/style_bible.json`
-4. Novel outline: `outline/outline.md`
-5. Spatial layout: `{{SPATIAL_LAYOUT_FILE}}`
-6. Constitution: `config/constitution.md`
+2. Chapter specs: `outline/chapter_specs.jsonl`
+3. Continuity sheet: `{{CONTINUITY_SHEET_FILE}}`
+4. Style bible: `outline/style_bible.json`
+5. Novel outline: `outline/outline.md`
+6. Spatial layout: `{{SPATIAL_LAYOUT_FILE}}`
+7. Constitution: `config/constitution.md`
 
 Context isolation requirement:
 1. Do not read prior cycle reviews, revision reports, or gate files.
@@ -66,6 +67,10 @@ Checks 1-2 below define the CRITERIA for character re-introduction and setting r
 4b. Count `"It wasn't X. It was Y"`, `"It was not X. It was Y"`, and `"Not X. Y."` constructions across the manuscript. Report the total as `not_x_y_count`. Threshold: 4 per book. Emit one finding per affected chapter where the pattern materially contributes to the overuse.
 4c. Count personification-of-abstraction constructions where an abstract noun is the grammatical subject performing a physical or human action. Report the total as `personified_abstraction_count`. Threshold: 8 per book. Emit one finding per affected chapter where the pattern materially contributes to the overuse.
 4d. Count sentences where the grammatical subject is an abstract noun from this list: loss, grief, silence, absence, pain, weight, truth, fear, relief, anger, shame, dread, hope, loneliness, exhaustion, meaning, distance, cost, power. Report the total as `abstract_noun_subject_count`. This is a recurrence signal, not a finding, and does not carry severity by itself.
+4e. Count figurative similes in prose lines and report the total as `simile_count`. Use exact tool-based counting. Focus on `like`- and comparison-based similes in narration, excluding dialogue, headings, and fixed-phrase predicate usages that are not functioning as comparisons. Threshold: about 1 per 1200 prose words book-wide. Emit one finding per affected chapter for chapters materially contributing above that rate, citing the strongest local instances and directing revision toward literal description unless the comparison is specific to the focalizer.
+4f. Count `as if` constructions in prose lines and report the total as `as_if_count`. Use exact tool-based counting. Threshold: 1 per 2000 prose words. Emit one finding per affected chapter when the chapter materially contributes to the overuse, naming which instances should be cut or converted to literal observation.
+4g. Count `the way` comparison templates in prose lines and report the total as `the_way_x_count`. Target constructions such as `the way he`, `the way she`, `the way they`, `the way you`, `the way someone`, and `the way people` followed by a verb phrase that functions as filler comparison rather than scene-specific recognition. Threshold: 4 per book. Emit one finding per affected chapter when the chapter materially contributes to the overuse, and direct revision toward literal description of what the focalizer actually sees.
+4h. Voice convergence. Use exact grep-based evidence to scan for dominant sarcasm/wry-deflection lexical patterns across named speaking characters — for example `dry`, `dryly`, `deadpan`, `wry`, `wryly`, rhetorical `really?`, `sure`, `right`, and `"not that"` minimizations. If more than 2 named characters share the same register density without clear support from `outline/style_bible.json`, emit a MEDIUM finding per affected chapter identifying which character voice should be recentered to their style-bible fields (`public_register`, `private_register`, `indirectness`, `evasion_style`).
 5. Em-dash and punctuation density. Count prose lines containing at least one em-dash (`—`). Compute density as em-dash-containing prose lines divided by total prose lines. If manuscript-wide density exceeds 10%, emit one finding for EVERY chapter whose own em-dash density materially exceeds 10%, not just the worst offenders. Chapters far above threshold may be HIGH; lesser but still noncompliant chapters may be MEDIUM. Each finding should give that chapter a concrete target that contributes to bringing manuscript-wide density below 8%.
 6. Sentence-opener monotony. Count sentences beginning with common pronouns such as `He`, `She`, `They`, `I`, and `It`. Compute density as pronoun-opener sentences divided by total sentences. If any single pronoun opener exceeds 7% of total sentences manuscript-wide, emit one finding for EVERY chapter whose local contribution materially exceeds 7% for that opener or otherwise makes that manuscript-wide pattern worse.
 7. Near-verbatim passages. Search for repeated multi-word sequences across chapter boundaries. A near-verbatim match is any passage of 10+ consecutive content words that appears in substantially the same form in more than one chapter, allowing minor inflection changes but not semantic rewording. This includes chapter-seam recaps and repeated scene-entry templates.
@@ -80,11 +85,12 @@ PART B — Consistency audit:
 6. Knowledge state. Track what each character knows and when they learn it. Flag action taken on not-yet-acquired knowledge or failure to act on already-acquired knowledge when that failure reads like a continuity bug rather than a dramatic choice.
 7. World rules and mechanism continuity. Track recurring world mechanisms, institutional processes, and governing rules established in the novel. Flag unexplained changes in operation.
 8. Progressive state tracking. Track significant characters' evolving capabilities, possessions, relationships, and knowledge chapter by chapter. Flag newly invoked capabilities or states that were not yet established, and established capabilities or possessions that disappear without explanation.
+9. Pacing mismatch against `beat_budget`. Use `outline/chapter_specs.jsonl` and compare each chapter's actual rendered length against its declared `beat_budget` and `plot_importance`. When non-primary beats (importance `secondary` or `bridge`) render at more than 1.5x their `target_words`, emit a `pacing_mismatch_findings` entry for that chapter. This is specifically for cases where side-business swallows the chapter's primary dramatic work. Each entry must include `finding_id`, `chapter_id`, `beat`, `importance`, `target_words`, `actual_words`, `evidence`, `severity`, `problem`, `rewrite_direction`, and `acceptance_test`. Count these in `pacing_mismatch_count`.
 
 Output requirements:
 1. Write exactly one JSON object to `{{CROSS_CHAPTER_AUDIT_FILE}}`.
 2. Use the current contract exactly. `cycle` must be the unquoted integer `{{CYCLE_INT}}`.
-3. Always include `not_x_y_count`, `personified_abstraction_count`, and `abstract_noun_subject_count` as non-negative integers, even when they are zero.
+3. Always include `not_x_y_count`, `personified_abstraction_count`, `abstract_noun_subject_count`, `simile_count`, `as_if_count`, `the_way_x_count`, and `pacing_mismatch_count` as non-negative integers, even when they are zero.
 4. Every finding must use `chapter_XX`, never shorthand.
 5. Use `rewrite_direction`, not legacy names like `revision_directive`.
 6. `evidence` must be a single string; flatten multiple citations into one semicolon-separated string.
@@ -95,8 +101,13 @@ Output requirements:
 3. `not_x_y_count` (int, >= 0)
 4. `personified_abstraction_count` (int, >= 0)
 5. `abstract_noun_subject_count` (int, >= 0)
-6. `redundancy_findings` (array)
-7. `consistency_findings` (array)
+6. `simile_count` (int, >= 0)
+7. `as_if_count` (int, >= 0)
+8. `the_way_x_count` (int, >= 0)
+9. `pacing_mismatch_count` (int, >= 0)
+10. `redundancy_findings` (array)
+11. `consistency_findings` (array)
+12. `pacing_mismatch_findings` (array)
 
 Each finding object must include:
 1. `finding_id`
@@ -108,6 +119,19 @@ Each finding object must include:
 7. `problem`
 8. `rewrite_direction`
 9. `acceptance_test`
+
+Each `pacing_mismatch_findings` object must include:
+1. `finding_id`
+2. `chapter_id`
+3. `beat`
+4. `importance` (`primary|secondary|bridge`)
+5. `target_words`
+6. `actual_words`
+7. `evidence`
+8. `severity`
+9. `problem`
+10. `rewrite_direction`
+11. `acceptance_test`
 
 Finding quality requirements:
 1. `problem` for redundancy findings must identify the earlier establishment location or strongest retained instance.

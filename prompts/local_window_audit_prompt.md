@@ -41,6 +41,7 @@ P9. `tonal_mismatch`: the emotional register shifts so abruptly at a chapter bou
 P10. `reader_confusion`: anything that would make a reader pause in unintentional confusion. Deliberate mystery and ambiguity are fine; accidental opacity is not.
 P11. `composed_seam_prose`: at a chapter boundary, the exit or entry sentence uses narrator performance, thematic summary, aphoristic contrast, or over-composed prose that would read better as transparent scene description. If a chapter ends with "Pain taught better when it wasn't being watched" or opens with "By noon he had learned another road fact: injury made distance dishonest," flag it here as a seam problem rather than letting the prose performance slide past the boundary.
 P12. `conversation_redundancy`: at a chapter boundary, a moral argument, emotional reckoning, revealed wound, or relational confrontation in the later chapter substantially restages one already landed in the earlier chapter — same characters examining the same ground, same emotional weight — without materially new evidence, consequence, or changed power relationship that alters the reader's understanding of the wound. Flag the later chapter.
+P13. `prop_state_continuity`: flag any object whose `per_chapter_state` transitions are non-monotonic, mutually incompatible, or physically impossible across this window, or any character whose blocking contradicts across a boundary. Use the continuity sheet as the canonical reference, but judge whether the prose actually supports the transition.
 
 After the pre-scan, evaluate structural and momentum issues using these ten categories:
 
@@ -51,7 +52,7 @@ After the pre-scan, evaluate structural and momentum issues using these ten cate
 5d. `information_flow`: information firehose, local stall, or setup/payoff failures whose payoff belongs inside this window.
 5e. `boundary_local_voice_drift`: dialogue or narration voice drift across adjacent chapters or POV shifts.
 5f. `redundant_scene_functions`: chapters serving the same narrative function or adjacent-chapter re-description and re-orientation.
-5g. `cross_chapter_prose_patterns`: the same somatic descriptor, metaphor, descriptive inventory, formulaic construction, or character-associated repetitive action recurring across adjacent chapters.
+5g. `cross_chapter_prose_patterns`: the same descriptor, object-state mention, location beat, sensory motif, metaphor, formulaic construction, or character-associated repetitive action recurring across adjacent chapters. Flag this when a specific descriptor or motif recurs 3 or more times within this 4-chapter window without each recurrence changing pressure, leverage, or meaning on the page. Two occurrences can read as deliberate recurrence; three or more in a short window reads as autopilot. Evidence must list every occurrence with `{{FULL_NOVEL_FILE}}:<line>` citations.
 5h. `repetitive_scene_dynamics`: adjacent chapters restaging the same interpersonal dynamic, appeal/response shape, or obstacle pattern without changed terms.
 5i. `character_decision_coherence`: decisions or behavior that contradict adjacent-chapter knowledge, personality, or goals without explanation.
 5j. `reading_momentum`: the specific chapter where the window fails to create new pressure, new information, changed leverage, cumulative intensification, or a distinct terminal state.

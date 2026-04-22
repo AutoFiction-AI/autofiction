@@ -19,6 +19,7 @@
           "private_register",
           "syntax_signature",
           "lexical_signature",
+          "first_appearance_tag",
           "forbidden_generic_lines",
           "stress_tells",
           "profanity_profile",
@@ -32,6 +33,7 @@
         ],
         "properties": {
           "character_id": { "type": "string", "minLength": 1 },
+          "first_appearance_tag": { "type": "string", "minLength": 1 },
           "public_register": { "type": "string", "minLength": 1 },
           "private_register": { "type": "string", "minLength": 1 },
           "syntax_signature": { "type": "string", "minLength": 1 },
@@ -115,6 +117,7 @@
         "sensory_bias",
         "diction",
         "forbidden_drift_patterns",
+        "exposition_density_policy",
         "chapter_texture_variance"
       ],
       "properties": {
@@ -135,6 +138,32 @@
           "type": "array",
           "minItems": 1,
           "items": { "type": "string", "minLength": 1 }
+        },
+        "exposition_density_policy": {
+          "type": "object",
+          "required": [
+            "commonsense_detail_floor",
+            "world_concept_explanation_mode",
+            "genre_norm",
+            "operational_rubric"
+          ],
+          "properties": {
+            "commonsense_detail_floor": {
+              "type": "string",
+              "enum": ["sparse", "moderate", "dense"]
+            },
+            "world_concept_explanation_mode": {
+              "type": "string",
+              "enum": [
+                "embedded-in-experience",
+                "brief-on-first-use",
+                "operational-on-first-use"
+              ]
+            },
+            "genre_norm": { "type": "string", "minLength": 1 },
+            "operational_rubric": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": true
         },
         "chapter_texture_variance": {
           "type": "string",

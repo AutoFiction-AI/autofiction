@@ -23,6 +23,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import lint_chapter_text as lint_module
+
 
 def _env_non_negative_int(name: str, default: int) -> int:
     raw = os.environ.get(name, "")
@@ -48,6 +50,21 @@ SCENE_PLAN_HEADER_WITH_UNDERCURRENT = (
     "scene_id\tchapter_id\tscene_order\tobjective\topposition\tturn\tconsequence_cost\ttension_peak\tundercurrent"
 )
 FOCALIZER_DIALOGUE_INTERIORITY_VALUES = {"high", "moderate", "low"}
+READER_INTRODUCTION_KIND_VALUES = {
+    "world_rule",
+    "jargon",
+    "relationship",
+    "setting",
+}
+READER_INTRODUCTION_REFRESH_VALUES = {"first", "refresh"}
+READER_INTRODUCTION_LEGIBILITY_VALUES = {"sketched", "grounded", "operational"}
+PLOT_IMPORTANCE_VALUES = {"primary", "secondary", "bridge"}
+EXPOSITION_COMMONSENSE_DETAIL_FLOOR_VALUES = {"sparse", "moderate", "dense"}
+WORLD_CONCEPT_EXPLANATION_MODE_VALUES = {
+    "embedded-in-experience",
+    "brief-on-first-use",
+    "operational-on-first-use",
+}
 STAGE_GROUP_VALUES = (
     "premise",
     "outline",
@@ -85,7 +102,7 @@ PRIMARY_REVIEW_LENS = "award"
 PRIMARY_GLOBAL_FINDING_SOURCE = "award_global"
 DEFAULT_MODEL_BY_PROVIDER = {
     "codex": "gpt-5.4",
-    "claude": "claude-opus-4-6",
+    "claude": "claude-opus-4-7",
 }
 DEFAULT_REASONING_EFFORT_BY_PROVIDER = {
     "codex": "xhigh",
@@ -518,6 +535,10 @@ CROSS_CHAPTER_AUDIT_METRIC_KEYS = (
     "not_x_y_count",
     "personified_abstraction_count",
     "abstract_noun_subject_count",
+    "simile_count",
+    "as_if_count",
+    "the_way_x_count",
+    "pacing_mismatch_count",
 )
 LOCAL_WINDOW_PASS_HINT_BY_CATEGORY = {
     "pre_scan": "p1_structural_craft",
@@ -572,12 +593,18 @@ class ProviderQuotaPause(PipelineError):
         reset_at_epoch: int,
         sleep_seconds: int,
         rate_limit_type: str | None,
+        overage_status: str | None = None,
+        overage_disabled_reason: str | None = None,
+        is_using_overage: bool | None = None,
     ) -> None:
         self.provider = provider
         self.result_text = result_text
         self.reset_at_epoch = reset_at_epoch
         self.sleep_seconds = sleep_seconds
         self.rate_limit_type = rate_limit_type or ""
+        self.overage_status = overage_status or ""
+        self.overage_disabled_reason = overage_disabled_reason or ""
+        self.is_using_overage = is_using_overage
         super().__init__(result_text or f"{provider} quota exhausted")
 
 
@@ -601,6 +628,9 @@ class ChapterSpec:
     secondary_character_beats: list[str] = field(default_factory=list)
     setups_to_plant: list[dict[str, Any]] = field(default_factory=list)
     payoffs_to_land: list[dict[str, Any]] = field(default_factory=list)
+    reader_introductions: list[dict[str, str]] = field(default_factory=list)
+    plot_importance: str = "secondary"
+    beat_budget: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def objective(self) -> str:
@@ -761,10 +791,25 @@ class NovelPipelineRunner:
     def run(self) -> int:
         self._log(f"run_dir={self.run_dir}")
         self._log(f"validation_mode={self.cfg.validation_mode}")
+        run_t0 = time.time()
+        self._log("stage=prepare_run_dir status=started")
         self._prepare_run_dir()
+        self._log(f"stage=prepare_run_dir status=done elapsed={time.time() - run_t0:.1f}s")
+
+        t0 = time.time()
+        self._log("stage=resolve_premise status=started")
         self._resolve_premise()
+        self._log(f"stage=resolve_premise status=done elapsed={time.time() - t0:.1f}s")
+
+        t0 = time.time()
+        self._log("stage=outline status=started")
         self._run_outline_stage()
+        self._log(f"stage=outline status=done elapsed={time.time() - t0:.1f}s")
+
+        t0 = time.time()
+        self._log("stage=draft status=started")
         self._run_draft_stage()
+        self._log(f"stage=draft status=done elapsed={time.time() - t0:.1f}s")
 
         gate_records: list[dict[str, Any]] = []
         success_cycle: int | None = None
@@ -779,7 +824,9 @@ class NovelPipelineRunner:
             )
 
         for cycle in range(start_cycle, self.cfg.max_cycles + 1):
+            cycle_t0 = time.time()
             cpad = self._cpad(cycle)
+            self._log(f"cycle={cpad} status=started")
             existing_cycle_status = self._load_existing_cycle_status(cycle)
             if existing_cycle_status is None:
                 cycle_status = self._new_cycle_status(cycle)
@@ -984,6 +1031,8 @@ class NovelPipelineRunner:
                     ],
                 )
                 self._write_cycle_status(cycle, cycle_status)
+                self._log(f"cycle={cpad} stage=post_revision_lint")
+                self._run_post_revision_lint(cycle)
                 self._log(f"cycle={cpad} stage=continuity_reconciliation")
                 continuity_result = self._run_continuity_reconciliation(cycle)
                 continuity_status = "complete"
@@ -1074,6 +1123,8 @@ class NovelPipelineRunner:
                 ],
             )
             self._write_cycle_status(cycle, cycle_status)
+            self._log(f"cycle={cpad} stage=post_revision_lint")
+            self._run_post_revision_lint(cycle)
             self._log(f"cycle={cpad} stage=continuity_reconciliation")
             continuity_result = self._run_continuity_reconciliation(cycle)
             continuity_status = "complete"
@@ -1196,6 +1247,9 @@ class NovelPipelineRunner:
 
     def _cross_chapter_audit_rel(self, cycle: int) -> str:
         return f"reviews/cycle_{self._cpad(cycle)}/cross_chapter_audit.json"
+
+    def _lint_report_rel(self, cycle: int) -> str:
+        return f"logs/cycle_{self._cpad(cycle)}/lint_report.json"
 
     def _write_run_config(self) -> None:
         existing_payload: dict[str, Any] = {}
@@ -4310,6 +4364,7 @@ class NovelPipelineRunner:
                 chapter_spec_file,
                 global_context_file,
                 boundary_context_file,
+                "outline/outline.md",
                 "outline/style_bible.json",
                 continuity_sheet_file,
                 "config/constitution.md",
@@ -4605,6 +4660,7 @@ class NovelPipelineRunner:
                 )
                 audit_inputs = [
                     self.run_dir / full_novel_file,
+                    self.run_dir / "outline" / "chapter_specs.jsonl",
                     self.run_dir / continuity_sheet_file,
                     self.run_dir / "outline" / "style_bible.json",
                     self.run_dir / "outline" / "outline.md",
@@ -4782,6 +4838,7 @@ class NovelPipelineRunner:
             chapter_id=None,
             allowed_inputs=[
                 full_novel_file,
+                "outline/chapter_specs.jsonl",
                 continuity_sheet_file,
                 "outline/style_bible.json",
                 "outline/outline.md",
@@ -5125,8 +5182,10 @@ class NovelPipelineRunner:
         self, cycle: int, audit_data: dict[str, Any]
     ) -> None:
         cpad = self._cpad(cycle)
-        audit_count = len(audit_data.get("redundancy_findings", [])) + len(
-            audit_data.get("consistency_findings", [])
+        audit_count = (
+            len(audit_data.get("redundancy_findings", []))
+            + len(audit_data.get("consistency_findings", []))
+            + len(audit_data.get("pacing_mismatch_findings", []))
         )
         self._log(f"cycle={cpad} cross_chapter_audit_findings count={audit_count}")
         if cycle <= 1:
@@ -5149,8 +5208,10 @@ class NovelPipelineRunner:
                 prev_rel,
                 f"snapshots/cycle_{self._cpad(cycle - 1)}/FINAL_NOVEL.md",
             )
-            prev_count = len(prev_data.get("redundancy_findings", [])) + len(
-                prev_data.get("consistency_findings", [])
+            prev_count = (
+                len(prev_data.get("redundancy_findings", []))
+                + len(prev_data.get("consistency_findings", []))
+                + len(prev_data.get("pacing_mismatch_findings", []))
             )
         except PipelineError:
             return
@@ -7028,6 +7089,10 @@ class NovelPipelineRunner:
                     finding = self._normalize_finding(raw, cycle, force_source="cross_chapter")
                     findings.append(finding)
                     by_chapter[finding["chapter_id"]].append(finding)
+                for raw in audit_data.get("pacing_mismatch_findings", []):
+                    finding = self._normalize_finding(raw, cycle, force_source="cross_chapter")
+                    findings.append(finding)
+                    by_chapter[finding["chapter_id"]].append(finding)
 
         local_window_available = 0
         local_window_expected = 0
@@ -7650,6 +7715,39 @@ class NovelPipelineRunner:
         self._write_json(f"snapshots/cycle_{cpad}/snapshot_manifest.post_revision.json", manifest)
         return False
 
+    def _run_post_revision_lint(self, cycle: int) -> dict[str, Any]:
+        chapters_dir = self.run_dir / "chapters"
+        if not chapters_dir.is_dir():
+            self._log(
+                f"cycle={self._cpad(cycle)} post_revision_lint_skip reason=no_chapters_dir"
+            )
+            return {"status": "skipped", "reason": "no_chapters_dir"}
+
+        chapter_reports = lint_module.lint_chapter_directory(
+            chapters_dir, apply_fixes=True
+        )
+        payload = lint_module.build_report_payload(chapter_reports)
+        self._write_json(self._lint_report_rel(cycle), payload)
+
+        summary = payload.get("summary", {})
+        auto_fix_count = int(summary.get("auto_fix_count", 0) or 0)
+        blocking_finding_count = int(summary.get("blocking_finding_count", 0) or 0)
+        if auto_fix_count > 0:
+            self._assemble_post_revision_snapshot(cycle)
+        self._log(
+            f"cycle={self._cpad(cycle)} post_revision_lint_complete "
+            f"findings={summary.get('finding_count', 0)} "
+            f"auto_fixed={auto_fix_count} "
+            f"blocking={blocking_finding_count}"
+        )
+        return {
+            "status": "complete",
+            "report_file": self._lint_report_rel(cycle),
+            "finding_count": int(summary.get("finding_count", 0) or 0),
+            "auto_fix_count": auto_fix_count,
+            "blocking_finding_count": blocking_finding_count,
+        }
+
     def _run_continuity_reconciliation(self, cycle: int) -> dict[str, Any]:
         cpad = self._cpad(cycle)
         full_novel_file = (
@@ -7775,9 +7873,72 @@ class NovelPipelineRunner:
         )
         return {"status": "complete"}
 
+    def _repair_continuity_sheet_data(
+        self, data: dict[str, Any]
+    ) -> tuple[dict[str, Any], list[str]]:
+        if not isinstance(data, dict):
+            return data, []
+        repairs: list[str] = []
+
+        default_top_level: dict[str, Any] = {
+            "characters": [],
+            "timeline": {
+                "story_start": "",
+                "estimated_span": "",
+                "seasonal_track": [],
+                "key_events": [],
+            },
+            "geography": {
+                "primary_setting": "",
+                "key_locations": [],
+                "distances": [],
+            },
+            "world_rules": [],
+            "power_structure": [],
+            "objects": [],
+            "financial_state": {"debts": [], "income_sources": []},
+            "knowledge_state": [],
+            "environmental_constants": [],
+            "character_blocking": [],
+        }
+        for key, default in default_top_level.items():
+            if key not in data or not isinstance(data.get(key), type(default)):
+                data[key] = copy.deepcopy(default)
+                repairs.append(f"{key} defaulted")
+
+        geography = data.get("geography", {})
+        if isinstance(geography, dict) and "spatial_layout_ref" not in geography:
+            geography["spatial_layout_ref"] = self._spatial_layout_rel()
+            repairs.append("geography.spatial_layout_ref defaulted")
+
+        objects = data.get("objects", [])
+        if isinstance(objects, list):
+            for idx, obj in enumerate(objects, start=1):
+                if not isinstance(obj, dict):
+                    continue
+                if "per_chapter_state" not in obj or not isinstance(
+                    obj.get("per_chapter_state"), list
+                ):
+                    obj["per_chapter_state"] = []
+                    repairs.append(f"objects[{idx}].per_chapter_state defaulted")
+
+        character_blocking = data.get("character_blocking", [])
+        if not isinstance(character_blocking, list):
+            data["character_blocking"] = []
+            repairs.append("character_blocking normalized to empty array")
+
+        return data, repairs
+
     def _validate_continuity_sheet(self) -> None:
         rel = "outline/continuity_sheet.json"
         data = self._read_json(rel)
+        repaired_data, repairs = self._repair_continuity_sheet_data(data)
+        if repairs:
+            self._write_json(rel, repaired_data)
+            self._log(
+                f"continuity_sheet_repair applied={len(repairs)} details={' | '.join(repairs[:8])}"
+            )
+            data = repaired_data
         required_keys = [
             "characters",
             "timeline",
@@ -7788,6 +7949,7 @@ class NovelPipelineRunner:
             "financial_state",
             "knowledge_state",
             "environmental_constants",
+            "character_blocking",
         ]
         missing = [k for k in required_keys if k not in data]
         if missing:
@@ -7796,7 +7958,7 @@ class NovelPipelineRunner:
             )
         expected_arrays = [
             "characters", "world_rules", "power_structure",
-            "objects", "knowledge_state", "environmental_constants",
+            "objects", "knowledge_state", "environmental_constants", "character_blocking",
         ]
         for key in expected_arrays:
             if not isinstance(data[key], list):
@@ -7810,6 +7972,20 @@ class NovelPipelineRunner:
                 raise PipelineError(f"{rel} each character entry must be an object")
             if not char.get("character_id"):
                 raise PipelineError(f"{rel} character entry missing 'character_id'")
+        for idx, obj in enumerate(data["objects"], start=1):
+            if not isinstance(obj, dict):
+                raise PipelineError(f"{rel} objects[{idx}] must be an object")
+            if "per_chapter_state" not in obj or not isinstance(
+                obj.get("per_chapter_state"), list
+            ):
+                raise PipelineError(
+                    f"{rel} objects[{idx}] per_chapter_state must be an array"
+                )
+        for idx, entry in enumerate(data["character_blocking"], start=1):
+            if not isinstance(entry, dict):
+                raise PipelineError(
+                    f"{rel} character_blocking[{idx}] must be an object"
+                )
 
     def _outline_continuity_snapshot_rel(self) -> str:
         return "outline/continuity_sheet.outline.json"
@@ -8080,6 +8256,7 @@ class NovelPipelineRunner:
                 "pressure_source": spec.pressure_source,
                 "state_shift": spec.state_shift,
                 "texture_mode": spec.texture_mode,
+                "plot_importance": spec.plot_importance,
                 "scene_count_target": spec.scene_count_target,
                 "opening_situation": spec.opening_situation,
                 "closing_state": spec.closing_state,
@@ -8093,6 +8270,8 @@ class NovelPipelineRunner:
                 "secondary_character_beats": spec.secondary_character_beats,
                 "setups_to_plant": spec.setups_to_plant,
                 "payoffs_to_land": spec.payoffs_to_land,
+                "reader_introductions": spec.reader_introductions,
+                "beat_budget": spec.beat_budget,
             }
             for spec in self.chapter_specs
         ]
@@ -8181,6 +8360,7 @@ class NovelPipelineRunner:
                     "pressure_source": spec.pressure_source,
                     "state_shift": spec.state_shift,
                     "texture_mode": spec.texture_mode,
+                    "plot_importance": spec.plot_importance,
                     "scene_count_target": spec.scene_count_target,
                     "opening_situation": spec.opening_situation,
                     "closing_state": spec.closing_state,
@@ -8194,6 +8374,8 @@ class NovelPipelineRunner:
                     "secondary_character_beats": spec.secondary_character_beats,
                     "setups_to_plant": spec.setups_to_plant,
                     "payoffs_to_land": spec.payoffs_to_land,
+                    "reader_introductions": spec.reader_introductions,
+                    "beat_budget": spec.beat_budget,
                     "planned_scene_count": scene_counts.get(spec.chapter_id, 0),
                 }
             )
@@ -8268,6 +8450,9 @@ class NovelPipelineRunner:
                 "secondary_character_beats": spec.secondary_character_beats,
                 "setups_to_plant": spec.setups_to_plant,
                 "payoffs_to_land": spec.payoffs_to_land,
+                "reader_introductions": spec.reader_introductions,
+                "plot_importance": spec.plot_importance,
+                "beat_budget": spec.beat_budget,
                 "state_deltas_required": [
                     spec.pressure_source,
                     spec.state_shift,
@@ -8301,6 +8486,12 @@ class NovelPipelineRunner:
         if not jobs:
             return
 
+        total = len(jobs)
+        self._log(
+            f"parallel_phase={label} total_jobs={total} max_workers={max_workers}"
+        )
+        phase_t0 = time.time()
+        completed = 0
         failures: list[str] = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_map = {executor.submit(self._run_job, job): job for job in jobs}
@@ -8310,12 +8501,28 @@ class NovelPipelineRunner:
                     future.result()
                 except Exception as exc:
                     failures.append(f"{job.job_id}: {exc}")
+                completed += 1
+                elapsed = time.time() - phase_t0
+                self._log(
+                    f"parallel_phase={label} progress={completed}/{total} "
+                    f"last_completed={job.job_id} elapsed={elapsed:.1f}s"
+                )
 
+        phase_elapsed = time.time() - phase_t0
+        self._log(
+            f"parallel_phase={label} status=done total_jobs={total} "
+            f"failures={len(failures)} elapsed={phase_elapsed:.1f}s"
+        )
         if failures:
             joined = "\n".join(failures[:8])
             raise PipelineError(f"{label} phase had job failures:\n{joined}")
 
     def _run_job(self, job: JobSpec) -> None:
+        job_t0 = time.time()
+        self._log(
+            f"job_start job={job.job_id} stage={job.stage} provider={job.provider} "
+            f"model={job.model or 'default'} chapter={job.chapter_id or 'n/a'}"
+        )
         manifest = {
             "job_id": job.job_id,
             "stage": job.stage,
@@ -8354,15 +8561,35 @@ class NovelPipelineRunner:
 
                 self._validate_job_workspace(job, workspace, before_hashes)
                 self._copy_outputs_from_workspace(job, workspace)
+                elapsed = time.time() - job_t0
+                self._log(
+                    f"job_done job={job.job_id} stage={job.stage} elapsed={elapsed:.1f}s"
+                )
                 return
             except ProviderQuotaPause as exc:
                 reset_utc = datetime.fromtimestamp(
                     exc.reset_at_epoch, timezone.utc
                 ).strftime("%Y-%m-%dT%H:%M:%SZ")
+                try:
+                    reset_local = datetime.fromtimestamp(exc.reset_at_epoch).astimezone().strftime(
+                        "%Y-%m-%d %H:%M %Z"
+                    )
+                except (OverflowError, OSError, ValueError):
+                    reset_local = "unknown"
+                sleep_human = self._format_duration_seconds(exc.sleep_seconds)
+                if exc.is_using_overage is None:
+                    overage_flag = "unknown"
+                else:
+                    overage_flag = "true" if exc.is_using_overage else "false"
                 self._log(
                     f"job_quota_pause job={job.job_id} stage={job.stage} "
-                    f"provider={exc.provider} rate_limit_type={exc.rate_limit_type or 'unknown'} "
-                    f"reset_at_utc={reset_utc} sleep_s={exc.sleep_seconds} "
+                    f"provider={exc.provider} model={job.model or 'default'} "
+                    f"rate_limit_type={exc.rate_limit_type or 'unknown'} "
+                    f"reset_at_utc={reset_utc} reset_at_local={reset_local} "
+                    f"sleep_s={exc.sleep_seconds} sleep_human={sleep_human} "
+                    f"overage_status={exc.overage_status or 'unknown'} "
+                    f"overage_disabled_reason={exc.overage_disabled_reason or 'none'} "
+                    f"is_using_overage={overage_flag} "
                     f"reason={exc.result_text}"
                 )
                 if exc.sleep_seconds > 0:
@@ -8462,14 +8689,29 @@ class NovelPipelineRunner:
 
             # --- idle-watchdog polling loop ---
             poll_interval = 10  # seconds between checks
+            heartbeat_interval = 60  # log a heartbeat every N seconds
             last_jsonl_size = 0
             idle_elapsed = 0.0
             wall_elapsed = 0.0
+            last_heartbeat = 0.0
             idle_killed = False
 
             while proc.poll() is None:
                 time.sleep(poll_interval)
                 wall_elapsed += poll_interval
+
+                # Periodic heartbeat log so operator knows the job is alive
+                if wall_elapsed - last_heartbeat >= heartbeat_interval:
+                    try:
+                        hb_size = log_file.stat().st_size
+                    except OSError:
+                        hb_size = 0
+                    self._log(
+                        f"job_heartbeat job={job.job_id} provider={provider_label} "
+                        f"wall={wall_elapsed:.0f}s idle={idle_elapsed:.0f}s "
+                        f"jsonl_bytes={hb_size}"
+                    )
+                    last_heartbeat = wall_elapsed
 
                 # Check wall-clock timeout
                 if wall_elapsed >= wall_limit:
@@ -8521,6 +8763,11 @@ class NovelPipelineRunner:
         return returncode, log_file, stderr_file
 
     def _execute_codex_job(self, job: JobSpec, workspace: Path) -> None:
+        self._log(
+            f"exec_codex job={job.job_id} model={job.model or 'default'} "
+            f"effort={job.reasoning_effort or 'default'} timeout={job.timeout_seconds}s"
+        )
+        exec_t0 = time.time()
         message_file = self.run_dir / "logs" / "jobs" / f"{job.job_id}.last_message.txt"
         cmd = self._build_codex_exec_cmd(job, workspace, message_file)
         returncode, _log_file, stderr_file = self._run_agent_process(
@@ -8529,10 +8776,20 @@ class NovelPipelineRunner:
             cmd=cmd,
             provider_label="codex",
         )
+        exec_elapsed = time.time() - exec_t0
+        self._log(
+            f"exec_codex_done job={job.job_id} rc={returncode} elapsed={exec_elapsed:.1f}s"
+        )
         if returncode != 0:
             stderr_tail = self._tail_file(stderr_file, max_lines=20)
+            last_message_tail = ""
+            if message_file.is_file():
+                last_message_tail = self._tail_file(message_file, max_lines=20)
+            quota_hint = ""
+            if self._looks_like_quota_text(stderr_tail, last_message_tail):
+                quota_hint = " quota_hint=stderr_suggests_rate_limit"
             raise PipelineError(
-                f"codex exec failed rc={returncode} stderr_tail={stderr_tail}"
+                f"codex exec failed rc={returncode} stderr_tail={stderr_tail}{quota_hint}"
             )
 
     def _load_provider_events(self, log_file: Path) -> list[dict[str, Any]]:
@@ -8601,6 +8858,35 @@ class NovelPipelineRunner:
                 return info
         return None
 
+    def _extract_claude_latest_rate_limit_info(
+        self, events: list[dict[str, Any]]
+    ) -> dict[str, Any] | None:
+        for event in reversed(events):
+            if event.get("type") != "rate_limit_event":
+                continue
+            info = event.get("rate_limit_info")
+            if isinstance(info, dict):
+                return info
+        return None
+
+    @staticmethod
+    def _looks_like_quota_text(*fragments: str) -> bool:
+        haystack = " ".join(f or "" for f in fragments).lower()
+        if not haystack:
+            return False
+        markers = (
+            "rate limit",
+            "rate_limit",
+            "rate-limit",
+            "429",
+            "too many requests",
+            "usage limit",
+            "quota",
+            "you've hit your limit",
+            "you have hit your limit",
+        )
+        return any(marker in haystack for marker in markers)
+
     def _claude_quota_pause_from_events(
         self, events: list[dict[str, Any]], result_text: str
     ) -> ProviderQuotaPause | None:
@@ -8611,6 +8897,13 @@ class NovelPipelineRunner:
         try:
             reset_at_epoch = int(raw_reset)
         except (TypeError, ValueError):
+            self._log(
+                f"quota_pause_parse_warning provider=claude "
+                f"reason=missing_or_invalid_resetsAt raw_resetsAt={raw_reset!r} "
+                f"rate_limit_type={str(info.get('rateLimitType', '')).strip() or 'unknown'!r} "
+                f"overage_status={str(info.get('overageStatus', '')).strip() or 'unknown'!r} "
+                f"overage_disabled_reason={str(info.get('overageDisabledReason', '')).strip() or 'none'!r}"
+            )
             return None
         now_epoch = int(time.time())
         base_sleep = max(0, reset_at_epoch - now_epoch)
@@ -8618,15 +8911,25 @@ class NovelPipelineRunner:
         jitter_cap = max(0, CLAUDE_QUOTA_RESET_JITTER_SECONDS)
         jitter_s = random.randint(0, jitter_cap) if jitter_cap > 0 else 0
         sleep_seconds = base_sleep + buffer_s + jitter_s
+        overage_raw = info.get("isUsingOverage")
+        is_using_overage = overage_raw if isinstance(overage_raw, bool) else None
         return ProviderQuotaPause(
             provider="claude",
             result_text=result_text or "You've hit your limit",
             reset_at_epoch=reset_at_epoch,
             sleep_seconds=sleep_seconds,
             rate_limit_type=str(info.get("rateLimitType", "")).strip() or None,
+            overage_status=str(info.get("overageStatus", "")).strip() or None,
+            overage_disabled_reason=str(info.get("overageDisabledReason", "")).strip() or None,
+            is_using_overage=is_using_overage,
         )
 
     def _execute_claude_job(self, job: JobSpec, workspace: Path) -> None:
+        self._log(
+            f"exec_claude job={job.job_id} model={job.model or 'default'} "
+            f"effort={job.reasoning_effort or 'default'} timeout={job.timeout_seconds}s"
+        )
+        exec_t0 = time.time()
         message_file = self.run_dir / "logs" / "jobs" / f"{job.job_id}.last_message.txt"
         cmd = self._build_claude_exec_cmd(job)
         returncode, log_file, stderr_file = self._run_agent_process(
@@ -8636,7 +8939,18 @@ class NovelPipelineRunner:
             provider_label="claude",
             cwd=workspace,
         )
+        exec_elapsed = time.time() - exec_t0
         events = self._load_provider_events(log_file)
+        usage = self._extract_claude_usage(events)
+        usage_str = ""
+        if usage:
+            in_tok = usage.get("input_tokens", "?")
+            out_tok = usage.get("output_tokens", "?")
+            usage_str = f" input_tokens={in_tok} output_tokens={out_tok}"
+        self._log(
+            f"exec_claude_done job={job.job_id} rc={returncode} "
+            f"elapsed={exec_elapsed:.1f}s{usage_str}"
+        )
         try:
             result_event = self._extract_claude_result_event(events)
             last_message = self._extract_claude_last_message_text(events)
@@ -8652,8 +8966,21 @@ class NovelPipelineRunner:
             quota_pause = self._claude_quota_pause_from_events(events, result_text)
             if quota_pause is not None:
                 raise quota_pause
+            latest_rl = self._extract_claude_latest_rate_limit_info(events)
+            quota_hint = ""
+            if latest_rl is not None:
+                quota_hint = (
+                    f" quota_hint=rate_limit_event_present"
+                    f" rl_status={str(latest_rl.get('status', '')).strip() or 'unknown'}"
+                    f" rl_type={str(latest_rl.get('rateLimitType', '')).strip() or 'unknown'}"
+                    f" overage_status={str(latest_rl.get('overageStatus', '')).strip() or 'unknown'}"
+                    f" overage_disabled_reason={str(latest_rl.get('overageDisabledReason', '')).strip() or 'none'}"
+                )
+            elif self._looks_like_quota_text(result_text, stderr_tail):
+                quota_hint = " quota_hint=stderr_suggests_rate_limit"
             raise PipelineError(
-                f"claude exec failed rc={returncode} result={result_text or '<empty>'} stderr_tail={stderr_tail}"
+                f"claude exec failed rc={returncode} result={result_text or '<empty>'} "
+                f"stderr_tail={stderr_tail}{quota_hint}"
             )
 
     def _job_idle_timeout_seconds(self, job: JobSpec) -> int:
@@ -9161,6 +9488,21 @@ class NovelPipelineRunner:
             {self.selected_premise}
 
             Chapter count: {chapter_count}
+
+            ## Supporting Character Pressure Map
+
+            - Protagonist: carrying procedural fear, erotic confusion, and a private need to be believed.
+
+            ## Reader Knowledge Plan
+
+            - Genre-calibrated commonsense-detail policy: keep mundane detail generic unless it changes pressure; do not spend scene weight on brands, makes, or routine behaviors unless narratively active.
+            - Novel-specific concepts with target introduction chapters:
+              - route_threshold_shift -> chapter_01
+              - compliance corridor protocol -> chapter_03
+            - speculative_premise_contract:
+              - route_threshold_shift: ground in chapter_01 by showing what the shift is, who can detect it, and why it changes tactical risk before later chapters use it for plot leverage.
+              - compliance corridor protocol: ground in chapter_03 by establishing who enforces it, how characters speak about it, and what it restricts before the protocol carries scene stakes.
+            - Commonsense-domain items to leave undescribed unless active: car makes, coffee brands, ordinary office gestures, basic transit steps, routine device handling.
             """
         )
         self._write_workspace_text(workspace, "outline/outline.md", outline)
@@ -9173,6 +9515,13 @@ class NovelPipelineRunner:
                 "chapter_id": chapter_id,
                 "chapter_number": i,
                 "projected_min_words": 2300,
+                "plot_importance": (
+                    "primary"
+                    if i in {1, chapter_count // 2, chapter_count}
+                    else "bridge"
+                    if i % 5 == 0
+                    else "secondary"
+                ),
                 "chapter_engine": (
                     f"aftermath and inventory in {chapter_id}"
                     if scene_count_target == 1
@@ -9198,7 +9547,39 @@ class NovelPipelineRunner:
                     f"Beat A for {chapter_id}",
                     f"Beat B for {chapter_id}",
                 ],
+                "beat_budget": [
+                    {"beat": "opening", "target_words": 300, "importance": "bridge"},
+                    {
+                        "beat": f"Beat A for {chapter_id}",
+                        "target_words": 900,
+                        "importance": "primary" if i in {1, chapter_count // 2, chapter_count} else "secondary",
+                    },
+                    {
+                        "beat": f"Beat B for {chapter_id}",
+                        "target_words": 800,
+                        "importance": "primary" if i in {1, chapter_count // 2, chapter_count} else "secondary",
+                    },
+                    {"beat": "closing", "target_words": 300, "importance": "bridge"},
+                ],
             }
+            if i == 1:
+                row["reader_introductions"] = [
+                    {
+                        "concept_id": "route_threshold_shift",
+                        "kind": "world_rule",
+                        "first_or_refresh": "first",
+                        "target_legibility": "grounded",
+                    }
+                ]
+            elif i == 3:
+                row["reader_introductions"] = [
+                    {
+                        "concept_id": "compliance_corridor_protocol",
+                        "kind": "jargon",
+                        "first_or_refresh": "first",
+                        "target_legibility": "operational",
+                    }
+                ]
             rows.append(row)
         chapter_specs_text = "\n".join(json.dumps(r, ensure_ascii=True) for r in rows) + "\n"
         self._write_workspace_text(
@@ -9227,6 +9608,7 @@ class NovelPipelineRunner:
             "character_voice_profiles": [
                 {
                     "character_id": "protagonist",
+                    "first_appearance_tag": "the staff fixer everyone else expects to keep the corridor working",
                     "public_register": "controlled, sparse, strategic",
                     "private_register": "raw, self-accusing, volatile",
                     "syntax_signature": "short clauses under stress, longer masking sentences under scrutiny",
@@ -9249,6 +9631,7 @@ class NovelPipelineRunner:
                 },
                 {
                     "character_id": "antagonist",
+                    "first_appearance_tag": "the compliance director who can formalize any private mistake into policy trouble",
                     "public_register": "bureaucratic precision with moral certainty",
                     "private_register": "coldly intimate and coercive",
                     "syntax_signature": "balanced clauses; clipped corrections when challenged",
@@ -9291,6 +9674,12 @@ class NovelPipelineRunner:
                     "generic cinematic phrasing"
                 ],
                 "default_narrator_mode": "transparent",
+                "exposition_density_policy": {
+                    "commonsense_detail_floor": "moderate",
+                    "world_concept_explanation_mode": "brief-on-first-use",
+                    "genre_norm": "speculative pressure novel / explain novel-specific rules when first needed, keep mundane detail quiet",
+                    "operational_rubric": "Leave everyday objects and routine gestures generic unless they change the scene; introduce invented rules on first contact with enough clarity for the reader to understand local stakes and action."
+                },
                 "chapter_texture_variance": (
                     "Alternate high-intensity scenes with reflective interiority; vary scene count, "
                     "dialogue density, and pacing so no two consecutive chapters feel "
@@ -9338,6 +9727,7 @@ class NovelPipelineRunner:
             "financial_state": {"debts": [], "income_sources": []},
             "knowledge_state": [],
             "environmental_constants": [],
+            "character_blocking": [],
         }
         self._write_workspace_json(
             workspace, "outline/continuity_sheet.json", continuity_sheet
@@ -9461,6 +9851,7 @@ class NovelPipelineRunner:
                     "financial_state": {"debts": [], "income_sources": []},
                     "knowledge_state": [],
                     "environmental_constants": [],
+                    "character_blocking": [],
                 }
         else:
             continuity_sheet = {
@@ -9473,6 +9864,7 @@ class NovelPipelineRunner:
                 "financial_state": {"debts": [], "income_sources": []},
                 "knowledge_state": [],
                 "environmental_constants": [],
+                "character_blocking": [],
             }
         sheet_path = workspace / sheet_file
         sheet_path.parent.mkdir(parents=True, exist_ok=True)
@@ -9575,8 +9967,13 @@ class NovelPipelineRunner:
             "not_x_y_count": 0,
             "personified_abstraction_count": 0,
             "abstract_noun_subject_count": 0,
+            "simile_count": 0,
+            "as_if_count": 0,
+            "the_way_x_count": 0,
+            "pacing_mismatch_count": 0,
             "redundancy_findings": [],
             "consistency_findings": [],
+            "pacing_mismatch_findings": [],
         }
         self._write_workspace_json(workspace, output, audit)
 
@@ -9990,6 +10387,105 @@ class NovelPipelineRunner:
         self._validate_spatial_layout_data(data, rel)
         return data
 
+    def _synthesize_beat_budget(
+        self,
+        *,
+        projected_min_words: int,
+        must_land_beats: list[str],
+        secondary_character_beats: list[str],
+        plot_importance: str,
+    ) -> list[dict[str, Any]]:
+        normalized_plot_importance = (
+            plot_importance if plot_importance in PLOT_IMPORTANCE_VALUES else "secondary"
+        )
+        planned: list[tuple[str, str, int]] = []
+        opening_words = max(120, round(projected_min_words * 0.15))
+        closing_words = max(120, round(projected_min_words * 0.15))
+        planned.append(("opening", "bridge", opening_words))
+        core_beats = must_land_beats or ["chapter_progression"]
+        core_total = max(projected_min_words - opening_words - closing_words, 1)
+        core_share = max(150, round(core_total / len(core_beats)))
+        for beat in core_beats:
+            planned.append((beat, normalized_plot_importance, core_share))
+        for beat in secondary_character_beats:
+            planned.append((beat, "secondary", max(120, round(projected_min_words * 0.1))))
+        planned.append(("closing", "bridge", closing_words))
+
+        budget: list[dict[str, Any]] = []
+        remaining = projected_min_words
+        for index, (beat, importance, target_words) in enumerate(planned):
+            is_last = index == len(planned) - 1
+            assigned = max(1, remaining) if is_last else min(target_words, max(1, remaining))
+            remaining -= assigned
+            budget.append(
+                {
+                    "beat": beat,
+                    "target_words": assigned,
+                    "importance": importance,
+                }
+            )
+        return budget
+
+    def _normalize_beat_budget_entries(
+        self,
+        *,
+        beat_budget_raw: Any,
+        rel: str,
+        idx: int,
+        projected_min_words: int,
+        must_land_beats: list[str],
+        secondary_character_beats: list[str],
+        plot_importance: str,
+    ) -> list[dict[str, Any]]:
+        valid_beats = set(must_land_beats) | set(secondary_character_beats) | {
+            "opening",
+            "closing",
+        }
+        if beat_budget_raw is None:
+            return self._synthesize_beat_budget(
+                projected_min_words=projected_min_words,
+                must_land_beats=must_land_beats,
+                secondary_character_beats=secondary_character_beats,
+                plot_importance=plot_importance,
+            )
+        if not isinstance(beat_budget_raw, list) or not beat_budget_raw:
+            raise PipelineError(f"invalid beat_budget in {rel}:{idx}")
+        normalized_budget: list[dict[str, Any]] = []
+        seen_beats: set[str] = set()
+        for entry in beat_budget_raw:
+            if not isinstance(entry, dict):
+                raise PipelineError(f"invalid beat_budget in {rel}:{idx}")
+            beat = str(entry.get("beat", "")).strip()
+            importance = str(entry.get("importance", "")).strip().lower()
+            target_words = entry.get("target_words")
+            if not beat or beat not in valid_beats:
+                raise PipelineError(
+                    f"invalid beat_budget in {rel}:{idx}: beat must match must_land_beats, secondary_character_beats, opening, or closing"
+                )
+            if beat in seen_beats:
+                raise PipelineError(f"invalid beat_budget in {rel}:{idx}: duplicate beat {beat}")
+            if importance not in PLOT_IMPORTANCE_VALUES:
+                raise PipelineError(
+                    f"invalid beat_budget in {rel}:{idx}: importance must be one of {', '.join(sorted(PLOT_IMPORTANCE_VALUES))}"
+                )
+            if (
+                not isinstance(target_words, int)
+                or isinstance(target_words, bool)
+                or target_words <= 0
+            ):
+                raise PipelineError(
+                    f"invalid beat_budget in {rel}:{idx}: target_words must be positive integer"
+                )
+            seen_beats.add(beat)
+            normalized_budget.append(
+                {
+                    "beat": beat,
+                    "target_words": target_words,
+                    "importance": importance,
+                }
+            )
+        return normalized_budget
+
     def _load_and_validate_chapter_specs(self) -> list[ChapterSpec]:
         rel = "outline/chapter_specs.jsonl"
         path = self.run_dir / rel
@@ -10019,6 +10515,7 @@ class NovelPipelineRunner:
                 chronology_anchor = str(data.get("chronology_anchor", "")).strip()
                 entry_obligation = str(data.get("entry_obligation", "")).strip()
                 exit_pressure = str(data.get("exit_pressure", "")).strip()
+                plot_importance = str(data.get("plot_importance", "")).strip().lower()
                 scene_count_target = data.get("scene_count_target")
                 scene_count_target_explicit = scene_count_target is not None
                 if not chapter_engine:
@@ -10035,12 +10532,16 @@ class NovelPipelineRunner:
                 secondary_beats_raw = data.get("secondary_character_beats", [])
                 setups_raw = data.get("setups_to_plant", [])
                 payoffs_raw = data.get("payoffs_to_land", [])
+                reader_introductions_raw = data.get("reader_introductions", [])
+                beat_budget_raw = data.get("beat_budget")
                 if secondary_beats_raw is None:
                     secondary_beats_raw = []
                 if setups_raw is None:
                     setups_raw = []
                 if payoffs_raw is None:
                     payoffs_raw = []
+                if reader_introductions_raw is None:
+                    reader_introductions_raw = []
 
                 if not CHAPTER_ID_RE.match(chapter_id):
                     raise PipelineError(f"invalid chapter_id in {rel}:{idx}: {chapter_id}")
@@ -10059,6 +10560,12 @@ class NovelPipelineRunner:
                 ):
                     raise PipelineError(
                         f"invalid projected_min_words in {rel}:{idx}: {projected_min_words}"
+                    )
+                if not plot_importance:
+                    plot_importance = "secondary"
+                if plot_importance not in PLOT_IMPORTANCE_VALUES:
+                    raise PipelineError(
+                        f"invalid plot_importance in {rel}:{idx}: must be one of {', '.join(sorted(PLOT_IMPORTANCE_VALUES))}"
                     )
                 if (
                     not chapter_engine
@@ -10102,6 +10609,8 @@ class NovelPipelineRunner:
                     raise PipelineError(f"invalid setups_to_plant in {rel}:{idx}")
                 if not isinstance(payoffs_raw, list):
                     raise PipelineError(f"invalid payoffs_to_land in {rel}:{idx}")
+                if not isinstance(reader_introductions_raw, list):
+                    raise PipelineError(f"invalid reader_introductions in {rel}:{idx}")
 
                 normalized_setups: list[dict[str, Any]] = []
                 for entry in setups_raw:
@@ -10158,6 +10667,50 @@ class NovelPipelineRunner:
                         normalized_entry["payoff_type"] = payoff_type
                     normalized_payoffs.append(normalized_entry)
 
+                normalized_reader_introductions: list[dict[str, str]] = []
+                for entry in reader_introductions_raw:
+                    if not isinstance(entry, dict):
+                        raise PipelineError(
+                            f"invalid reader_introductions in {rel}:{idx}"
+                        )
+                    concept_id = str(entry.get("concept_id", "")).strip()
+                    kind = str(entry.get("kind", "")).strip()
+                    first_or_refresh = str(entry.get("first_or_refresh", "")).strip()
+                    target_legibility = str(entry.get("target_legibility", "")).strip()
+                    if not concept_id:
+                        raise PipelineError(
+                            f"invalid reader_introductions in {rel}:{idx}: concept_id required"
+                        )
+                    if kind not in READER_INTRODUCTION_KIND_VALUES:
+                        raise PipelineError(
+                            f"invalid reader_introductions in {rel}:{idx}: kind must be one of {', '.join(sorted(READER_INTRODUCTION_KIND_VALUES))}"
+                        )
+                    if first_or_refresh not in READER_INTRODUCTION_REFRESH_VALUES:
+                        raise PipelineError(
+                            f"invalid reader_introductions in {rel}:{idx}: first_or_refresh must be one of {', '.join(sorted(READER_INTRODUCTION_REFRESH_VALUES))}"
+                        )
+                    if target_legibility not in READER_INTRODUCTION_LEGIBILITY_VALUES:
+                        raise PipelineError(
+                            f"invalid reader_introductions in {rel}:{idx}: target_legibility must be one of {', '.join(sorted(READER_INTRODUCTION_LEGIBILITY_VALUES))}"
+                        )
+                    normalized_reader_introductions.append(
+                        {
+                            "concept_id": concept_id,
+                            "kind": kind,
+                            "first_or_refresh": first_or_refresh,
+                            "target_legibility": target_legibility,
+                        }
+                    )
+                normalized_beat_budget = self._normalize_beat_budget_entries(
+                    beat_budget_raw=beat_budget_raw,
+                    rel=rel,
+                    idx=idx,
+                    projected_min_words=projected_min_words,
+                    must_land_beats=[x.strip() for x in beats_raw],
+                    secondary_character_beats=[x.strip() for x in secondary_beats_raw],
+                    plot_importance=plot_importance,
+                )
+
                 expected_number = self._chapter_number(chapter_id)
                 if chapter_number != expected_number:
                     raise PipelineError(
@@ -10186,6 +10739,9 @@ class NovelPipelineRunner:
                         ],
                         setups_to_plant=normalized_setups,
                         payoffs_to_land=normalized_payoffs,
+                        reader_introductions=normalized_reader_introductions,
+                        plot_importance=plot_importance,
+                        beat_budget=normalized_beat_budget,
                     )
                 )
 
@@ -10310,6 +10866,10 @@ class NovelPipelineRunner:
                     "lexical_signature": (
                         "Lexical choices should reflect background and scene pressure without "
                         "relying on repeated keyword motifs."
+                    ),
+                    "first_appearance_tag": (
+                        "Introduce this character on first appearance with a chapter-true role "
+                        "or relationship cue that makes their significance immediately legible."
                     ),
                     "forbidden_generic_lines": (
                         "Avoid platitudes, stock reassurances, and generic cinematic filler."
@@ -10630,6 +11190,88 @@ class NovelPipelineRunner:
                 "structurally identical."
             )
             repairs.append("prose_style_profile.chapter_texture_variance defaulted")
+
+        exposition_density = prose.get("exposition_density_policy")
+        if not isinstance(exposition_density, dict):
+            exposition_density = {}
+            prose["exposition_density_policy"] = exposition_density
+            repairs.append("prose_style_profile.exposition_density_policy defaulted to object")
+
+        commonsense_detail_floor = exposition_density.get("commonsense_detail_floor")
+        normalized_detail_floor = ""
+        if isinstance(commonsense_detail_floor, str) and commonsense_detail_floor.strip():
+            candidate = re.sub(r"[\s_-]+", " ", commonsense_detail_floor.strip().lower()).strip()
+            if candidate in {"sparse", "low", "minimal", "light"}:
+                normalized_detail_floor = "sparse"
+            elif candidate in {"moderate", "medium", "balanced"}:
+                normalized_detail_floor = "moderate"
+            elif candidate in {"dense", "high", "heavy", "thick"}:
+                normalized_detail_floor = "dense"
+        if not normalized_detail_floor:
+            exposition_density["commonsense_detail_floor"] = "moderate"
+            repairs.append(
+                "prose_style_profile.exposition_density_policy.commonsense_detail_floor defaulted"
+            )
+        elif normalized_detail_floor != commonsense_detail_floor:
+            exposition_density["commonsense_detail_floor"] = normalized_detail_floor
+            repairs.append(
+                "prose_style_profile.exposition_density_policy.commonsense_detail_floor normalized"
+            )
+
+        explanation_mode = exposition_density.get("world_concept_explanation_mode")
+        normalized_explanation_mode = ""
+        if isinstance(explanation_mode, str) and explanation_mode.strip():
+            candidate = re.sub(r"[\s_]+", "-", explanation_mode.strip().lower()).strip("-")
+            if candidate in {
+                "embedded-in-experience",
+                "embedded-experience",
+                "embedded",
+                "in-experience",
+            }:
+                normalized_explanation_mode = "embedded-in-experience"
+            elif candidate in {
+                "brief-on-first-use",
+                "brief-first-use",
+                "brief",
+            }:
+                normalized_explanation_mode = "brief-on-first-use"
+            elif candidate in {
+                "operational-on-first-use",
+                "operational-first-use",
+                "operational",
+                "rule-first",
+            }:
+                normalized_explanation_mode = "operational-on-first-use"
+        if not normalized_explanation_mode:
+            exposition_density["world_concept_explanation_mode"] = "brief-on-first-use"
+            repairs.append(
+                "prose_style_profile.exposition_density_policy.world_concept_explanation_mode defaulted"
+            )
+        elif normalized_explanation_mode != explanation_mode:
+            exposition_density["world_concept_explanation_mode"] = normalized_explanation_mode
+            repairs.append(
+                "prose_style_profile.exposition_density_policy.world_concept_explanation_mode normalized"
+            )
+
+        genre_norm = exposition_density.get("genre_norm")
+        if not isinstance(genre_norm, str) or not genre_norm.strip():
+            exposition_density["genre_norm"] = (
+                "Match exposition density to genre: keep commonsense detail generic unless active; "
+                "explain novel-specific concepts when the reader needs them to follow the scene."
+            )
+            repairs.append(
+                "prose_style_profile.exposition_density_policy.genre_norm defaulted"
+            )
+
+        operational_rubric = exposition_density.get("operational_rubric")
+        if not isinstance(operational_rubric, str) or not operational_rubric.strip():
+            exposition_density["operational_rubric"] = (
+                "Leave routine real-world detail generic unless it changes pressure; introduce new "
+                "world concepts on first contact with enough clarity for cold-reader scene legibility."
+            )
+            repairs.append(
+                "prose_style_profile.exposition_density_policy.operational_rubric defaulted"
+            )
 
         aesthetic = data.get("aesthetic_risk_policy")
         if not isinstance(aesthetic, dict):
@@ -11234,6 +11876,7 @@ class NovelPipelineRunner:
                 "private_register",
                 "syntax_signature",
                 "lexical_signature",
+                "first_appearance_tag",
                 "forbidden_generic_lines",
                 "stress_tells",
                 "profanity_profile",
@@ -11257,6 +11900,7 @@ class NovelPipelineRunner:
                 "private_register",
                 "syntax_signature",
                 "lexical_signature",
+                "first_appearance_tag",
                 "forbidden_generic_lines",
                 "stress_tells",
                 "profanity_profile",
@@ -11367,6 +12011,7 @@ class NovelPipelineRunner:
             "diction",
             "forbidden_drift_patterns",
             "default_narrator_mode",
+            "exposition_density_policy",
             "chapter_texture_variance",
         ):
             if key not in prose_style:
@@ -11393,6 +12038,49 @@ class NovelPipelineRunner:
             if not all(isinstance(x, str) and x.strip() for x in value):
                 raise PipelineError(
                     f"{rel} prose_style_profile {list_key} must contain non-empty strings"
+                )
+        exposition_density = prose_style.get("exposition_density_policy")
+        if not isinstance(exposition_density, dict):
+            raise PipelineError(
+                f"{rel} prose_style_profile exposition_density_policy must be object"
+            )
+        for key in (
+            "commonsense_detail_floor",
+            "world_concept_explanation_mode",
+            "genre_norm",
+            "operational_rubric",
+        ):
+            if key not in exposition_density:
+                raise PipelineError(
+                    f"{rel} prose_style_profile exposition_density_policy missing {key}"
+                )
+        commonsense_detail_floor = exposition_density.get("commonsense_detail_floor")
+        if (
+            not isinstance(commonsense_detail_floor, str)
+            or commonsense_detail_floor.strip()
+            not in EXPOSITION_COMMONSENSE_DETAIL_FLOOR_VALUES
+        ):
+            raise PipelineError(
+                f"{rel} prose_style_profile exposition_density_policy commonsense_detail_floor must be one of: sparse, moderate, dense"
+            )
+        world_concept_explanation_mode = exposition_density.get(
+            "world_concept_explanation_mode"
+        )
+        if (
+            not isinstance(world_concept_explanation_mode, str)
+            or world_concept_explanation_mode.strip()
+            not in WORLD_CONCEPT_EXPLANATION_MODE_VALUES
+        ):
+            raise PipelineError(
+                f"{rel} prose_style_profile exposition_density_policy world_concept_explanation_mode must be one of: embedded-in-experience, brief-on-first-use, operational-on-first-use"
+            )
+        for text_key in ("genre_norm", "operational_rubric"):
+            if (
+                not isinstance(exposition_density.get(text_key), str)
+                or not str(exposition_density.get(text_key, "")).strip()
+            ):
+                raise PipelineError(
+                    f"{rel} prose_style_profile exposition_density_policy {text_key} must be non-empty string"
                 )
 
         aesthetic_policy = data.get("aesthetic_risk_policy")
@@ -11431,6 +12119,7 @@ class NovelPipelineRunner:
                 "chapter_id": spec.chapter_id,
                 "chapter_number": spec.chapter_number,
                 "projected_min_words": spec.projected_min_words,
+                "plot_importance": spec.plot_importance,
                 "chapter_engine": spec.chapter_engine,
                 "pressure_source": spec.pressure_source,
                 "state_shift": spec.state_shift,
@@ -11445,6 +12134,7 @@ class NovelPipelineRunner:
                 "conflict": spec.conflict,
                 "consequence": spec.consequence,
                 "must_land_beats": spec.must_land_beats,
+                "beat_budget": spec.beat_budget,
             }
             if spec.secondary_character_beats:
                 payload["secondary_character_beats"] = spec.secondary_character_beats
@@ -11452,6 +12142,8 @@ class NovelPipelineRunner:
                 payload["setups_to_plant"] = spec.setups_to_plant
             if spec.payoffs_to_land:
                 payload["payoffs_to_land"] = spec.payoffs_to_land
+            if spec.reader_introductions:
+                payload["reader_introductions"] = spec.reader_introductions
             self._write_json(rel, payload)
 
     def _validate_chapter_heading(self, chapter_path: Path, chapter_number: int) -> None:
@@ -12186,6 +12878,78 @@ class NovelPipelineRunner:
                     )
                 seen_ids.add(finding_id)
 
+        pacing_findings = data.get("pacing_mismatch_findings")
+        if not isinstance(pacing_findings, list):
+            raise PipelineError(f"{rel} pacing_mismatch_findings must be an array")
+        pacing_count = data.get("pacing_mismatch_count")
+        if pacing_count != len(pacing_findings):
+            raise PipelineError(
+                f"{rel} pacing_mismatch_count must equal len(pacing_mismatch_findings)"
+            )
+        for idx, finding in enumerate(pacing_findings, start=1):
+            if not isinstance(finding, dict):
+                raise PipelineError(f"{rel} pacing_mismatch_findings[{idx}] must be object")
+            for key in (
+                "finding_id",
+                "chapter_id",
+                "beat",
+                "importance",
+                "target_words",
+                "actual_words",
+                "evidence",
+                "severity",
+                "problem",
+                "rewrite_direction",
+                "acceptance_test",
+            ):
+                if key not in finding:
+                    raise PipelineError(
+                        f"{rel} pacing_mismatch_findings[{idx}] missing {key}"
+                    )
+            if str(finding["chapter_id"]).strip() not in chapter_ids:
+                raise PipelineError(
+                    f"{rel} pacing_mismatch_findings[{idx}] chapter_id must map to chapter_XX in this manuscript"
+                )
+            importance = str(finding["importance"]).strip().lower()
+            if importance not in PLOT_IMPORTANCE_VALUES:
+                raise PipelineError(
+                    f"{rel} pacing_mismatch_findings[{idx}] importance must be one of {', '.join(sorted(PLOT_IMPORTANCE_VALUES))}"
+                )
+            for int_key in ("target_words", "actual_words"):
+                value = finding.get(int_key)
+                if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                    raise PipelineError(
+                        f"{rel} pacing_mismatch_findings[{idx}] {int_key} must be a non-negative integer"
+                    )
+            severity = str(finding["severity"]).strip().upper()
+            if severity not in SEVERITY_VALUES:
+                raise PipelineError(
+                    f"{rel} pacing_mismatch_findings[{idx}] invalid severity"
+                )
+            evidence = self._normalize_evidence_field(finding["evidence"])
+            if not self._evidence_citations_valid(evidence, novel_file):
+                raise PipelineError(
+                    f"{rel} pacing_mismatch_findings[{idx}] evidence must cite {novel_file}:<line>"
+                )
+            self._validate_rewrite_direction(
+                rewrite_direction=str(finding["rewrite_direction"]),
+                target_file=novel_file,
+                rel=rel,
+                finding_index=idx,
+            )
+            self._validate_acceptance_test(
+                acceptance_test=str(finding["acceptance_test"]),
+                target_file=novel_file,
+                rel=rel,
+                finding_index=idx,
+            )
+            finding_id = str(finding["finding_id"]).strip()
+            if finding_id in seen_ids:
+                raise PipelineError(
+                    f"{rel} duplicate finding_id across audit arrays: {finding_id}"
+                )
+            seen_ids.add(finding_id)
+
     def _repair_cross_chapter_audit_data(
         self,
         data: dict[str, Any],
@@ -12302,6 +13066,119 @@ class NovelPipelineRunner:
                         repairs.append(f"{array_name}[{idx}].finding_id deduplicated")
                     seen_ids[base_id] = dup_count + 1
 
+        pacing_findings = data.get("pacing_mismatch_findings")
+        if not isinstance(pacing_findings, list):
+            data["pacing_mismatch_findings"] = []
+            pacing_findings = data["pacing_mismatch_findings"]
+            repairs.append("pacing_mismatch_findings defaulted to empty array")
+        for idx, finding in enumerate(pacing_findings, start=1):
+            if not isinstance(finding, dict):
+                continue
+            finding_id = str(finding.get("finding_id", "")).strip()
+            if not finding_id:
+                finding["finding_id"] = f"pacing_mismatch_{idx}"
+                repairs.append(
+                    f"pacing_mismatch_findings[{idx}].finding_id synthesized"
+                )
+            normalized_chapter_id, changed = self._coerce_full_award_chapter_id(
+                finding.get("chapter_id", ""),
+                chapter_ids,
+            )
+            if changed:
+                finding["chapter_id"] = normalized_chapter_id
+                repairs.append(
+                    f"pacing_mismatch_findings[{idx}].chapter_id normalized"
+                )
+            importance = str(finding.get("importance", "")).strip().lower()
+            if importance not in PLOT_IMPORTANCE_VALUES:
+                finding["importance"] = "secondary"
+                repairs.append(
+                    f"pacing_mismatch_findings[{idx}].importance defaulted"
+                )
+            else:
+                finding["importance"] = importance
+            for int_key in ("target_words", "actual_words"):
+                raw_value = finding.get(int_key)
+                normalized_value: int | None = None
+                if isinstance(raw_value, int) and not isinstance(raw_value, bool) and raw_value >= 0:
+                    normalized_value = raw_value
+                elif isinstance(raw_value, str) and raw_value.strip().isdigit():
+                    normalized_value = int(raw_value.strip())
+                elif (
+                    isinstance(raw_value, float)
+                    and raw_value.is_integer()
+                    and raw_value >= 0
+                ):
+                    normalized_value = int(raw_value)
+                if normalized_value is None:
+                    finding[int_key] = 0
+                    repairs.append(
+                        f"pacing_mismatch_findings[{idx}].{int_key} defaulted to 0"
+                    )
+                elif normalized_value != raw_value:
+                    finding[int_key] = normalized_value
+                    repairs.append(
+                        f"pacing_mismatch_findings[{idx}].{int_key} normalized"
+                    )
+            severity = str(finding.get("severity", "")).strip().upper()
+            if severity not in SEVERITY_VALUES:
+                finding["severity"] = "MEDIUM"
+                repairs.append(
+                    f"pacing_mismatch_findings[{idx}].severity defaulted"
+                )
+            else:
+                finding["severity"] = severity
+            evidence = self._normalize_evidence_field(finding.get("evidence", ""))
+            if evidence and evidence != finding.get("evidence"):
+                finding["evidence"] = evidence
+                repairs.append(
+                    f"pacing_mismatch_findings[{idx}].evidence flattened"
+                )
+            if not str(finding.get("beat", "")).strip():
+                finding["beat"] = "unspecified beat"
+                repairs.append(f"pacing_mismatch_findings[{idx}].beat synthesized")
+            if not str(finding.get("problem", "")).strip():
+                beat = str(finding.get("beat", "")).strip() or "this beat"
+                target_words = int(finding.get("target_words", 0) or 0)
+                actual_words = int(finding.get("actual_words", 0) or 0)
+                finding["problem"] = (
+                    f"{beat} overruns its word budget ({actual_words} actual vs {target_words} target),"
+                    " causing non-primary material to crowd the chapter's primary movement."
+                )
+                repairs.append(f"pacing_mismatch_findings[{idx}].problem synthesized")
+            if not str(finding.get("rewrite_direction", "")).strip():
+                citations = self._extract_locator_citations(
+                    str(finding.get("evidence", "")).strip(),
+                    f"snapshots/cycle_{self._cpad(cycle)}/FINAL_NOVEL.md",
+                )
+                locator = "; ".join(citations[:2]) or f"snapshots/cycle_{self._cpad(cycle)}/FINAL_NOVEL.md:1"
+                finding["rewrite_direction"] = (
+                    f"Compress the non-primary material anchored at {locator} so {finding['beat']} stays within budget and the chapter's primary beats regain page share."
+                )
+                repairs.append(
+                    f"pacing_mismatch_findings[{idx}].rewrite_direction synthesized"
+                )
+            if not str(finding.get("acceptance_test", "")).strip():
+                finding["acceptance_test"] = (
+                    f"Pass if {finding['beat']} is visibly shorter in revision, the cited span no longer carries side-business beyond its budgeted weight, and the chapter's primary beats regain narrative dominance."
+                )
+                repairs.append(
+                    f"pacing_mismatch_findings[{idx}].acceptance_test synthesized"
+                )
+            base_id = str(finding.get("finding_id", "")).strip()
+            if base_id:
+                dup_count = seen_ids.get(base_id, 0)
+                if dup_count:
+                    finding["finding_id"] = f"{base_id}_{dup_count + 1}"
+                    repairs.append(
+                        f"pacing_mismatch_findings[{idx}].finding_id deduplicated"
+                    )
+                seen_ids[base_id] = dup_count + 1
+        pacing_count = data.get("pacing_mismatch_count")
+        if pacing_count != len(pacing_findings):
+            data["pacing_mismatch_count"] = len(pacing_findings)
+            repairs.append("pacing_mismatch_count normalized")
+
         summary = data.get("summary")
         if not isinstance(summary, str) or not summary.strip():
             redundancy_count = len(data.get("redundancy_findings", [])) if isinstance(
@@ -12310,10 +13187,14 @@ class NovelPipelineRunner:
             consistency_count = len(data.get("consistency_findings", [])) if isinstance(
                 data.get("consistency_findings"), list
             ) else 0
+            pacing_count = len(data.get("pacing_mismatch_findings", [])) if isinstance(
+                data.get("pacing_mismatch_findings"), list
+            ) else 0
             data["summary"] = (
                 f"Cross-chapter audit for cycle {cycle}. "
                 f"Redundancy findings: {redundancy_count}. "
-                f"Consistency findings: {consistency_count}."
+                f"Consistency findings: {consistency_count}. "
+                f"Pacing mismatch findings: {pacing_count}."
             )
             repairs.append("summary synthesized from finding counts")
 
@@ -12360,8 +13241,13 @@ class NovelPipelineRunner:
             "not_x_y_count": 0,
             "personified_abstraction_count": 0,
             "abstract_noun_subject_count": 0,
+            "simile_count": 0,
+            "as_if_count": 0,
+            "the_way_x_count": 0,
+            "pacing_mismatch_count": 0,
             "redundancy_findings": [],
             "consistency_findings": [],
+            "pacing_mismatch_findings": [],
         }
 
     def _is_cross_chapter_audit_fallback_payload(
@@ -12385,8 +13271,21 @@ class NovelPipelineRunner:
                 expected["abstract_noun_subject_count"],
             )
             == expected["abstract_noun_subject_count"]
+            and data.get("simile_count", expected["simile_count"])
+            == expected["simile_count"]
+            and data.get("as_if_count", expected["as_if_count"])
+            == expected["as_if_count"]
+            and data.get("the_way_x_count", expected["the_way_x_count"])
+            == expected["the_way_x_count"]
+            and data.get(
+                "pacing_mismatch_count",
+                expected["pacing_mismatch_count"],
+            )
+            == expected["pacing_mismatch_count"]
             and data.get("redundancy_findings") == expected["redundancy_findings"]
             and data.get("consistency_findings") == expected["consistency_findings"]
+            and data.get("pacing_mismatch_findings")
+            == expected["pacing_mismatch_findings"]
         )
 
     def _normalize_local_window_category(self, value: str) -> str:
@@ -14504,6 +15403,19 @@ class NovelPipelineRunner:
 
     def _utc_now(self) -> str:
         return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def _format_duration_seconds(self, seconds: int) -> str:
+        seconds = max(0, int(seconds))
+        if seconds < 60:
+            return f"{seconds}s"
+        minutes, sec = divmod(seconds, 60)
+        if minutes < 60:
+            return f"{minutes}m{sec:02d}s"
+        hours, minutes = divmod(minutes, 60)
+        if hours < 24:
+            return f"{hours}h{minutes:02d}m"
+        days, hours = divmod(hours, 24)
+        return f"{days}d{hours:02d}h{minutes:02d}m"
 
     def _log(self, message: str) -> None:
         print(f"[novel-pipeline] {message}", flush=True)

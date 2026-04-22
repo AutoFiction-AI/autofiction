@@ -25,6 +25,9 @@ Reconciliation rules:
 9. For `state_transitions`, only record changes that affect continuity: age changes, injuries gained or healed, objects acquired or lost, relationships formed or broken, knowledge gained. Do not track emotional arc — that is the chapter spec's job.
 10. For `knowledge_state`, only track information that characters could act on incorrectly if a drafter gets it wrong: secrets, lies, things learned in specific chapters that affect later behavior.
 11. Treat `{{SPATIAL_LAYOUT_FILE}}` as the authoritative source for spatial ground truth. The continuity sheet's geography section should point to that file instead of duplicating room-by-room, route-by-route, or distance-by-distance spatial facts. Only keep high-level location facts in the continuity sheet that downstream stages need for non-spatial continuity.
+12. `objects[].per_chapter_state` is the canonical tracker for plot-active props. Each entry must record `chapter`, `state`, `holder`, and `location`.
+13. `character_blocking[]` tracks plot-active physical presence. Use it only for characters whose entrances, exits, carried objects, or positions materially matter in a chapter.
+14. When two chapters disagree on an object's state transition, log the conflict with `field: "prop_state_drift"` in the conflict log.
 
 Required outputs:
 1. `{{CONTINUITY_SHEET_OUTPUT_FILE}}` (overwrites existing sheet)
@@ -60,7 +63,8 @@ Must be a valid JSON object with these top-level keys (all required, but arrays/
 
 5. `power_structure` (array of objects with `holder`, `over`, and `mechanism` fields)
 
-6. `objects` (array of objects with `name`, `owner`, `origin`, `status`, and `chapter_introduced` fields)
+6. `objects` (array of objects with `name`, `owner`, `origin`, `status`, `chapter_introduced`, and `per_chapter_state`)
+   - `per_chapter_state` is an array of objects with `chapter`, `state`, `holder`, and `location`
 
 7. `financial_state` (object with):
    - `debts` (array of objects with `creditor`, `amount`, `deadline`, and `status` fields)
@@ -69,6 +73,8 @@ Must be a valid JSON object with these top-level keys (all required, but arrays/
 8. `knowledge_state` (array of objects with `character`, `knows`, `learned_in`, and `hidden_from` fields)
 
 9. `environmental_constants` (array of strings: persistent sensory and environmental facts about the world)
+
+10. `character_blocking` (array of objects with `chapter`, `character`, `entrance`, `exit`, `carrying`, and `position`)
 
 `{{CONFLICT_LOG_OUTPUT_FILE}}` contract:
 Must be a valid JSON object with:
