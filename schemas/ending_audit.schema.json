@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "cycle",
+    "verdict",
+    "summary",
+    "ending_map",
+    "findings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cycle": {"type": "integer", "minimum": 1},
+    "verdict": {"type": "string", "enum": ["PASS", "FAIL"]},
+    "summary": {"type": "string", "minLength": 1},
+    "ending_map": {
+      "type": "object",
+      "required": [
+        "climax_location",
+        "denouement_span",
+        "closing_threads",
+        "last_image_summary",
+        "last_line_quoted",
+        "epilogue_present"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "climax_location": {"type": "string"},
+        "denouement_span": {"type": "string"},
+        "closing_threads": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["thread", "status", "evidence"],
+            "additionalProperties": false,
+            "properties": {
+              "thread": {"type": "string"},
+              "status": {
+                "type": "string",
+                "enum": [
+                  "closed_on_page",
+                  "closed_by_summary",
+                  "left_open_by_design",
+                  "fizzled"
+                ]
+              },
+              "evidence": {"type": "string"}
+            }
+          }
+        },
+        "last_image_summary": {"type": "string"},
+        "last_line_quoted": {"type": "string"},
+        "epilogue_present": {"type": "boolean"}
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "finding_id",
+          "category",
+          "severity",
+          "chapter_id",
+          "evidence",
+          "problem",
+          "rewrite_direction",
+          "acceptance_test",
+          "pass_hint"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "finding_id": {"type": "string", "minLength": 1},
+          "category": {
+            "type": "string",
+            "enum": [
+              "climax_charge",
+              "thread_inventory",
+              "wrong_threads_closed",
+              "denouement_length",
+              "ending_earned_by_investment",
+              "last_image",
+              "last_paragraph",
+              "last_line",
+              "unprepared_arrivals",
+              "ending_register_match",
+              "epilogue_or_coda_audit",
+              "relief_vs_resolution",
+              "would_a_reader_underline_anything_here"
+            ]
+          },
+          "severity": {"type": "string", "enum": ["MEDIUM", "HIGH", "CRITICAL"]},
+          "chapter_id": {"type": "string", "pattern": "^chapter_[0-9]{2}$"},
+          "evidence": {"type": "string", "minLength": 1},
+          "problem": {"type": "string", "minLength": 1},
+          "rewrite_direction": {"type": "string", "minLength": 1},
+          "acceptance_test": {"type": "string", "minLength": 1},
+          "pass_hint": {
+            "type": "string",
+            "enum": [
+              "p1_structural_craft",
+              "p2_dialogue_idiolect_cadence",
+              "p3_prose_copyedit"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

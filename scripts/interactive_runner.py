@@ -18,8 +18,11 @@ inspected before the next is generated.
 
 from __future__ import annotations
 
+import dataclasses
+import difflib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -49,6 +52,12 @@ class InteractivePipelineRunner(NovelPipelineRunner):
     """NovelPipelineRunner with human-in-the-loop checkpoints."""
 
     def __init__(self, *, repo_root: Path, cfg) -> None:
+        # Interactive mode: the human checkpoint after the outline stage IS
+        # the review. Suppress the parent's automatic LLM outline_review /
+        # outline_revision cycles so the human sees the freshly generated
+        # outline before any LLM critique fires.
+        if not getattr(cfg, "skip_outline_review", False):
+            cfg = dataclasses.replace(cfg, skip_outline_review=True)
         super().__init__(repo_root=repo_root, cfg=cfg)
         self._annotations_dir = self.run_dir / "annotations"
         self._pending_outline_notes: str | None = None
@@ -57,6 +66,10 @@ class InteractivePipelineRunner(NovelPipelineRunner):
         self._pending_revision_notes: dict[int, str] = {}
         self._current_cycle: int | None = None
         self._decision_bin = self._resolve_decision_bin()
+        # Snapshot of artifact text at the moment the human asked for a
+        # revise/rewrite, keyed by run-relative path. Used to render a
+        # within-checkpoint diff once the regenerated artifact appears.
+        self._prior_artifacts: dict[str, str] = {}
 
     # ------------------------------------------------------------------
     # Stage overrides
@@ -75,6 +88,7 @@ class InteractivePipelineRunner(NovelPipelineRunner):
                 self._pending_outline_notes = None
                 return
             self._pending_outline_notes = self._compose_notes(action, note)
+            self._snapshot_paths(self._outline_read_paths())
             self._invalidate_outline_outputs()
             self._log(f"interactive outline_rerun action={action}")
             super()._run_outline_stage()
@@ -102,6 +116,7 @@ class InteractivePipelineRunner(NovelPipelineRunner):
                 self._pending_chapter_notes[spec.chapter_id] = self._compose_notes(
                     action, note
                 )
+                self._snapshot_paths([chapter_rel])
                 self._delete_chapter_draft(spec.chapter_id)
                 self._log(
                     f"interactive draft_rerun chapter={spec.chapter_id} action={action}"
@@ -126,6 +141,7 @@ class InteractivePipelineRunner(NovelPipelineRunner):
                     self._pending_review_notes.pop(cycle, None)
                     return result
                 self._pending_review_notes[cycle] = self._compose_notes(action, note)
+                self._snapshot_paths(self._review_read_paths(cycle))
                 self._invalidate_review_outputs(cycle)
                 self._log(
                     f"interactive review_rerun cycle={cpad} action={action}"
@@ -156,6 +172,7 @@ class InteractivePipelineRunner(NovelPipelineRunner):
                     self._pending_revision_notes.pop(cycle, None)
                     return result
                 self._pending_revision_notes[cycle] = self._compose_notes(action, note)
+                self._snapshot_paths(self._revision_read_paths(cycle))
                 self._invalidate_revision_outputs(cycle, chapter_ids)
                 self._log(
                     f"interactive revision_rerun cycle={cpad} action={action}"
@@ -367,13 +384,28 @@ class InteractivePipelineRunner(NovelPipelineRunner):
         print(bar, flush=True)
         print(f"run_dir: {self.run_dir}", flush=True)
         print(summary, flush=True)
+
+        digest = self._build_digest(stage_label)
+        if digest:
+            print(f"\n--- DIGEST ---\n{digest}", flush=True)
+
+        diff = self._build_diff(stage_label, read_paths)
+        if diff:
+            print(f"\n--- DIFF vs. prior version ---\n{diff}", flush=True)
+
         if read_paths:
-            print("\nRead these files (paths relative to run_dir):", flush=True)
-            for rel in read_paths:
-                print(f"  - {rel}", flush=True)
+            print("\nRaw files (paths relative to run_dir):", flush=True)
+            for idx, rel in enumerate(read_paths, start=1):
+                print(f"  [{idx}] {rel}", flush=True)
+
         print(
-            "\nType your free-text annotation about what works and what does not. "
-            "Be specific. Empty input is interpreted as 'continue'.",
+            "\nCommands while typing your annotation:\n"
+            "  /r N        — dump raw file [N] inline (then keep typing)\n"
+            "  /r <path>   — dump a specific file inline\n"
+            "  /list       — re-show the file index\n"
+            "  /help       — show this command list\n"
+            "Type your free-text annotation about what works and what does "
+            "not. Be specific. Empty input is interpreted as 'continue'.",
             flush=True,
         )
         print(
@@ -383,7 +415,7 @@ class InteractivePipelineRunner(NovelPipelineRunner):
         )
         print(bar, flush=True)
 
-        note = self._read_multiline_from_tty()
+        note = self._read_annotation_with_commands(read_paths)
         note = note.strip()
 
         if not note:
@@ -396,18 +428,94 @@ class InteractivePipelineRunner(NovelPipelineRunner):
         self._persist_annotation(key, action, note)
         return action, note
 
-    @staticmethod
-    def _read_multiline_from_tty() -> str:
+    def _read_annotation_with_commands(self, read_paths: list[str]) -> str:
+        """Read a multiline annotation with inline /r-style commands.
+
+        Lines that start with `/` are treated as commands and never appear
+        in the returned annotation. A line containing only `.` or EOF
+        terminates the annotation.
+        """
         lines: list[str] = []
         try:
             while True:
                 line = input()
-                if line.strip() == ".":
+                stripped = line.strip()
+                if stripped == ".":
                     break
+                if stripped.startswith("/"):
+                    self._handle_checkpoint_command(stripped, read_paths)
+                    continue
                 lines.append(line)
         except EOFError:
             pass
         return "\n".join(lines)
+
+    def _handle_checkpoint_command(
+        self, command: str, read_paths: list[str]
+    ) -> None:
+        parts = command.split(None, 1)
+        head = parts[0].lower()
+        arg = parts[1].strip() if len(parts) > 1 else ""
+        if head in ("/help", "/?"):
+            print(
+                "  /r N        — dump raw file [N] inline\n"
+                "  /r <path>   — dump a specific run-relative file\n"
+                "  /list       — re-show the file index\n"
+                "  /help       — this list\n"
+                "  .           — finish annotation",
+                flush=True,
+            )
+            return
+        if head in ("/list", "/l"):
+            if not read_paths:
+                print("  (no files listed at this checkpoint)", flush=True)
+                return
+            for idx, rel in enumerate(read_paths, start=1):
+                print(f"  [{idx}] {rel}", flush=True)
+            return
+        if head in ("/r", "/read"):
+            if not arg:
+                print("  usage: /r <index>  or  /r <path>", flush=True)
+                return
+            target: Path | None = None
+            label: str = arg
+            if arg.isdigit():
+                i = int(arg)
+                if 1 <= i <= len(read_paths):
+                    label = read_paths[i - 1]
+                    target = self.run_dir / label
+                else:
+                    print(
+                        f"  no file at index {i} (range 1..{len(read_paths)})",
+                        flush=True,
+                    )
+                    return
+            else:
+                target = self.run_dir / arg
+            if target is None or not target.is_file():
+                print(f"  file not found: {label}", flush=True)
+                return
+            self._dump_file_to_tty(target, label)
+            return
+        print(f"  unknown command: {head}. Try /help.", flush=True)
+
+    def _dump_file_to_tty(self, path: Path, label: str) -> None:
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            print(f"  could not read {label}: {exc}", flush=True)
+            return
+        bar = "-" * 72
+        print(f"\n{bar}\n>>> {label}\n{bar}", flush=True)
+        # Pretty-print JSON if it parses; otherwise dump as-is.
+        if path.suffix == ".json":
+            try:
+                data = json.loads(text)
+                text = json.dumps(data, indent=2, ensure_ascii=False)
+            except (json.JSONDecodeError, ValueError):
+                pass
+        print(text, flush=True)
+        print(f"{bar}\n<<< end {label}\n", flush=True)
 
     def _persist_annotation(self, key: str, action: str, note: str) -> None:
         path = self._annotations_dir / f"{key}.md"
@@ -429,6 +537,566 @@ class InteractivePipelineRunner(NovelPipelineRunner):
         if not prefix:
             return raw_note.strip()
         return f"{prefix}\n\n{raw_note.strip()}"
+
+    # ------------------------------------------------------------------
+    # Digest + diff: pre-read summaries so the human doesn't have to open
+    # every artifact to form an opinion.
+    # ------------------------------------------------------------------
+
+    def _snapshot_paths(self, rels: list[str]) -> None:
+        for rel in rels:
+            path = self.run_dir / rel
+            if not path.is_file():
+                continue
+            try:
+                self._prior_artifacts[rel] = path.read_text(
+                    encoding="utf-8", errors="replace"
+                )
+            except OSError:
+                continue
+
+    def _build_digest(self, stage_label: str) -> str:
+        try:
+            if stage_label == "outline":
+                return self._digest_outline()
+            if stage_label.startswith("chapter_draft:"):
+                return self._digest_chapter_draft(
+                    stage_label.split(":", 1)[1]
+                )
+            if stage_label.startswith("chapter_review_cycle_"):
+                cycle = int(stage_label.rsplit("_", 1)[1])
+                return self._digest_review_cycle(cycle)
+            if stage_label.startswith("revision_cycle_"):
+                cycle = int(stage_label.rsplit("_", 1)[1])
+                return self._digest_revision_cycle(cycle)
+        except Exception as exc:  # noqa: BLE001 — digest must never crash the harness
+            return f"(digest unavailable: {exc})"
+        return ""
+
+    def _build_diff(self, stage_label: str, read_paths: list[str]) -> str:
+        try:
+            if stage_label == "outline":
+                return self._diff_text_artifact("outline/outline.md")
+            if stage_label.startswith("chapter_draft:"):
+                rel = f"chapters/{stage_label.split(':', 1)[1]}.md"
+                return self._diff_text_artifact(rel)
+            if stage_label.startswith("chapter_review_cycle_"):
+                cycle = int(stage_label.rsplit("_", 1)[1])
+                return self._diff_review_cycle(cycle)
+            if stage_label.startswith("revision_cycle_"):
+                cycle = int(stage_label.rsplit("_", 1)[1])
+                return self._diff_revision_cycle(cycle)
+        except Exception as exc:  # noqa: BLE001
+            return f"(diff unavailable: {exc})"
+        return ""
+
+    # ---- per-stage digests -------------------------------------------
+
+    def _digest_outline(self) -> str:
+        lines: list[str] = []
+        outline_md = self._read_run_text("outline/outline.md")
+        if outline_md:
+            words = len(outline_md.split())
+            chapter_titles = self._extract_outline_chapter_titles(outline_md)
+            lines.append(f"outline.md: {words:,} words")
+            if chapter_titles:
+                lines.append(f"chapters in outline.md: {len(chapter_titles)}")
+                for title in chapter_titles[:30]:
+                    lines.append(f"  - {title}")
+                if len(chapter_titles) > 30:
+                    lines.append(f"  ...and {len(chapter_titles) - 30} more")
+
+        specs_jsonl = self._read_run_text("outline/chapter_specs.jsonl")
+        if specs_jsonl:
+            count = 0
+            target_words = 0
+            for raw in specs_jsonl.splitlines():
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    spec = json.loads(raw)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                count += 1
+                target_words += int(spec.get("projected_min_words") or 0)
+            if count:
+                lines.append(
+                    f"chapter_specs.jsonl: {count} specs"
+                    + (
+                        f", min target ~{target_words:,} words"
+                        if target_words
+                        else ""
+                    )
+                )
+
+        scene_tsv = self._read_run_text("outline/scene_plan.tsv")
+        if scene_tsv:
+            rows = [r for r in scene_tsv.splitlines() if r.strip()]
+            data_rows = rows[1:] if len(rows) > 1 else []
+            lines.append(f"scene_plan.tsv: {len(data_rows)} scenes")
+
+        sb = self._read_run_json("outline/style_bible.json")
+        if isinstance(sb, dict):
+            profiles = sb.get("character_voice_profiles") or []
+            if isinstance(profiles, list):
+                names = [
+                    str(p.get("character_id") or "?")
+                    for p in profiles
+                    if isinstance(p, dict)
+                ]
+                if names:
+                    lines.append(
+                        "style_bible characters: "
+                        + ", ".join(names[:20])
+                        + (f" (+{len(names) - 20})" if len(names) > 20 else "")
+                    )
+
+        spatial = self._read_run_json("outline/spatial_layout.json")
+        if isinstance(spatial, dict):
+            locs = spatial.get("locations") or spatial.get("places") or []
+            if isinstance(locs, list) and locs:
+                lines.append(f"spatial_layout locations: {len(locs)}")
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def _extract_outline_chapter_titles(text: str) -> list[str]:
+        # Match the outline convention "**Chapter N — Title**" anchored at
+        # the start of a line, so register-marker bullets like
+        # "- **Chapter 7 — phoneme-displacement register**" inside body
+        # paragraphs are not picked up. The title runs from the en/em dash
+        # to the first closing `**` on the same line (chapter 9's italic
+        # parenthetical after the closing `**` is correctly excluded).
+        pattern = re.compile(
+            r"^\*\*Chapter\s+(\d+)\s*[—\-–]\s*([^*\n]+?)\*\*",
+            re.IGNORECASE | re.MULTILINE,
+        )
+        seen: set[str] = set()
+        titles: list[str] = []
+        for match in pattern.finditer(text):
+            num = match.group(1)
+            if num in seen:
+                continue
+            seen.add(num)
+            title = match.group(2).strip()
+            titles.append(f"Chapter {num} — {title}")
+        return titles
+
+    def _digest_chapter_draft(self, chapter_id: str) -> str:
+        rel = f"chapters/{chapter_id}.md"
+        text = self._read_run_text(rel)
+        if not text:
+            return f"(no content at {rel})"
+        word_count = len(text.split())
+        line_count = text.count("\n") + 1
+        # Count scene breaks (loose heuristic: blank-line-separated `#` or
+        # `## Scene` headers, or `***` separators).
+        scene_breaks = (
+            len(re.findall(r"(?m)^\s*\*\s*\*\s*\*\s*$", text))
+            + len(re.findall(r"(?m)^##\s", text))
+        )
+        head_lines = self._first_nonempty_lines(text, 6)
+        tail_lines = self._last_nonempty_lines(text, 4)
+        prior = self._prior_artifacts.get(rel)
+        delta = ""
+        if prior is not None:
+            prior_words = len(prior.split())
+            delta = f"  (Δ {word_count - prior_words:+,} words vs. prior)"
+
+        out = [
+            f"{rel}: {word_count:,} words, {line_count} lines, ~{scene_breaks} scene breaks{delta}",
+            "",
+            "head:",
+        ]
+        out.extend(f"  > {ln}" for ln in head_lines)
+        out.append("")
+        out.append("tail:")
+        out.extend(f"  > {ln}" for ln in tail_lines)
+        return "\n".join(out)
+
+    @staticmethod
+    def _first_nonempty_lines(text: str, n: int) -> list[str]:
+        out: list[str] = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            out.append(stripped[:160])
+            if len(out) >= n:
+                break
+        return out
+
+    @staticmethod
+    def _last_nonempty_lines(text: str, n: int) -> list[str]:
+        out: list[str] = []
+        for line in reversed(text.splitlines()):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            out.append(stripped[:160])
+            if len(out) >= n:
+                break
+        return list(reversed(out))
+
+    def _digest_review_cycle(self, cycle: int) -> str:
+        cpad = self._cpad(cycle)
+        review_dir = self.run_dir / "reviews" / f"cycle_{cpad}"
+        if not review_dir.is_dir():
+            return f"(no reviews/cycle_{cpad}/ directory)"
+        files = sorted(review_dir.glob("*.review.json"))
+        if not files:
+            return f"(no chapter_*.review.json files in reviews/cycle_{cpad}/)"
+
+        lines: list[str] = [f"cycle {cpad}: {len(files)} chapter review(s)"]
+        for path in files:
+            data = self._load_json(path)
+            if not isinstance(data, dict):
+                lines.append(f"  {path.name}: (unparseable)")
+                continue
+            chap = data.get("chapter_id", path.stem.split(".")[0])
+            verdicts = data.get("verdicts") or {}
+            verdict_summary = " ".join(
+                f"{k}={v}" for k, v in sorted(verdicts.items())
+            ) if isinstance(verdicts, dict) else ""
+            findings = data.get("findings") or []
+            counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0}
+            for f in findings if isinstance(findings, list) else []:
+                if not isinstance(f, dict):
+                    continue
+                sev = str(f.get("severity", "")).strip().upper()
+                if sev in counts:
+                    counts[sev] += 1
+            counts_str = (
+                f"CRIT={counts['CRITICAL']} HIGH={counts['HIGH']} "
+                f"MED={counts['MEDIUM']} (total {len(findings)})"
+            )
+            lines.append(f"  {chap}: {verdict_summary} | {counts_str}")
+
+            # Top findings: critical > high > medium, capped.
+            top: list[dict[str, Any]] = []
+            for sev_order in ("CRITICAL", "HIGH", "MEDIUM"):
+                for f in findings if isinstance(findings, list) else []:
+                    if not isinstance(f, dict):
+                        continue
+                    if str(f.get("severity", "")).strip().upper() == sev_order:
+                        top.append(f)
+                    if len(top) >= 3:
+                        break
+                if len(top) >= 3:
+                    break
+            for f in top:
+                src = f.get("source", "?")
+                sev = f.get("severity", "?")
+                problem = str(f.get("problem", "")).split(".")[0]
+                if len(problem) > 140:
+                    problem = problem[:137] + "..."
+                lines.append(f"    [{sev}/{src}] {problem}")
+            summary = data.get("summary")
+            if isinstance(summary, str) and summary.strip():
+                short = summary.strip().replace("\n", " ")
+                if len(short) > 220:
+                    short = short[:217] + "..."
+                lines.append(f"    summary: {short}")
+        return "\n".join(lines)
+
+    def _digest_revision_cycle(self, cycle: int) -> str:
+        cpad = self._cpad(cycle)
+        rev_dir = self.run_dir / "revisions" / f"cycle_{cpad}"
+        if not rev_dir.is_dir():
+            return f"(no revisions/cycle_{cpad}/ directory)"
+        # The canonical per-chapter report is named `<chapter_id>.revision_report.json`.
+        # Pass-level files (`<chapter_id>.<pass>.revision_report.json`) are not
+        # surfaced here.
+        files = sorted(
+            p
+            for p in rev_dir.glob("*.revision_report.json")
+            if p.stem.count(".") == 1  # chapter_NN.revision_report
+        )
+        if not files:
+            files = sorted(rev_dir.glob("*.revision_report.json"))
+        if not files:
+            return f"(no revision_report.json files in revisions/cycle_{cpad}/)"
+
+        snapshot_rel = f"snapshots/cycle_{cpad}/FINAL_NOVEL.post_revision.md"
+        snap_text = self._read_run_text(snapshot_rel)
+        lines: list[str] = [f"cycle {cpad}: {len(files)} chapter revision report(s)"]
+        if snap_text:
+            lines.append(
+                f"{snapshot_rel}: {len(snap_text.split()):,} words"
+            )
+        for path in files:
+            data = self._load_json(path)
+            if not isinstance(data, dict):
+                lines.append(f"  {path.name}: (unparseable)")
+                continue
+            chap = data.get("chapter_id", path.stem.split(".")[0])
+            results = data.get("finding_results") or []
+            counts = {"FIXED": 0, "PARTIAL": 0, "UNRESOLVED": 0}
+            for r in results if isinstance(results, list) else []:
+                if not isinstance(r, dict):
+                    continue
+                st = str(r.get("status_after_revision", "")).strip().upper()
+                if st in counts:
+                    counts[st] += 1
+            total = sum(counts.values())
+            chap_rel = f"revisions/cycle_{cpad}/{chap}.md"
+            new_text = self._read_run_text(chap_rel)
+            wd = ""
+            if new_text is not None:
+                wd = f", {len(new_text.split()):,} words"
+            lines.append(
+                f"  {chap}: FIXED={counts['FIXED']} PARTIAL={counts['PARTIAL']} "
+                f"UNRESOLVED={counts['UNRESOLVED']} (of {total}){wd}"
+            )
+            unresolved_notes = [
+                str(r.get("revision_note", "")).strip()
+                for r in (results if isinstance(results, list) else [])
+                if isinstance(r, dict)
+                and str(r.get("status_after_revision", "")).strip().upper()
+                in {"PARTIAL", "UNRESOLVED"}
+                and str(r.get("revision_note", "")).strip()
+            ]
+            for note_text in unresolved_notes[:2]:
+                short = note_text.replace("\n", " ")
+                if len(short) > 180:
+                    short = short[:177] + "..."
+                lines.append(f"    note: {short}")
+            summary = data.get("summary")
+            if isinstance(summary, str) and summary.strip():
+                short = summary.strip().replace("\n", " ")
+                if len(short) > 220:
+                    short = short[:217] + "..."
+                lines.append(f"    summary: {short}")
+        return "\n".join(lines)
+
+    # ---- per-stage diffs ---------------------------------------------
+
+    def _diff_text_artifact(self, rel: str) -> str:
+        prior = self._prior_artifacts.get(rel)
+        if prior is None:
+            return ""
+        current = self._read_run_text(rel)
+        if current is None:
+            return ""
+        if prior == current:
+            return "(no textual change from prior version)"
+        return self._format_unified_diff(prior, current, rel, max_lines=80)
+
+    @staticmethod
+    def _format_unified_diff(
+        prior: str, current: str, label: str, *, max_lines: int = 80
+    ) -> str:
+        diff_iter = difflib.unified_diff(
+            prior.splitlines(),
+            current.splitlines(),
+            fromfile=f"{label} (prior)",
+            tofile=f"{label} (current)",
+            n=2,
+            lineterm="",
+        )
+        out: list[str] = []
+        for i, dline in enumerate(diff_iter):
+            if i >= max_lines:
+                out.append(f"... (diff truncated at {max_lines} lines)")
+                break
+            out.append(dline)
+        return "\n".join(out)
+
+    def _diff_review_cycle(self, cycle: int) -> str:
+        """Compare this cycle's reviews to the just-rejected snapshot (if any)
+        or to the previous cycle's reviews on disk."""
+        cpad = self._cpad(cycle)
+        review_dir = self.run_dir / "reviews" / f"cycle_{cpad}"
+        if not review_dir.is_dir():
+            return ""
+        per_chapter: list[str] = []
+        for path in sorted(review_dir.glob("*.review.json")):
+            rel = str(path.relative_to(self.run_dir))
+            cur = self._load_json(path)
+            if not isinstance(cur, dict):
+                continue
+            chap = cur.get("chapter_id", path.stem.split(".")[0])
+            prior_text = self._prior_artifacts.get(rel)
+            prior_data: dict[str, Any] | None = None
+            prior_origin = "(no prior version)"
+            if prior_text is not None:
+                try:
+                    parsed = json.loads(prior_text)
+                    if isinstance(parsed, dict):
+                        prior_data = parsed
+                        prior_origin = "vs. rejected previous attempt"
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            if prior_data is None and cycle > 1:
+                prev_path = (
+                    self.run_dir
+                    / "reviews"
+                    / f"cycle_{self._cpad(cycle - 1)}"
+                    / path.name
+                )
+                prev = self._load_json(prev_path)
+                if isinstance(prev, dict):
+                    prior_data = prev
+                    prior_origin = f"vs. cycle_{self._cpad(cycle - 1)}"
+            if prior_data is None:
+                continue
+            per_chapter.append(
+                self._format_review_chapter_diff(chap, prior_data, cur, prior_origin)
+            )
+        return "\n".join(per_chapter)
+
+    @staticmethod
+    def _format_review_chapter_diff(
+        chap: str,
+        prior: dict[str, Any],
+        current: dict[str, Any],
+        origin: str,
+    ) -> str:
+        def _verdicts(d: dict[str, Any]) -> dict[str, str]:
+            v = d.get("verdicts")
+            return v if isinstance(v, dict) else {}
+
+        def _finding_ids(d: dict[str, Any]) -> dict[str, dict[str, Any]]:
+            out: dict[str, dict[str, Any]] = {}
+            for f in d.get("findings") or []:
+                if isinstance(f, dict):
+                    fid = str(f.get("finding_id", "")).strip()
+                    if fid:
+                        out[fid] = f
+            return out
+
+        flips: list[str] = []
+        prior_v = _verdicts(prior)
+        cur_v = _verdicts(current)
+        for k in sorted(set(prior_v) | set(cur_v)):
+            if prior_v.get(k) != cur_v.get(k):
+                flips.append(f"{k}: {prior_v.get(k, '?')}→{cur_v.get(k, '?')}")
+
+        prior_ids = _finding_ids(prior)
+        cur_ids = _finding_ids(current)
+        added = sorted(set(cur_ids) - set(prior_ids))
+        removed = sorted(set(prior_ids) - set(cur_ids))
+
+        head = f"  {chap} {origin}: "
+        bits: list[str] = []
+        if flips:
+            bits.append("verdicts " + ", ".join(flips))
+        else:
+            bits.append("verdicts unchanged")
+        bits.append(f"+{len(added)}/-{len(removed)} findings")
+        out = [head + " | ".join(bits)]
+        for fid in added[:4]:
+            f = cur_ids[fid]
+            sev = f.get("severity", "?")
+            src = f.get("source", "?")
+            problem = str(f.get("problem", "")).split(".")[0]
+            if len(problem) > 140:
+                problem = problem[:137] + "..."
+            out.append(f"    + [{sev}/{src}] {fid}: {problem}")
+        if len(added) > 4:
+            out.append(f"    + ...and {len(added) - 4} more")
+        for fid in removed[:4]:
+            out.append(f"    - {fid}")
+        if len(removed) > 4:
+            out.append(f"    - ...and {len(removed) - 4} more")
+        return "\n".join(out)
+
+    def _diff_revision_cycle(self, cycle: int) -> str:
+        cpad = self._cpad(cycle)
+        rev_dir = self.run_dir / "revisions" / f"cycle_{cpad}"
+        if not rev_dir.is_dir():
+            return ""
+        per_chapter: list[str] = []
+        for path in sorted(rev_dir.glob("*.revision_report.json")):
+            if path.stem.count(".") != 1:
+                continue  # skip pass-level files
+            rel = str(path.relative_to(self.run_dir))
+            cur = self._load_json(path)
+            if not isinstance(cur, dict):
+                continue
+            chap = cur.get("chapter_id", path.stem.split(".")[0])
+            prior_text = self._prior_artifacts.get(rel)
+            prior_data: dict[str, Any] | None = None
+            prior_origin = "(no prior version)"
+            if prior_text is not None:
+                try:
+                    parsed = json.loads(prior_text)
+                    if isinstance(parsed, dict):
+                        prior_data = parsed
+                        prior_origin = "vs. rejected previous attempt"
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            if prior_data is None and cycle > 1:
+                prev_path = (
+                    self.run_dir
+                    / "revisions"
+                    / f"cycle_{self._cpad(cycle - 1)}"
+                    / path.name
+                )
+                prev = self._load_json(prev_path)
+                if isinstance(prev, dict):
+                    prior_data = prev
+                    prior_origin = f"vs. cycle_{self._cpad(cycle - 1)}"
+            if prior_data is None:
+                continue
+            per_chapter.append(
+                self._format_revision_chapter_diff(
+                    chap, prior_data, cur, prior_origin
+                )
+            )
+        return "\n".join(per_chapter)
+
+    @staticmethod
+    def _format_revision_chapter_diff(
+        chap: str,
+        prior: dict[str, Any],
+        current: dict[str, Any],
+        origin: str,
+    ) -> str:
+        def _status_counts(d: dict[str, Any]) -> dict[str, int]:
+            counts = {"FIXED": 0, "PARTIAL": 0, "UNRESOLVED": 0}
+            for r in d.get("finding_results") or []:
+                if not isinstance(r, dict):
+                    continue
+                s = str(r.get("status_after_revision", "")).strip().upper()
+                if s in counts:
+                    counts[s] += 1
+            return counts
+
+        pc = _status_counts(prior)
+        cc = _status_counts(current)
+        deltas = ", ".join(
+            f"{k}: {pc[k]}→{cc[k]}" for k in ("FIXED", "PARTIAL", "UNRESOLVED")
+        )
+        return f"  {chap} {origin}: {deltas}"
+
+    # ---- small IO helpers --------------------------------------------
+
+    def _read_run_text(self, rel: str) -> str | None:
+        path = self.run_dir / rel
+        if not path.is_file():
+            return None
+        try:
+            return path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
+
+    def _read_run_json(self, rel: str) -> Any:
+        text = self._read_run_text(rel)
+        if text is None:
+            return None
+        try:
+            return json.loads(text)
+        except (json.JSONDecodeError, ValueError):
+            return None
+
+    @staticmethod
+    def _load_json(path: Path) -> Any:
+        try:
+            return json.loads(path.read_text(encoding="utf-8", errors="replace"))
+        except (OSError, json.JSONDecodeError, ValueError):
+            return None
 
     # ------------------------------------------------------------------
     # Decision LLM: classify free-text into continue|revise|rewrite.

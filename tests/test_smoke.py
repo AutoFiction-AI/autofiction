@@ -48,7 +48,7 @@ class SmokeTests(unittest.TestCase):
                 (run_dir / "config" / "run_config.json").read_text(encoding="utf-8")
             )
             self.assertEqual(run_config["provider"], "codex")
-            self.assertEqual(run_config["model"], "gpt-5.4")
+            self.assertEqual(run_config["model"], "gpt-5.5")
             self.assertEqual(run_config["reasoning_effort"], "xhigh")
             gate = json.loads((run_dir / "gate" / "cycle_01" / "gate.json").read_text(encoding="utf-8"))
             self.assertIn(gate["decision"], {"PASS", "FAIL"})
@@ -84,6 +84,91 @@ class SmokeTests(unittest.TestCase):
                 (run_dir / "outline" / "continuity_sheet.json").read_text(encoding="utf-8")
             )
             self.assertIn("character_blocking", continuity_sheet)
+            cycle_status = json.loads(
+                (run_dir / "status" / "cycle_01" / "cycle_status.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertIn("scene_consistency_audit", cycle_status["stages"])
+            self.assertIn("dialogue_diagnostic", cycle_status["stages"])
+            self.assertEqual(
+                cycle_status["stages"]["scene_consistency_audit"]["status"],
+                "complete",
+            )
+            self.assertEqual(
+                cycle_status["stages"]["dialogue_diagnostic"]["status"],
+                "complete",
+            )
+            scene_artifacts = sorted(
+                (run_dir / "reviews" / "cycle_01").glob(
+                    "chapter_*.scene_consistency.json"
+                )
+            )
+            self.assertTrue(
+                scene_artifacts,
+                "expected scene_consistency artifacts to be written",
+            )
+            sample_scene = json.loads(scene_artifacts[0].read_text(encoding="utf-8"))
+            self.assertIn("scenes_indexed", sample_scene)
+            self.assertIn("findings", sample_scene)
+            dialogue_artifacts = sorted(
+                (run_dir / "reviews" / "cycle_01").glob(
+                    "chapter_*.dialogue_diagnostic.json"
+                )
+            )
+            self.assertTrue(
+                dialogue_artifacts,
+                "expected dialogue_diagnostic artifacts to be written",
+            )
+            sample_dialogue = json.loads(
+                dialogue_artifacts[0].read_text(encoding="utf-8")
+            )
+            self.assertIn("exchanges_indexed", sample_dialogue)
+            self.assertIn("findings", sample_dialogue)
+            for stage_key in (
+                "cold_reader_pass",
+                "plot_architecture_audit",
+                "character_arc_audit",
+                "ending_audit",
+                "prose_distinctiveness_audit",
+                "theme_coherence_audit",
+            ):
+                self.assertIn(stage_key, cycle_status["stages"])
+                self.assertEqual(
+                    cycle_status["stages"][stage_key]["status"],
+                    "complete",
+                    f"{stage_key} did not complete",
+                )
+            for basename in (
+                "cold_reader.review.json",
+                "plot_architecture.review.json",
+                "ending_audit.review.json",
+                "prose_distinctiveness.review.json",
+                "theme_coherence.review.json",
+            ):
+                path = run_dir / "reviews" / "cycle_01" / basename
+                self.assertTrue(
+                    path.is_file(),
+                    f"expected {basename} to be written",
+                )
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                self.assertIn(payload["verdict"], {"PASS", "FAIL"})
+                self.assertIn("findings", payload)
+            character_arc_artifacts = sorted(
+                (run_dir / "reviews" / "cycle_01").glob(
+                    "character_arc_*.review.json"
+                )
+            )
+            self.assertTrue(
+                character_arc_artifacts,
+                "expected per-character arc audit artifacts to be written",
+            )
+            sample_arc = json.loads(
+                character_arc_artifacts[0].read_text(encoding="utf-8")
+            )
+            self.assertIn("character_id", sample_arc)
+            self.assertIn("arc_map", sample_arc)
+            self.assertIn("findings", sample_arc)
 
     def test_claude_provider_dry_run_uses_provider_defaults(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_claude_", dir="/tmp") as tmp:

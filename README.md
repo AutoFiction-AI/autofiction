@@ -18,7 +18,7 @@ A paper describing this system is in preparation.
 
 ## How This Was Built
 
-The pipeline code in this repository was written primarily by Codex, with planning and prompt editing done in Claude Code. The novels published on autofiction.ai were generated primarily using GPT-5.4 (xhigh reasoning) and Claude Opus 4.6 (max reasoning). Human involvement was limited to writing premises, iterating on prompts, debugging pipeline failures, and occasionally restarting failed runs. No human edited the novel text itself.
+The pipeline code in this repository was written primarily by Codex, with planning and prompt editing done in Claude Code. The novels published on autofiction.ai were generated primarily using GPT-5.5 (xhigh reasoning) and Claude Opus 4.6 (max reasoning). Human involvement was limited to writing premises, iterating on prompts, debugging pipeline failures, and occasionally restarting failed runs. No human edited the novel text itself.
 
 ## Research Framing
 
@@ -59,10 +59,10 @@ The most recent novels on autofiction.ai (*[The Wrong Mouth](https://www.autofic
 | Premise                      | Manual      | (user-written)  |           |
 | Outline                      | Claude Code | Claude Opus 4.6 | max       |
 | Chapter drafting             | Claude Code | Claude Opus 4.6 | max       |
-| Chapter review               | Codex       | GPT-5.4         | xhigh     |
+| Chapter review               | Codex       | GPT-5.5         | xhigh     |
 | Full-book review             | Claude Code | Claude Opus 4.6 | max       |
 | Cross-chapter audit          | Claude Code | Claude Opus 4.6 | max       |
-| Revision (structural, prose) | Codex       | GPT-5.4         | xhigh     |
+| Revision (structural, prose) | Codex       | GPT-5.5         | xhigh     |
 | Revision (dialogue pass)     | Claude Code | Claude Opus 4.6 | max       |
 
 

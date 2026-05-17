@@ -69,6 +69,14 @@ def make_runner(tmp_dir: Path) -> runner_module.NovelPipelineRunner:
         job_timeout_seconds=3600,
         job_idle_timeout_seconds=1800,
         validation_mode="lenient",
+        skip_scene_consistency_audit=True,
+        skip_dialogue_diagnostic=True,
+        skip_cold_reader_pass=True,
+        skip_plot_architecture_audit=True,
+        skip_character_arc_audit=True,
+        skip_ending_audit=True,
+        skip_prose_distinctiveness_audit=True,
+        skip_theme_coherence_audit=True,
     )
     return runner_module.NovelPipelineRunner(REPO_ROOT, cfg)
 
@@ -3260,93 +3268,8 @@ class ClaudeCliParsingTests(unittest.TestCase):
             self.assertEqual(summary["status"], "reused")
             self.assertEqual(summary["units"]["chapter_01"]["status"], "reused")
 
-    def test_chapter_expand_job_receives_outline_and_scene_plan_inputs(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="snp_expand_inputs_", dir="/tmp") as tmp:
-            runner = make_runner(Path(tmp))
-            runner.chapter_specs = [
-                runner_module.ChapterSpec(
-                    chapter_id="chapter_01",
-                    chapter_number=1,
-                    projected_min_words=1000,
-                    chapter_engine="discovery",
-                    pressure_source="pressure",
-                    state_shift="shift",
-                    texture_mode="hot",
-                    scene_count_target=2,
-                    scene_count_target_explicit=True,
-                    must_land_beats=["beat"],
-                    secondary_character_beats=["Give the bartender private stakes."],
-                )
-            ]
-
-            run_dir = runner.cfg.run_dir
-            (run_dir / "chapters").mkdir(parents=True, exist_ok=True)
-            (run_dir / "outline" / "chapter_specs").mkdir(parents=True, exist_ok=True)
-            (run_dir / "config" / "prompts").mkdir(parents=True, exist_ok=True)
-            (run_dir / "outline" / "outline.md").write_text(
-                "## Middle-Book Progression Map\n\nplaceholder\n",
-                encoding="utf-8",
-            )
-            (run_dir / "outline" / "scene_plan.tsv").write_text(
-                "scene_id\tchapter_id\tscene_order\tobjective\topposition\tturn\tconsequence_cost\ttension_peak\n"
-                "s1\tchapter_01\t1\tobj\topp\tturn\tcost\tYES\n",
-                encoding="utf-8",
-            )
-            (run_dir / "outline" / "spatial_layout.json").write_text(
-                json.dumps({"summary": "layout", "micro": None, "macro": None}) + "\n",
-                encoding="utf-8",
-            )
-            (run_dir / "chapters" / "chapter_01.md").write_text(
-                "# Chapter 1\n\nToo short.\n",
-                encoding="utf-8",
-            )
-            (run_dir / "config" / "prompts" / "chapter_expand_prompt.md").write_text(
-                (REPO_ROOT / "prompts" / "chapter_expand_prompt.md").read_text(
-                    encoding="utf-8"
-                ),
-                encoding="utf-8",
-            )
-            (run_dir / "config" / "prompts" / "chapter_draft_prompt.md").write_text(
-                (REPO_ROOT / "prompts" / "chapter_draft_prompt.md").read_text(
-                    encoding="utf-8"
-                ),
-                encoding="utf-8",
-            )
-
-            captured_job_groups: list[tuple[str, list[runner_module.JobSpec]]] = []
-
-            chapter_path = run_dir / "chapters" / "chapter_01.md"
-
-            def fake_fresh(output_path: Path, *_args, **_kwargs) -> bool:
-                return output_path != chapter_path
-
-            runner._artifact_fresh_against_inputs = fake_fresh
-
-            def capture_run_jobs_parallel(
-                jobs: list[runner_module.JobSpec], _max_parallel: int, label: str
-            ) -> None:
-                captured_job_groups.append((label, list(jobs)))
-
-            runner._run_jobs_parallel = capture_run_jobs_parallel
-
-            runner._run_draft_stage()
-
-            self.assertEqual(len(captured_job_groups), 2)
-            self.assertEqual(captured_job_groups[0][0], "draft")
-            self.assertEqual(captured_job_groups[1][0], "draft_expand")
-            draft_job = captured_job_groups[0][1][0]
-            self.assertEqual(len(captured_job_groups[1][1]), 1)
-            expand_job = captured_job_groups[1][1][0]
-            self.assertIn("outline/spatial_layout.json", draft_job.allowed_inputs)
-            self.assertEqual(expand_job.stage, "chapter_expand")
-            self.assertIn("outline/outline.md", expand_job.allowed_inputs)
-            self.assertIn("outline/scene_plan.tsv", expand_job.allowed_inputs)
-            self.assertIn("outline/spatial_layout.json", expand_job.allowed_inputs)
-
-    def test_draft_stage_does_not_expand_when_chapter_is_above_seventy_percent_threshold(
-        self,
-    ) -> None:
-        with tempfile.TemporaryDirectory(prefix="snp_expand_threshold_", dir="/tmp") as tmp:
+    def test_draft_stage_logs_under_target_without_spawning_expand(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_draft_under_target_", dir="/tmp") as tmp:
             runner = make_runner(Path(tmp))
             runner.chapter_specs = [
                 runner_module.ChapterSpec(
@@ -3364,9 +3287,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
             ]
 
             run_dir = runner.cfg.run_dir
-            (run_dir / "chapters").mkdir(parents=True, exist_ok=True)
-            (run_dir / "outline" / "chapter_specs").mkdir(parents=True, exist_ok=True)
-            (run_dir / "config" / "prompts").mkdir(parents=True, exist_ok=True)
+            runner._prepare_run_dir()
             (run_dir / "outline" / "outline.md").write_text(
                 "## Middle-Book Progression Map\n\nplaceholder\n",
                 encoding="utf-8",
@@ -3380,44 +3301,64 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 json.dumps({"summary": "layout", "micro": None, "macro": None}) + "\n",
                 encoding="utf-8",
             )
-            chapter_body = " ".join(["word"] * 750)
-            (run_dir / "chapters" / "chapter_01.md").write_text(
-                f"# Chapter 1\n\n{chapter_body}\n",
+            (run_dir / "outline" / "static_story_context.json").write_text(
+                "{}\n",
                 encoding="utf-8",
             )
-            (run_dir / "config" / "prompts" / "chapter_expand_prompt.md").write_text(
-                (REPO_ROOT / "prompts" / "chapter_expand_prompt.md").read_text(
-                    encoding="utf-8"
-                ),
+            (run_dir / "outline" / "style_bible.json").write_text("{}\n", encoding="utf-8")
+            (run_dir / "outline" / "continuity_sheet.json").write_text(
+                "{}\n",
                 encoding="utf-8",
             )
-            (run_dir / "config" / "prompts" / "chapter_draft_prompt.md").write_text(
-                (REPO_ROOT / "prompts" / "chapter_draft_prompt.md").read_text(
-                    encoding="utf-8"
-                ),
+            (run_dir / "outline" / "continuity_sheet.outline.json").write_text(
+                "{}\n",
+                encoding="utf-8",
+            )
+            (run_dir / "outline" / "chapter_specs" / "chapter_01.json").write_text(
+                "{}\n",
                 encoding="utf-8",
             )
 
             captured_job_groups: list[tuple[str, list[runner_module.JobSpec]]] = []
 
-            chapter_path = run_dir / "chapters" / "chapter_01.md"
-
-            def fake_fresh(output_path: Path, *_args, **_kwargs) -> bool:
-                return output_path != chapter_path
-
-            runner._artifact_fresh_against_inputs = fake_fresh
-
             def capture_run_jobs_parallel(
                 jobs: list[runner_module.JobSpec], _max_parallel: int, label: str
             ) -> None:
                 captured_job_groups.append((label, list(jobs)))
+                for job in jobs:
+                    chapter_file = next(
+                        p for p in job.required_outputs if p.startswith("chapters/")
+                    )
+                    (run_dir / chapter_file).write_text(
+                        "# Chapter 1\n\nToo short.\n",
+                        encoding="utf-8",
+                    )
 
             runner._run_jobs_parallel = capture_run_jobs_parallel
 
-            runner._run_draft_stage()
+            with mock.patch.object(runner, "_log") as log_mock:
+                runner._run_draft_stage()
 
             self.assertEqual(len(captured_job_groups), 1)
             self.assertEqual(captured_job_groups[0][0], "draft")
+            self.assertTrue(
+                all(
+                    job.stage != "chapter_expand"
+                    for _label, jobs in captured_job_groups
+                    for job in jobs
+                )
+            )
+            logged = [" ".join(str(arg) for arg in call.args) for call in log_mock.call_args_list]
+            self.assertIn("draft_complete", logged)
+            self.assertTrue(
+                any(
+                    line == (
+                        "draft_under_target chapter=chapter_01 words=5 "
+                        "projected_min_words=1000; deferring to revision cycles"
+                    )
+                    for line in logged
+                )
+            )
 
     def test_chapter_review_job_receives_chapter_spec_input(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_review_spec_input_", dir="/tmp") as tmp:
@@ -3738,6 +3679,40 @@ class ClaudeCliParsingTests(unittest.TestCase):
 
             with self.assertRaises(runner_module.PipelineError):
                 runner._render_prompt("bad_prompt.md", {})
+
+    def test_dialogue_samples_block_shuffles_inclusion_order(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="snp_dialogue_shuffle_", dir="/tmp") as tmp:
+            run_dir = Path(tmp) / "run"
+            runner = make_runner(run_dir)
+            samples_dir = run_dir / "config" / "dialogue_samples"
+            samples_dir.mkdir(parents=True, exist_ok=True)
+            sorted_names = [
+                "01_alpha.txt",
+                "02_beta.txt",
+                "03_gamma.txt",
+                "04_delta.txt",
+            ]
+            for name in sorted_names:
+                (samples_dir / name).write_text(f"{name}\n", encoding="utf-8")
+
+            block = runner._dialogue_samples_block()
+            headings = [
+                line.removeprefix("### dialogue_samples/")
+                for line in block.splitlines()
+                if line.startswith("### dialogue_samples/")
+            ]
+
+            self.assertCountEqual(headings, sorted_names)
+            self.assertNotEqual(headings, sorted_names)
+
+            second_runner = make_runner(run_dir)
+            second_block = second_runner._dialogue_samples_block()
+            second_headings = [
+                line.removeprefix("### dialogue_samples/")
+                for line in second_block.splitlines()
+                if line.startswith("### dialogue_samples/")
+            ]
+            self.assertEqual(second_headings, headings)
 
     def test_revision_job_optional_guidance_uses_labels_not_colliding_numbers(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_revision_prompt_", dir="/tmp") as tmp:
@@ -7307,7 +7282,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
             run_revision.assert_called_once()
             self.assertEqual(write_final_report.call_args.args[0], 1)
 
-    def test_run_draft_stage_skips_expand_when_all_chapters_are_fresh_on_resume(self) -> None:
+    def test_run_draft_stage_resume_does_not_attempt_expansion(self) -> None:
         with tempfile.TemporaryDirectory(prefix="snp_draft_resume_skip_expand_", dir="/tmp") as tmp:
             runner = make_runner(Path(tmp))
             runner.chapter_specs = [
@@ -7362,7 +7337,6 @@ class ClaudeCliParsingTests(unittest.TestCase):
             run_jobs.assert_not_called()
             logged = [" ".join(str(arg) for arg in call.args) for call in log_mock.call_args_list]
             self.assertIn("draft_resume_all_chapters_present", logged)
-            self.assertIn("draft_expand_resume_skipped reason=all_chapters_fresh", logged)
             self.assertIn("draft_complete", logged)
             self.assertEqual(chapter_path.read_text(encoding="utf-8"), "# Chapter 1\n\nShort body.\n")
 
@@ -7606,7 +7580,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
             codex_profile = runner_module.ExecutionProfile(
                 provider="codex",
                 agent_bin="codex",
-                model="gpt-5.4",
+                model="gpt-5.5",
                 reasoning_effort="xhigh",
             )
             claude_profile = runner_module.ExecutionProfile(
@@ -7627,7 +7601,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 runner.cfg,
                 provider="codex",
                 agent_bin="codex",
-                model="gpt-5.4",
+                model="gpt-5.5",
                 reasoning_effort="xhigh",
                 stage_profiles=stage_profiles,
             )
@@ -7893,7 +7867,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
             codex_profile = runner_module.ExecutionProfile(
                 provider="codex",
                 agent_bin="codex",
-                model="gpt-5.4",
+                model="gpt-5.5",
                 reasoning_effort="xhigh",
             )
             claude_profile = runner_module.ExecutionProfile(
@@ -7921,7 +7895,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 max_parallel_revisions=runner.cfg.max_parallel_revisions,
                 provider="codex",
                 agent_bin="codex",
-                model="gpt-5.4",
+                model="gpt-5.5",
                 reasoning_effort="xhigh",
                 stage_profiles={
                     stage_group: codex_profile
@@ -7959,7 +7933,7 @@ class ClaudeCliParsingTests(unittest.TestCase):
                 prompt_text="test",
             )
             self.assertEqual(p1_job.provider, "codex")
-            self.assertEqual(p1_job.model, "gpt-5.4")
+            self.assertEqual(p1_job.model, "gpt-5.5")
             self.assertEqual(p2_job.provider, "claude")
             self.assertEqual(p2_job.model, "claude-opus-4-7")
 

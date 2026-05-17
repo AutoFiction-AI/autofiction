@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "cycle",
+    "verdict",
+    "summary",
+    "theme_map",
+    "findings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cycle": {"type": "integer", "minimum": 1},
+    "verdict": {"type": "string", "enum": ["PASS", "FAIL"]},
+    "summary": {"type": "string", "minLength": 1},
+    "theme_map": {
+      "type": "object",
+      "required": [
+        "central_question",
+        "what_book_has_to_say",
+        "recurring_motifs",
+        "paid_for_at",
+        "evasion_locations",
+        "one_paragraph_summary"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "central_question": {"type": "string"},
+        "what_book_has_to_say": {"type": "string"},
+        "recurring_motifs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["motif", "occurrence_cites", "judgment"],
+            "additionalProperties": false,
+            "properties": {
+              "motif": {"type": "string"},
+              "occurrence_cites": {
+                "type": "array",
+                "items": {"type": "string"}
+              },
+              "judgment": {
+                "type": "string",
+                "enum": ["load_bearing", "decorative"]
+              }
+            }
+          }
+        },
+        "paid_for_at": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "evasion_locations": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "one_paragraph_summary": {"type": "string"}
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "finding_id",
+          "category",
+          "severity",
+          "chapter_id",
+          "evidence",
+          "problem",
+          "rewrite_direction",
+          "acceptance_test",
+          "pass_hint"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "finding_id": {"type": "string", "minLength": 1},
+          "category": {
+            "type": "string",
+            "enum": [
+              "central_question",
+              "engagement_with_question",
+              "recurring_image_audit",
+              "motif_payoff",
+              "idea_tested_through_character_cost",
+              "evasion_pattern",
+              "thematic_register_match",
+              "thesis_speech_failure",
+              "narrator_thematic_underlining",
+              "what_book_has_to_say",
+              "would_a_reader_argue_with_it",
+              "the_one_paragraph_summary_test"
+            ]
+          },
+          "severity": {"type": "string", "enum": ["MEDIUM", "HIGH", "CRITICAL"]},
+          "chapter_id": {"type": "string", "pattern": "^chapter_[0-9]{2}$"},
+          "evidence": {"type": "string", "minLength": 1},
+          "problem": {"type": "string", "minLength": 1},
+          "rewrite_direction": {"type": "string", "minLength": 1},
+          "acceptance_test": {"type": "string", "minLength": 1},
+          "pass_hint": {
+            "type": "string",
+            "enum": [
+              "p1_structural_craft",
+              "p2_dialogue_idiolect_cadence",
+              "p3_prose_copyedit"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

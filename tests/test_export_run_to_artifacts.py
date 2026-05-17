@@ -91,7 +91,7 @@ class ExportRunToArtifactsTests(unittest.TestCase):
                 run_dir / "config" / "run_config.json",
                 {
                     "provider": "codex",
-                    "model": "gpt-5.4",
+                    "model": "gpt-5.5",
                     "reasoning_effort": "xhigh",
                     "premise_mode": "user",
                     "final_cycle_global_only": True,
@@ -105,7 +105,7 @@ class ExportRunToArtifactsTests(unittest.TestCase):
                         },
                         "review": {
                             "provider": "codex",
-                            "model": "gpt-5.4",
+                            "model": "gpt-5.5",
                             "reasoning_effort": "xhigh",
                         },
                         "full_review": {
@@ -120,7 +120,7 @@ class ExportRunToArtifactsTests(unittest.TestCase):
                         },
                         "revision": {
                             "provider": "codex",
-                            "model": "gpt-5.4",
+                            "model": "gpt-5.5",
                             "reasoning_effort": "xhigh",
                         },
                         "llm_aggregator": {
@@ -207,7 +207,7 @@ class ExportRunToArtifactsTests(unittest.TestCase):
                 run_dir / "config" / "run_config.json",
                 {
                     "provider": "codex",
-                    "model": "gpt-5.4",
+                    "model": "gpt-5.5",
                     "reasoning_effort": "xhigh",
                     "premise_mode": "user",
                 },

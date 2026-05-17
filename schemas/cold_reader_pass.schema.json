@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "cycle",
+    "verdict",
+    "summary",
+    "observations",
+    "findings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cycle": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["PASS", "FAIL"]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observations": {
+      "type": "object",
+      "required": [
+        "opening_engagement",
+        "drag_points",
+        "confusion_points",
+        "bookmark_failures",
+        "who_you_cared_about",
+        "central_question_legibility",
+        "ending_earned",
+        "emotional_landings",
+        "things_you_remember",
+        "would_you_recommend",
+        "genre_mode_recognized",
+        "character_function_vs_person"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "opening_engagement": {"type": "string", "minLength": 1},
+        "drag_points": {"type": "string", "minLength": 1},
+        "confusion_points": {"type": "string", "minLength": 1},
+        "bookmark_failures": {"type": "string", "minLength": 1},
+        "who_you_cared_about": {"type": "string", "minLength": 1},
+        "central_question_legibility": {"type": "string", "minLength": 1},
+        "ending_earned": {"type": "string", "minLength": 1},
+        "emotional_landings": {"type": "string", "minLength": 1},
+        "things_you_remember": {"type": "string", "minLength": 1},
+        "would_you_recommend": {"type": "string", "minLength": 1},
+        "genre_mode_recognized": {"type": "string", "minLength": 1},
+        "character_function_vs_person": {"type": "string", "minLength": 1}
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "finding_id",
+          "observation_key",
+          "severity",
+          "chapter_id",
+          "evidence",
+          "problem",
+          "rewrite_direction",
+          "acceptance_test",
+          "pass_hint"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "finding_id": {"type": "string", "minLength": 1},
+          "observation_key": {
+            "type": "string",
+            "enum": [
+              "opening_engagement",
+              "drag_points",
+              "confusion_points",
+              "bookmark_failures",
+              "who_you_cared_about",
+              "central_question_legibility",
+              "ending_earned",
+              "emotional_landings",
+              "things_you_remember",
+              "would_you_recommend",
+              "genre_mode_recognized",
+              "character_function_vs_person"
+            ]
+          },
+          "severity": {"type": "string", "enum": ["MEDIUM", "HIGH", "CRITICAL"]},
+          "chapter_id": {"type": "string", "pattern": "^chapter_[0-9]{2}$"},
+          "evidence": {"type": "string", "minLength": 1},
+          "problem": {"type": "string", "minLength": 1},
+          "rewrite_direction": {"type": "string", "minLength": 1},
+          "acceptance_test": {"type": "string", "minLength": 1},
+          "pass_hint": {
+            "type": "string",
+            "enum": [
+              "p1_structural_craft",
+              "p2_dialogue_idiolect_cadence",
+              "p3_prose_copyedit"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

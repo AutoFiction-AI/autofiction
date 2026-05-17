@@ -39,7 +39,7 @@ fi
 CODEX_BIN=/Applications/Codex.app/Contents/Resources/codex \
 \
 python3 scripts/interactive_runner.py \
-  --premise-file "exp/longer.txt" \
+  --premise-file "exp/benjamin.txt" \
   --run-dir runs/vel_interactive_latest \
   --min-cycles 4 \
   --max-cycles 4 \

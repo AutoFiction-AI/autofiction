@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "cycle",
+    "verdict",
+    "summary",
+    "voice_map",
+    "findings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cycle": {"type": "integer", "minimum": 1},
+    "verdict": {"type": "string", "enum": ["PASS", "FAIL"]},
+    "summary": {"type": "string", "minLength": 1},
+    "voice_map": {
+      "type": "object",
+      "required": [
+        "signature_moves",
+        "quotable_passages",
+        "averaged_register_spans",
+        "pov_voice_assessment",
+        "the_blind_test_judgment"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "signature_moves": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["move", "examples"],
+            "additionalProperties": false,
+            "properties": {
+              "move": {"type": "string"},
+              "examples": {
+                "type": "array",
+                "items": {"type": "string"}
+              }
+            }
+          }
+        },
+        "quotable_passages": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "averaged_register_spans": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "pov_voice_assessment": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["pov_label", "voice_summary", "distinguishable_from_other_pov"],
+            "additionalProperties": false,
+            "properties": {
+              "pov_label": {"type": "string"},
+              "voice_summary": {"type": "string"},
+              "distinguishable_from_other_pov": {"type": "boolean"}
+            }
+          }
+        },
+        "the_blind_test_judgment": {"type": "string"}
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "finding_id",
+          "category",
+          "severity",
+          "chapter_id",
+          "evidence",
+          "problem",
+          "rewrite_direction",
+          "acceptance_test",
+          "pass_hint"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "finding_id": {"type": "string", "minLength": 1},
+          "category": {
+            "type": "string",
+            "enum": [
+              "signature_moves",
+              "averaged_literary_register_drift",
+              "paragraph_pickability_test",
+              "sentence_rhythm_diversity",
+              "image_economy",
+              "stylistic_risk_taken",
+              "transparent_prose_done_well",
+              "metaphor_originality",
+              "voice_consistency_across_pov",
+              "quotability_test",
+              "the_blind_test",
+              "default_LLM_prose_signature_check"
+            ]
+          },
+          "severity": {"type": "string", "enum": ["MEDIUM", "HIGH", "CRITICAL"]},
+          "chapter_id": {"type": "string", "pattern": "^chapter_[0-9]{2}$"},
+          "evidence": {"type": "string", "minLength": 1},
+          "problem": {"type": "string", "minLength": 1},
+          "rewrite_direction": {"type": "string", "minLength": 1},
+          "acceptance_test": {"type": "string", "minLength": 1},
+          "pass_hint": {
+            "type": "string",
+            "enum": [
+              "p1_structural_craft",
+              "p2_dialogue_idiolect_cadence",
+              "p3_prose_copyedit"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

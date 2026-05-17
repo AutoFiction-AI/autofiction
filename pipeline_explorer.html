@@ -1,0 +1,1877 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AutoFiction Pipeline Explorer</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  :root, :root[data-theme="dark"] {
+    /* base */
+    --bg: #0b0e17;
+    --bg2: #131826;
+    --bg3: #1a2032;
+    --bg4: #232b42;
+    --bg-card-end: #10141f;
+    --bg-viewer-end: #0f1320;
+    --bg-radial: #1c1f3d;
+    --border: #2c3450;
+    --border-soft: #232a40;
+    --fg: #eef1fa;
+    --fg-dim: #9099b8;
+    --fg-faint: #6b7596;
+
+    /* primary accent */
+    --accent: #818cf8;
+    --accent-dim: #4f46e5;
+    --accent-bright: #a5b4fc;
+    --accent-glow: rgba(129, 140, 248, 0.22);
+
+    /* state */
+    --pass: #4ade80;
+    --fail: #f87171;
+    --warn: #fbbf24;
+    --info: #38bdf8;
+
+    /* severities */
+    --high: #f87171;
+    --critical: #ef4444;
+    --medium: #fbbf24;
+    --low: #94a3b8;
+
+    /* stage accents */
+    --c-premise: #c084fc;
+    --c-outline: #2dd4bf;
+    --c-draft: #60a5fa;
+    --c-review: #fb923c;
+    --c-audit: #facc15;
+    --c-findings: #f472b6;
+    --c-gate: #4ade80;
+    --c-revision: #a78bfa;
+    --c-snapshot: #38bdf8;
+    --c-final: #f59e0b;
+
+    /* themed gradients & shadows */
+    --grad-header: linear-gradient(120deg, #1c2042 0%, #131826 60%, #131826 100%);
+    --grad-h2: linear-gradient(90deg, #fff, #c4cef0);
+    --json-string: #a5d6ff;
+
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+    --shadow-md: 0 6px 18px rgba(0,0,0,0.35);
+    --shadow-side: -4px 0 16px rgba(0,0,0,0.25);
+    --shadow-header: 0 2px 8px rgba(0,0,0,0.25);
+  }
+
+  :root[data-theme="light"] {
+    --bg: #f5f7fc;
+    --bg2: #ffffff;
+    --bg3: #eef1f8;
+    --bg4: #dfe4f1;
+    --bg-card-end: #f6f8fc;
+    --bg-viewer-end: #f0f3fb;
+    --bg-radial: #d8def0;
+    --border: #d4d9e6;
+    --border-soft: #e3e6ef;
+    --fg: #1a1f33;
+    --fg-dim: #4a526b;
+    --fg-faint: #6b7595;
+
+    --accent: #4f46e5;
+    --accent-dim: #4338ca;
+    --accent-bright: #4f46e5;
+    --accent-glow: rgba(79, 70, 229, 0.18);
+
+    --pass: #16a34a;
+    --fail: #dc2626;
+    --warn: #ca8a04;
+    --info: #0284c7;
+
+    --high: #dc2626;
+    --critical: #b91c1c;
+    --medium: #b45309;
+    --low: #64748b;
+
+    --c-premise: #9333ea;
+    --c-outline: #0d9488;
+    --c-draft: #2563eb;
+    --c-review: #ea580c;
+    --c-audit: #b45309;
+    --c-findings: #db2777;
+    --c-gate: #16a34a;
+    --c-revision: #7c3aed;
+    --c-snapshot: #0284c7;
+    --c-final: #d97706;
+
+    --grad-header: linear-gradient(120deg, #e8ecfa 0%, #ffffff 60%, #ffffff 100%);
+    --grad-h2: linear-gradient(90deg, #1a1f33, #4f46e5);
+    --json-string: #15803d;
+
+    --shadow-sm: 0 1px 3px rgba(30, 41, 80, 0.06);
+    --shadow-md: 0 6px 18px rgba(30, 41, 80, 0.1);
+    --shadow-side: -4px 0 16px rgba(30, 41, 80, 0.06);
+    --shadow-header: 0 2px 8px rgba(30, 41, 80, 0.06);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: radial-gradient(circle at 18% -10%, var(--bg-radial) 0%, var(--bg) 55%);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 13px;
+    overflow: hidden;
+  }
+  a { color: var(--accent-bright); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  button {
+    font: inherit; color: inherit;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  button:hover { background: var(--bg4); border-color: var(--accent); }
+  button.active { background: var(--accent-dim); border-color: var(--accent-dim); color: white; }
+  select {
+    font: inherit; color: inherit;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+  }
+  pre, code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+  pre { white-space: pre-wrap; word-wrap: break-word; margin: 0; }
+
+  header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 8px 18px;
+    background: var(--grad-header);
+    border-bottom: 1px solid var(--border);
+    height: 50px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow-header);
+  }
+  header h1 {
+    font-size: 15px;
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    background: linear-gradient(135deg, #818cf8, #c084fc 40%, #f472b6 85%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  header .spacer { flex: 1; }
+  header label { color: var(--fg-dim); font-size: 12px; }
+  header .pill {
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+  }
+  .pill.pass { background: rgba(74,222,128,0.16); color: var(--pass); border-color: rgba(74,222,128,0.4); }
+  .pill.fail { background: rgba(248,113,113,0.16); color: var(--fail); border-color: rgba(248,113,113,0.4); }
+  .pill.warn { background: rgba(251,191,36,0.16); color: var(--warn); border-color: rgba(251,191,36,0.4); }
+
+  nav.tabs {
+    display: flex; gap: 0; padding: 0 18px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    height: 38px;
+    flex-shrink: 0;
+  }
+  nav.tabs button {
+    background: transparent; border: none; border-radius: 0;
+    padding: 8px 16px; height: 100%;
+    border-bottom: 2px solid transparent;
+    color: var(--fg-dim);
+    font-weight: 500;
+    transition: color 0.12s, border-color 0.12s, background 0.12s;
+  }
+  nav.tabs button.active {
+    color: var(--fg);
+    border-bottom-color: var(--accent);
+    background: linear-gradient(180deg, transparent 0%, rgba(129,140,248,0.08) 100%);
+  }
+  nav.tabs button:hover { color: var(--fg); }
+
+  main {
+    display: flex;
+    height: calc(100vh - 88px);
+  }
+  #panes {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+  aside.side {
+    width: 240px; min-width: 240px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 14px 12px;
+  }
+  aside.side h3 {
+    margin: 14px 0 6px 0; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--fg-faint);
+    font-weight: 700;
+  }
+  aside.side h3:first-child { margin-top: 0; }
+  aside.side ul { list-style: none; margin: 0; padding: 0; }
+  aside.side li {
+    padding: 5px 10px; cursor: pointer; border-radius: 5px;
+    color: var(--fg-dim);
+    font-size: 12px;
+    transition: background 0.1s, color 0.1s;
+  }
+  aside.side li:hover { background: var(--bg3); color: var(--fg); }
+  aside.side li.active {
+    background: linear-gradient(135deg, var(--accent-dim) 0%, #6d28d9 100%);
+    color: white;
+    box-shadow: 0 2px 8px rgba(79,70,229,0.3);
+  }
+
+  section.content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px 22px;
+    background: transparent;
+    min-width: 0;
+  }
+  section.content h2 {
+    font-size: 18px;
+    font-weight: 700;
+    background: var(--grad-h2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ----- viewer side panel ----- */
+  .viewer-panel {
+    width: 560px;
+    min-width: 380px;
+    max-width: 60%;
+    background: linear-gradient(180deg, var(--bg2) 0%, var(--bg-viewer-end) 100%);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+    box-shadow: var(--shadow-side);
+    position: relative;
+  }
+  .viewer-resizer {
+    position: absolute; left: -3px; top: 0; bottom: 0;
+    width: 6px;
+    cursor: col-resize;
+    z-index: 10;
+  }
+  .viewer-resizer:hover { background: var(--accent-glow); }
+  .viewer-empty {
+    padding: 60px 28px;
+    text-align: center;
+    color: var(--fg-faint);
+    font-style: italic;
+    margin: auto;
+  }
+  .viewer-empty .icon {
+    font-size: 36px; display: block; margin-bottom: 14px; opacity: 0.55;
+    background: linear-gradient(135deg, var(--c-premise), var(--c-findings));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ----- pipeline diagram ----- */
+  .pipeline-stages {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 22px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, rgba(129,140,248,0.08), rgba(244,114,182,0.04));
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+  }
+  .pipeline-stages .stage {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .pipeline-stages .stage.s-premise   { color: var(--c-premise);  border-color: rgba(192,132,252,0.45); background: rgba(192,132,252,0.10); }
+  .pipeline-stages .stage.s-outline   { color: var(--c-outline);  border-color: rgba(45,212,191,0.45);  background: rgba(45,212,191,0.10); }
+  .pipeline-stages .stage.s-draft     { color: var(--c-draft);    border-color: rgba(96,165,250,0.45);  background: rgba(96,165,250,0.10); }
+  .pipeline-stages .stage.s-review    { color: var(--c-review);   border-color: rgba(251,146,60,0.45);  background: rgba(251,146,60,0.10); }
+  .pipeline-stages .stage.s-audit     { color: var(--c-audit);    border-color: rgba(250,204,21,0.45);  background: rgba(250,204,21,0.10); }
+  .pipeline-stages .stage.s-aggregate { color: var(--c-findings); border-color: rgba(244,114,182,0.45); background: rgba(244,114,182,0.10); }
+  .pipeline-stages .stage.s-gate      { color: var(--c-gate);     border-color: rgba(74,222,128,0.45);  background: rgba(74,222,128,0.10); }
+  .pipeline-stages .stage.s-revision  { color: var(--c-revision); border-color: rgba(167,139,250,0.45); background: rgba(167,139,250,0.10); }
+  .pipeline-stages .arrow { color: var(--fg-faint); align-self: center; font-size: 14px; }
+
+  .cycle-card {
+    background: linear-gradient(180deg, var(--bg2) 0%, var(--bg-card-end) 100%);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 14px;
+    padding: 14px 18px 16px 22px;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+  }
+  .cycle-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, var(--c-draft), var(--c-revision));
+  }
+  .cycle-card.c-premise::before { background: var(--c-premise); }
+  .cycle-card.c-outline::before { background: var(--c-outline); }
+  .cycle-card.c-final::before   { background: linear-gradient(180deg, var(--c-final), var(--c-gate)); }
+
+  .cycle-card h3 {
+    margin: 0 0 12px 0; font-size: 14px;
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700;
+  }
+  .cycle-card .grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(170px,1fr)); gap: 8px;
+  }
+  .stage-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    cursor: pointer;
+    transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s, background 0.12s;
+  }
+  .stage-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+    background: var(--bg4);
+    box-shadow: var(--shadow-md), 0 0 0 1px var(--accent-glow);
+  }
+  .stage-card .label {
+    font-size: 10px; color: var(--fg-faint);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    font-weight: 600;
+  }
+  .stage-card .count {
+    font-size: 13px; font-weight: 600; margin-top: 2px;
+    color: var(--fg);
+    word-break: break-word;
+  }
+  .stage-card.empty { opacity: 0.4; cursor: default; }
+  .stage-card.empty:hover { transform: none; border-color: var(--border); background: var(--bg3); box-shadow: none; }
+
+  /* ----- chapter provenance ----- */
+  .prov-cycle {
+    margin-bottom: 16px;
+    background: linear-gradient(180deg, var(--bg2) 0%, var(--bg-card-end) 100%);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px 14px 22px;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+  }
+  .prov-cycle::before {
+    content: ""; position: absolute; top: 0; left: 0; bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, var(--c-draft), var(--c-revision));
+  }
+  .prov-cycle h3 { margin: 0 0 10px 0; font-size: 14px; display: flex; align-items: center; gap: 10px; font-weight: 700; }
+  .prov-flow {
+    display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 6px;
+  }
+  .prov-step {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    min-height: 64px;
+    display: flex; flex-direction: column; gap: 4px;
+    transition: transform 0.12s, border-color 0.12s, background 0.12s, box-shadow 0.12s;
+  }
+  .prov-step:hover {
+    border-color: var(--accent);
+    background: var(--bg4);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+  .prov-step .label { font-size: 10px; color: var(--fg-faint); text-transform: uppercase; letter-spacing: 0.05em; }
+  .prov-step .title { font-size: 12px; font-weight: 600; color: var(--fg); }
+  .prov-step .meta { font-size: 10px; color: var(--fg-dim); margin-top: auto; }
+  .prov-step.empty { opacity: 0.35; cursor: default; }
+  .prov-step.empty:hover { transform: none; border-color: var(--border); background: var(--bg3); box-shadow: none; }
+
+  .prov-passes {
+    margin-top: 8px; display: grid; grid-template-columns: repeat(3,1fr); gap: 6px;
+  }
+  .prov-passes .prov-step { min-height: 50px; }
+
+  /* arrows between consecutive prov-flow steps */
+  .prov-flow .prov-step { position: relative; }
+  .prov-flow .prov-step:not(:last-child)::after {
+    content: "→";
+    position: absolute;
+    right: -11px;
+    top: 50%;
+    transform: translate(0, -50%);
+    color: var(--accent-bright);
+    font-size: 13px;
+    line-height: 1;
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg2);
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    z-index: 3;
+    pointer-events: none;
+    font-weight: 700;
+  }
+
+  /* connector between cycle cards */
+  .cycle-connector {
+    display: flex; align-items: center; gap: 12px;
+    margin: 2px 0 10px 0;
+    padding: 0 18px;
+    font-size: 10px;
+    color: var(--fg-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+  }
+  .cycle-connector .line {
+    flex: 1; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+  }
+  .cycle-connector .arrow {
+    color: var(--c-revision);
+    font-size: 16px;
+  }
+
+  /* graph tab */
+  .graph-wrap {
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg2);
+    box-shadow: var(--shadow-sm);
+    max-height: calc(100vh - 220px);
+  }
+  .graph-wrap svg { display: block; }
+  .g-node { cursor: pointer; transition: filter 0.12s; }
+  .g-node:hover { filter: brightness(1.15); }
+  .g-edge { transition: stroke 0.1s, opacity 0.1s, stroke-width 0.1s; }
+  .legend-swatch {
+    width: 12px; height: 12px; border-radius: 3px;
+    display: inline-block; flex-shrink: 0;
+  }
+
+  /* ----- viewer panes (inside viewer-panel) ----- */
+  .viewer {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    margin: 0;
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .viewer-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--bg3), var(--bg2));
+    flex-shrink: 0;
+  }
+  .viewer-head strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-faint); font-weight: 700; }
+  .viewer-head .path {
+    font-family: ui-monospace, monospace; font-size: 11px; color: var(--accent-bright);
+    flex: 1; overflow-x: auto; white-space: nowrap;
+  }
+  .viewer-body { padding: 16px 18px; overflow-y: auto; flex: 1; }
+  .viewer-body .markdown { line-height: 1.65; font-size: 13px; }
+  .viewer-body .markdown h1 { font-size: 22px; margin-top: 1em; color: var(--accent-bright); }
+  .viewer-body .markdown h2 { font-size: 18px; margin-top: 1.2em; color: var(--c-outline); }
+  .viewer-body .markdown h3 { font-size: 15px; margin-top: 1.2em; color: var(--c-draft); }
+  .viewer-body .markdown code { background: var(--bg3); padding: 1px 5px; border-radius: 4px; color: var(--c-findings); }
+  .viewer-body .markdown pre { background: var(--bg3); padding: 12px; border-radius: 6px; overflow-x: auto; border: 1px solid var(--border-soft); }
+  .viewer-body .markdown pre code { background: transparent; color: var(--fg); padding: 0; }
+  .viewer-body .markdown blockquote { border-left: 3px solid var(--accent); margin: 8px 0; padding: 4px 12px; color: var(--fg-dim); background: rgba(129,140,248,0.06); }
+  .viewer-body .markdown table { border-collapse: collapse; }
+  .viewer-body .markdown th, .viewer-body .markdown td { border: 1px solid var(--border); padding: 5px 10px; }
+  .viewer-body .markdown th { background: var(--bg3); }
+  .viewer-body .markdown a { color: var(--accent-bright); }
+
+  .json-tree { font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.55; }
+  .json-key { color: var(--c-draft); font-weight: 500; }
+  .json-string { color: var(--json-string); }
+  .json-number { color: var(--c-review); }
+  .json-bool, .json-null { color: var(--c-audit); }
+  .json-tree details { margin-left: 0; }
+  .json-tree summary { cursor: pointer; list-style: revert; color: var(--c-revision); }
+  .json-tree details > div { margin-left: 16px; padding-left: 8px; border-left: 1px dashed var(--border); }
+
+  .findings-list { display: flex; flex-direction: column; gap: 10px; }
+  .finding {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--c-findings);
+    border-radius: 6px;
+    padding: 10px 14px;
+  }
+  .finding-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .finding-head .id { font-family: ui-monospace, monospace; font-size: 11px; color: var(--fg-dim); }
+  .severity {
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    border: 1px solid transparent;
+  }
+  .severity.HIGH, .severity.CRITICAL { background: rgba(248,113,113,0.18); color: var(--high); border-color: rgba(248,113,113,0.4); }
+  .severity.MEDIUM { background: rgba(251,191,36,0.18); color: var(--medium); border-color: rgba(251,191,36,0.4); }
+  .severity.LOW { background: rgba(148,163,184,0.18); color: var(--low); border-color: rgba(148,163,184,0.4); }
+  .status-tag {
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    border: 1px solid transparent;
+  }
+  .status-tag.FIXED      { background: rgba(74,222,128,0.18); color: var(--pass); border-color: rgba(74,222,128,0.4); }
+  .status-tag.PARTIAL    { background: rgba(251,191,36,0.18); color: var(--warn); border-color: rgba(251,191,36,0.4); }
+  .status-tag.UNRESOLVED { background: rgba(248,113,113,0.18); color: var(--fail); border-color: rgba(248,113,113,0.4); }
+  .finding .problem { margin-top: 6px; line-height: 1.5; }
+  .finding .meta { margin-top: 4px; font-size: 11px; color: var(--fg-dim); font-family: ui-monospace, monospace; }
+  .finding details { margin-top: 6px; }
+  .finding summary { cursor: pointer; font-size: 11px; color: var(--accent-bright); }
+
+  /* ----- file tree ----- */
+  .file-tree { font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.7; }
+  .file-tree details summary { cursor: pointer; }
+  .file-tree .file { cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: background 0.1s; }
+  .file-tree .file:hover { background: var(--bg3); color: var(--accent-bright); }
+
+  .empty-msg { color: var(--fg-faint); font-style: italic; padding: 20px; text-align: center; }
+  .legend { font-size: 11px; color: var(--fg-dim); margin-bottom: 14px; line-height: 1.6; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .kvs { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; font-size: 12px; }
+  .kvs .k { color: var(--fg-faint); font-weight: 600; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 5px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: #353d59; background-clip: content-box; border: 2px solid transparent; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AutoFiction Pipeline Explorer</h1>
+  <label>Run:
+    <select id="run-picker"></select>
+  </label>
+  <span id="run-pill" class="pill"></span>
+  <span class="spacer"></span>
+  <span id="run-summary" style="font-size: 11px; color: var(--fg-dim);"></span>
+  <button id="theme-toggle" title="Toggle light / dark" style="font-size:14px; line-height:1;">☾</button>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="pipeline" class="active">Pipeline</button>
+  <button data-tab="chapters">Chapters</button>
+  <button data-tab="graph">Graph</button>
+  <button data-tab="artifacts">Artifacts</button>
+  <button data-tab="prompts">Prompts</button>
+  <button data-tab="logs">Logs</button>
+</nav>
+
+<main id="main">
+  <div id="panes"></div>
+  <aside id="viewer-panel" class="viewer-panel">
+    <div class="viewer-resizer" id="viewer-resizer"></div>
+    <div class="viewer-empty"><span class="icon">◈</span>Select an artifact to view it here</div>
+  </aside>
+</main>
+
+<script>
+const INDEX_URL = "runs/_explorer_index.json";
+let INDEX = null;
+let RUN = null;        // current run object
+let TAB = "pipeline";
+
+function el(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === "class") e.className = v;
+    else if (k === "style" && typeof v === "object") Object.assign(e.style, v);
+    else if (k.startsWith("on") && typeof v === "function") e.addEventListener(k.slice(2), v);
+    else if (v !== null && v !== undefined && v !== false) e.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) {
+    if (k === null || k === undefined || k === false) continue;
+    e.appendChild(typeof k === "string" ? document.createTextNode(k) : k);
+  }
+  return e;
+}
+
+async function fetchJSON(path) {
+  const r = await fetch(path);
+  if (!r.ok) throw new Error(`fetch ${path} -> ${r.status}`);
+  return await r.json();
+}
+
+async function fetchText(path) {
+  const r = await fetch(path);
+  if (!r.ok) throw new Error(`fetch ${path} -> ${r.status}`);
+  return await r.text();
+}
+
+function runFile(rel) {
+  // file paths in index are relative to the run root; prepend runs/<run_id>/
+  return `runs/${RUN.id}/${rel}`;
+}
+
+function shortName(path) {
+  return path ? path.split("/").pop() : "";
+}
+
+function pillForVerdict(v) {
+  if (!v) return null;
+  const cls = v === "PASS" ? "pass" : v === "FAIL" ? "fail" : "warn";
+  return el("span", { class: `pill ${cls}` }, v);
+}
+
+function tabSet(tabId) {
+  TAB = tabId;
+  for (const b of document.querySelectorAll("#tabs button")) {
+    b.classList.toggle("active", b.dataset.tab === tabId);
+  }
+  render();
+}
+
+document.getElementById("tabs").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-tab]");
+  if (b) tabSet(b.dataset.tab);
+});
+
+function setTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  try { localStorage.setItem("explorer-theme", theme); } catch {}
+  const btn = document.getElementById("theme-toggle");
+  if (btn) btn.textContent = theme === "light" ? "☀" : "☾";
+}
+setTheme(
+  (() => { try { return localStorage.getItem("explorer-theme") || "dark"; } catch { return "dark"; } })()
+);
+document.getElementById("theme-toggle").addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme") || "dark";
+  setTheme(cur === "light" ? "dark" : "light");
+});
+
+document.getElementById("run-picker").addEventListener("change", (ev) => {
+  RUN = INDEX.runs[ev.target.value];
+  render();
+});
+
+(async () => {
+  try {
+    INDEX = await fetchJSON(INDEX_URL);
+  } catch (e) {
+    document.getElementById("main").innerHTML = `<section class="content">
+      <h2>Could not load index</h2>
+      <p>Expected <code>runs/_explorer_index.json</code> next to this page.</p>
+      <p>Generate it with:</p>
+      <pre>python scripts/build_explorer_index.py</pre>
+      <p>Then serve the repo with <code>python -m http.server 8000</code> and open
+      <code>http://localhost:8000/pipeline_explorer.html</code>.</p>
+      <p>Error: <code>${e.message}</code></p>
+    </section>`;
+    return;
+  }
+  const picker = document.getElementById("run-picker");
+  for (const id of Object.keys(INDEX.runs)) {
+    picker.appendChild(el("option", { value: id }, INDEX.runs[id].title || id));
+  }
+  const def = INDEX.default_run && INDEX.runs[INDEX.default_run] ? INDEX.default_run : Object.keys(INDEX.runs)[0];
+  picker.value = def;
+  RUN = INDEX.runs[def];
+  render();
+  attachResizer();
+})();
+
+// ---------- rendering ----------
+
+function render() {
+  const panes = document.getElementById("panes");
+  panes.innerHTML = "";
+  if (!RUN) return;
+  updateRunHeader();
+  if (TAB === "pipeline") renderPipeline(panes);
+  else if (TAB === "chapters") renderChapters(panes);
+  else if (TAB === "graph") renderGraph(panes);
+  else if (TAB === "artifacts") renderArtifacts(panes);
+  else if (TAB === "prompts") renderPrompts(panes);
+  else if (TAB === "logs") renderLogs(panes);
+}
+
+function viewerEmptyEl() {
+  return el("div", { class: "viewer-empty" },
+    el("span", { class: "icon" }, "◈"),
+    "Select an artifact to view it here");
+}
+
+function clearViewer() {
+  const panel = document.getElementById("viewer-panel");
+  panel.innerHTML = "";
+  panel.appendChild(el("div", { class: "viewer-resizer", id: "viewer-resizer" }));
+  panel.appendChild(viewerEmptyEl());
+  attachResizer();
+}
+
+function attachResizer() {
+  const handle = document.getElementById("viewer-resizer");
+  const panel = document.getElementById("viewer-panel");
+  if (!handle || !panel) return;
+  handle.onmousedown = (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = panel.getBoundingClientRect().width;
+    const onMove = (ev) => {
+      const dx = startX - ev.clientX;
+      const newW = Math.max(360, Math.min(window.innerWidth * 0.75, startW + dx));
+      panel.style.width = newW + "px";
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
+}
+
+function updateRunHeader() {
+  const pill = document.getElementById("run-pill");
+  const lastCycle = RUN.cycles[RUN.cycles.length - 1];
+  pill.className = "pill";
+  pill.textContent = `${RUN.cycles.length} cycle${RUN.cycles.length===1?"":"s"} · ${RUN.chapters.length} chapter${RUN.chapters.length===1?"":"s"}`;
+  document.getElementById("run-summary").textContent = lastCycle ? `last gate: ${lastCycle.id}` : "";
+}
+
+// ---------- pipeline tab ----------
+
+const STAGES = [
+  "premise", "outline", "draft", "review", "audit", "aggregate", "gate", "revision", "snapshot"
+];
+
+async function renderPipeline(main) {
+  main.innerHTML = "";
+  const aside = el("aside", { class: "side" });
+  aside.appendChild(el("h3", {}, "Stages"));
+  const ul = el("ul");
+  for (const label of [
+    ["overview", "Overview"],
+    ["premise", "1. Premise"],
+    ["outline", "2. Outline"],
+    ["cycles", "3. Cycles & Gates"],
+    ["final", "4. Final novel"],
+  ]) {
+    const li = el("li", { id: `nav-${label[0]}` }, label[1]);
+    li.addEventListener("click", () => scrollAnchor(label[0]));
+    ul.appendChild(li);
+  }
+  aside.appendChild(ul);
+
+  aside.appendChild(el("h3", {}, "Cycles"));
+  const cu = el("ul");
+  for (const c of RUN.cycles) {
+    const li = el("li", {}, c.id);
+    li.addEventListener("click", () => scrollAnchor(c.id));
+    cu.appendChild(li);
+  }
+  aside.appendChild(cu);
+
+  const content = el("section", { class: "content", id: "content" });
+
+  // Stage chain header (the contract pipeline)
+  content.appendChild(el("h2", { id: "overview", style: { marginTop: 0 } }, RUN.title));
+  content.appendChild(el("p", { class: "legend" },
+    "Each cycle runs: assemble snapshot → build context packs → review (per chapter, full-book, cross-chapter audit) → aggregate findings → gate decision → if FAIL: build revision packets → 3 revision passes → merged report → seam polish → post-revision snapshot. Click any card below to inspect the underlying artifact."));
+
+  // Premise + Outline section
+  const heads = el("div", { class: "pipeline-stages" });
+  heads.append(
+    el("div", { class: "stage s-premise" }, "premise"),
+    el("span", { class: "arrow" }, "→"),
+    el("div", { class: "stage s-outline" }, "outline"),
+    el("span", { class: "arrow" }, "→"),
+    el("div", { class: "stage s-draft" }, "drafting"),
+    el("span", { class: "arrow" }, "→"),
+    el("div", { class: "stage s-review" }, "review"),
+    el("span", { class: "arrow" }, "→"),
+    el("div", { class: "stage s-audit" }, "audit"),
+    el("span", { class: "arrow" }, "→"),
+    el("div", { class: "stage s-aggregate" }, "aggregate"),
+    el("span", { class: "arrow" }, "→"),
+    el("div", { class: "stage s-gate" }, "gate"),
+    el("span", { class: "arrow" }, "→"),
+    el("div", { class: "stage s-revision" }, "revision"),
+  );
+  content.appendChild(heads);
+
+  // ===== Premise card =====
+  const premiseCard = el("div", { class: "cycle-card c-premise", id: "premise" });
+  premiseCard.appendChild(el("h3", {}, "1. Premise"));
+  const pgrid = el("div", { class: "grid" });
+  for (const [label, key] of [
+    ["input premise", "input_premise"],
+    ["selection", "selection"],
+    ["candidates", "candidates"],
+    ["uniqueness clusters", "uniqueness_clusters"],
+    ["search plan", "search_plan"],
+    ["brainstorming", "brainstorming"],
+  ]) {
+    const f = RUN.premise[key];
+    pgrid.appendChild(stageCard(label, f, f ? shortName(f) : "—"));
+  }
+  premiseCard.appendChild(pgrid);
+  content.appendChild(premiseCard);
+
+  // ===== Outline card =====
+  const outlineCard = el("div", { class: "cycle-card c-outline", id: "outline" });
+  outlineCard.appendChild(el("h3", {}, "2. Outline"));
+  const ogrid = el("div", { class: "grid" });
+  for (const [label, key] of [
+    ["outline.md", "outline_md"],
+    ["chapter specs", "chapter_specs_jsonl"],
+    ["scene plan", "scene_plan_tsv"],
+    ["style bible", "style_bible"],
+    ["continuity sheet", "continuity_sheet"],
+    ["spatial layout", "spatial_layout"],
+    ["static story context", "static_story_context"],
+    ["title", "title"],
+  ]) {
+    const f = RUN.outline[key];
+    ogrid.appendChild(stageCard(label, f, f ? shortName(f) : "—"));
+  }
+  // outline reviews + revisions
+  for (const r of RUN.outline.reviews || []) {
+    ogrid.appendChild(stageCard("outline review", r, shortName(r)));
+  }
+  for (const r of RUN.outline.revisions || []) {
+    ogrid.appendChild(stageCard("outline revision", r, shortName(r)));
+  }
+  outlineCard.appendChild(ogrid);
+  content.appendChild(outlineCard);
+
+  // ===== Cycles =====
+  content.appendChild(el("h2", { id: "cycles", style: { marginTop: "24px" } }, "3. Cycles & Gates"));
+  for (let i = 0; i < RUN.cycles.length; i++) {
+    content.appendChild(await cycleCard(RUN.cycles[i]));
+    if (i < RUN.cycles.length - 1) {
+      content.appendChild(cycleConnector("post-revision snapshot becomes the next cycle's input"));
+    }
+  }
+
+  // ===== Final =====
+  const fin = el("div", { class: "cycle-card c-final", id: "final" });
+  fin.appendChild(el("h3", {}, "4. Final"));
+  const fg = el("div", { class: "grid" });
+  fg.appendChild(stageCard("FINAL_NOVEL.md", RUN.final_novel, "manuscript"));
+  fg.appendChild(stageCard("final report", RUN.final_report, "summary"));
+  fg.appendChild(stageCard("final status", RUN.final_status, "status"));
+  fg.appendChild(stageCard("validation warnings", RUN.validation_warnings, "warnings"));
+  fin.appendChild(fg);
+  content.appendChild(fin);
+
+
+  main.append(aside, content);
+}
+
+function scrollAnchor(id) {
+  const target = document.getElementById(id);
+  if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function stageCard(label, file, valueText, extra) {
+  const card = el("div", { class: "stage-card" + (file ? "" : " empty") });
+  card.appendChild(el("div", { class: "label" }, label));
+  card.appendChild(el("div", { class: "count" }, valueText || "—"));
+  if (extra) card.appendChild(el("div", { class: "label" }, extra));
+  if (file) {
+    card.addEventListener("click", () => openInViewer(file));
+  } else {
+    card.style.cursor = "default";
+  }
+  return card;
+}
+
+async function cycleCard(cycle) {
+  let gateData = null;
+  if (cycle.gate) {
+    try { gateData = await fetchJSON(runFile(cycle.gate)); } catch {}
+  }
+  const card = el("div", { class: "cycle-card", id: cycle.id });
+  const head = el("h3", {}, cycle.id);
+  if (gateData) {
+    head.appendChild(pillForVerdict(gateData.decision));
+    head.appendChild(el("span", { style: { fontSize: "11px", color: "var(--fg-dim)", fontWeight: "400" } },
+      `unresolved ≥MEDIUM: ${gateData.unresolved_medium_plus_count} · review failures: ${gateData.chapter_review_failures} · full-award: ${gateData.full_award_verdict}`));
+  }
+  card.appendChild(head);
+
+  const grid = el("div", { class: "grid" });
+  // snapshot
+  grid.appendChild(stageCard("snapshot (pre-review)", cycle.snapshot.final_novel_pre_review, "FINAL_NOVEL.pre_review.md"));
+  grid.appendChild(stageCard("snapshot manifest", cycle.snapshot.manifest_pre, "manifest"));
+  // global context
+  grid.appendChild(stageCard("cycle context", cycle.context.global, "global_cycle_context"));
+  grid.appendChild(stageCard("continuity sheet", cycle.context.continuity_sheet, "continuity_sheet"));
+  // reviews
+  grid.appendChild(stageCard("full-award review", cycle.full_award_review, "full_award.review.json"));
+  grid.appendChild(stageCard("cross-chapter audit", cycle.cross_chapter_audit, "cross_chapter_audit.json"));
+  grid.appendChild(stageCard("continuity conflicts", cycle.continuity_conflicts, "continuity_conflicts"));
+  grid.appendChild(stageCard("local windows", null, `${(cycle.local_windows||[]).length} windows`));
+  // findings + aggregation
+  grid.appendChild(stageCard("aggregated findings", cycle.findings.all, "all_findings.jsonl"));
+  grid.appendChild(stageCard("findings summary", cycle.findings.summary, "summary.json"));
+  grid.appendChild(stageCard("revision targets", cycle.findings.target_list, "chapter_target_list.txt"));
+  grid.appendChild(stageCard("aggregation decisions", cycle.aggregation_decisions, "aggregation_decisions"));
+  // gate
+  grid.appendChild(stageCard("gate", cycle.gate, gateData ? gateData.decision : "gate.json"));
+  grid.appendChild(stageCard("status", cycle.status, "cycle_status"));
+  // post-revision
+  grid.appendChild(stageCard("post-revision snapshot", cycle.snapshot.final_novel_post_revision, "FINAL_NOVEL.post_revision.md"));
+  grid.appendChild(stageCard("post-revision manifest", cycle.snapshot.manifest_post, "manifest.post_revision"));
+
+  card.appendChild(grid);
+  return card;
+}
+
+// ---------- chapters tab ----------
+
+let CURRENT_CHAPTER = null;
+
+function renderChapters(main) {
+  main.innerHTML = "";
+  const aside = el("aside", { class: "side" });
+  aside.appendChild(el("h3", {}, "Chapters"));
+  const ul = el("ul");
+  for (const ch of RUN.chapters) {
+    const li = el("li", {}, ch.replace("_", " "));
+    if (ch === CURRENT_CHAPTER) li.classList.add("active");
+    li.addEventListener("click", () => {
+      CURRENT_CHAPTER = ch;
+      renderChapters(main);
+    });
+    ul.appendChild(li);
+  }
+  aside.appendChild(ul);
+  main.appendChild(aside);
+
+  const content = el("section", { class: "content" });
+  if (!CURRENT_CHAPTER) CURRENT_CHAPTER = RUN.chapters[0];
+  if (!CURRENT_CHAPTER) {
+    content.appendChild(el("div", { class: "empty-msg" }, "No chapters in this run."));
+    main.appendChild(content);
+    return;
+  }
+  content.appendChild(el("h2", { style: { marginTop: 0 } }, CURRENT_CHAPTER.replace("_", " ")));
+  content.appendChild(el("p", { class: "legend" },
+    "Provenance flow per cycle: each chapter passes from snapshot draft → review → revision packet (per-pass) → 3 revision passes → aggregated revision report → next snapshot. Click any node to inspect the artifact below."));
+
+  for (let i = 0; i < RUN.cycles.length; i++) {
+    const cycle = RUN.cycles[i];
+    const ch = cycle.chapters[CURRENT_CHAPTER];
+    if (!ch) continue;
+    content.appendChild(buildProvCycle(cycle, ch));
+    let nextHas = false;
+    for (let j = i + 1; j < RUN.cycles.length; j++) {
+      if (RUN.cycles[j].chapters && RUN.cycles[j].chapters[CURRENT_CHAPTER]) { nextHas = true; break; }
+    }
+    if (nextHas) content.appendChild(cycleConnector("post-revision draft seeds the next cycle"));
+  }
+
+  // final chapter file (top-level chapters/)
+  const finalPath = `chapters/${CURRENT_CHAPTER}.md`;
+  const finalCard = el("div", { class: "cycle-card" });
+  finalCard.appendChild(el("h3", {}, "Final manuscript chapter"));
+  finalCard.appendChild(stageCard("chapters/" + CURRENT_CHAPTER + ".md", finalPath, "final draft"));
+  content.appendChild(finalCard);
+
+  main.appendChild(content);
+}
+
+function buildProvCycle(cycle, ch) {
+  const wrap = el("div", { class: "prov-cycle" });
+  const head = el("h3", {}, cycle.id);
+  wrap.appendChild(head);
+
+  const flow = el("div", { class: "prov-flow" });
+  flow.appendChild(provStep("draft (pre-revision)", "snapshots/cycle_NN/chapters/", ch.snapshot_pre));
+  flow.appendChild(provStep("review", "reviews/cycle_NN/", ch.review));
+  flow.appendChild(provStep("revision packet (aggregate)", "packets/cycle_NN/", ch.packets.aggregate));
+  flow.appendChild(provStep("revision report (aggregate)", "revisions/cycle_NN/", ch.revisions.aggregate));
+  flow.appendChild(provStep("post-revision draft", "snapshots/cycle_NN/post_revision/chapters/", ch.snapshot_post));
+  // gate sits at the end
+  flow.appendChild(provStep("cycle gate", "gate/cycle_NN/gate.json", cycle.gate));
+  wrap.appendChild(flow);
+
+  // 3 passes row
+  const passes = el("div", { class: "prov-passes" });
+  for (const pass of ["p1_structural_craft", "p2_dialogue_idiolect_cadence", "p3_prose_copyedit"]) {
+    const label = pass.replace(/^p\d_/, "").replace(/_/g, " ") + " (pass " + pass[1] + ")";
+    const subFlow = el("div", { class: "prov-step", style: { padding: 0, background: "transparent", border: "none", minHeight: 0 } });
+    subFlow.appendChild(el("div", { class: "label", style: { padding: "0 0 4px 4px" } }, "pass " + pass[1] + " — " + pass.slice(3).replace(/_/g, " ")));
+    const inner = el("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px" } });
+    inner.appendChild(provStep("packet", "packets/", ch.packets[pass]));
+    inner.appendChild(provStep("report", "revisions/", ch.revisions[pass]));
+    subFlow.appendChild(inner);
+    passes.appendChild(subFlow);
+  }
+  wrap.appendChild(passes);
+
+  return wrap;
+}
+
+function provStep(title, sublabel, file) {
+  const step = el("div", { class: "prov-step" + (file ? "" : " empty") });
+  step.appendChild(el("div", { class: "label" }, sublabel));
+  step.appendChild(el("div", { class: "title" }, title));
+  if (file) {
+    step.appendChild(el("div", { class: "meta" }, shortName(file)));
+    step.addEventListener("click", () => openInViewer(file));
+  } else {
+    step.appendChild(el("div", { class: "meta" }, "—"));
+  }
+  return step;
+}
+
+// ---------- artifacts tab ----------
+
+function renderArtifacts(main) {
+  main.innerHTML = "";
+  const aside = el("aside", { class: "side" });
+  aside.appendChild(el("h3", {}, "Sections"));
+  const ul = el("ul");
+  for (const s of ["premise", "outline", "snapshots", "reviews", "findings", "packets", "revisions", "gate", "context", "status", "logs", "manifests"]) {
+    const li = el("li", {}, s);
+    li.addEventListener("click", () => {
+      const t = document.getElementById("section-" + s);
+      if (t) t.scrollIntoView({ behavior: "smooth" });
+    });
+    ul.appendChild(li);
+  }
+  aside.appendChild(ul);
+  main.appendChild(aside);
+
+  const content = el("section", { class: "content" });
+  content.appendChild(el("h2", { style: { marginTop: 0 } }, "Artifact tree"));
+  content.appendChild(el("p", { class: "legend" }, "Files grouped by stage. Click any file path to view its contents below."));
+
+  // Premise
+  content.appendChild(artifactSection("section-premise", "Premise", Object.entries(RUN.premise)
+    .filter(([, v]) => !!v)
+    .map(([k, v]) => ({ label: k, path: v }))));
+
+  // Outline (flatten)
+  const outlineEntries = [];
+  for (const [k, v] of Object.entries(RUN.outline)) {
+    if (Array.isArray(v)) {
+      for (const f of v) outlineEntries.push({ label: shortName(f), path: f });
+    } else if (v) outlineEntries.push({ label: k, path: v });
+  }
+  content.appendChild(artifactSection("section-outline", "Outline", outlineEntries));
+
+  // Per cycle: snapshots, reviews, findings, packets, revisions, gate, context, status
+  const buckets = {
+    snapshots: [],
+    reviews: [],
+    findings: [],
+    packets: [],
+    revisions: [],
+    gate: [],
+    context: [],
+    status: [],
+  };
+  for (const cycle of RUN.cycles) {
+    const tag = (s) => `${cycle.id} ${s}`;
+    for (const [k, v] of Object.entries(cycle.snapshot)) {
+      if (v) buckets.snapshots.push({ label: tag(k), path: v });
+    }
+    if (cycle.full_award_review) buckets.reviews.push({ label: tag("full_award"), path: cycle.full_award_review });
+    if (cycle.cross_chapter_audit) buckets.reviews.push({ label: tag("cross_chapter_audit"), path: cycle.cross_chapter_audit });
+    if (cycle.continuity_conflicts) buckets.reviews.push({ label: tag("continuity_conflicts"), path: cycle.continuity_conflicts });
+    for (const w of cycle.local_windows || []) {
+      buckets.reviews.push({ label: tag(shortName(w)), path: w });
+    }
+    for (const [chId, ch] of Object.entries(cycle.chapters)) {
+      if (ch.review) buckets.reviews.push({ label: tag(`${chId}.review`), path: ch.review });
+      for (const [pk, pv] of Object.entries(ch.packets)) {
+        if (pv) buckets.packets.push({ label: tag(`${chId}.${pk}`), path: pv });
+      }
+      for (const [pk, pv] of Object.entries(ch.revisions)) {
+        if (pv) buckets.revisions.push({ label: tag(`${chId}.${pk}`), path: pv });
+      }
+    }
+    for (const [k, v] of Object.entries(cycle.findings)) {
+      if (v) buckets.findings.push({ label: tag(k), path: v });
+    }
+    if (cycle.aggregation_decisions) buckets.packets.push({ label: tag("aggregation_decisions"), path: cycle.aggregation_decisions });
+    if (cycle.aggregator_input) buckets.packets.push({ label: tag("aggregator_input"), path: cycle.aggregator_input });
+    if (cycle.gate) buckets.gate.push({ label: cycle.id, path: cycle.gate });
+    if (cycle.status) buckets.status.push({ label: cycle.id, path: cycle.status });
+    for (const [k, v] of Object.entries(cycle.context)) {
+      if (v && typeof v === "string" && v.endsWith(".json")) {
+        buckets.context.push({ label: tag(k), path: v });
+      }
+    }
+  }
+  content.appendChild(artifactSection("section-snapshots", "Snapshots", buckets.snapshots));
+  content.appendChild(artifactSection("section-reviews", "Reviews & audits", buckets.reviews));
+  content.appendChild(artifactSection("section-findings", "Findings", buckets.findings));
+  content.appendChild(artifactSection("section-packets", "Revision packets", buckets.packets));
+  content.appendChild(artifactSection("section-revisions", "Revision reports", buckets.revisions));
+  content.appendChild(artifactSection("section-gate", "Gate decisions", buckets.gate));
+  content.appendChild(artifactSection("section-status", "Cycle status", buckets.status));
+  content.appendChild(artifactSection("section-context", "Cycle context packs", buckets.context));
+
+  // Logs section pointer
+  const logSection = el("div", { class: "cycle-card", id: "section-logs" });
+  logSection.appendChild(el("h3", {}, "Logs"));
+  logSection.appendChild(el("p", { class: "legend" }, `${(RUN.logs||[]).length} job log groups — see the Logs tab.`));
+  content.appendChild(logSection);
+
+  const manSection = el("div", { class: "cycle-card", id: "section-manifests" });
+  manSection.appendChild(el("h3", {}, "Manifests"));
+  manSection.appendChild(el("p", { class: "legend" }, `${(RUN.manifests||[]).length} job manifests describing each agent invocation. Sample below — full list in Logs tab.`));
+  const manGrid = el("div", { class: "grid" });
+  for (const m of (RUN.manifests || []).slice(0, 18)) {
+    const c = stageCard(m.stage, m.manifest_path, m.job_id, `${m.provider || ""} ${m.model || ""}`);
+    manGrid.appendChild(c);
+  }
+  manSection.appendChild(manGrid);
+  content.appendChild(manSection);
+
+  main.appendChild(content);
+}
+
+function artifactSection(id, title, entries) {
+  const sec = el("div", { class: "cycle-card", id });
+  sec.appendChild(el("h3", {}, `${title} `, el("span", { style: { fontSize: "11px", color: "var(--fg-dim)", fontWeight: "400" } }, `(${entries.length})`)));
+  if (!entries.length) {
+    sec.appendChild(el("div", { class: "empty-msg" }, "—"));
+    return sec;
+  }
+  const tree = el("div", { class: "file-tree" });
+  for (const e of entries) {
+    const row = el("div", {}, el("span", { class: "file", onclick: () => openInViewer(e.path) }, `${e.label}  `,
+      el("span", { style: { color: "var(--fg-dim)" } }, e.path)));
+    tree.appendChild(row);
+  }
+  sec.appendChild(tree);
+  return sec;
+}
+
+// ---------- prompts tab ----------
+
+function renderPrompts(main) {
+  main.innerHTML = "";
+  const aside = el("aside", { class: "side" });
+  aside.appendChild(el("h3", {}, "Shared prompts"));
+  const ul = el("ul");
+  for (const p of INDEX.shared_prompts) {
+    const li = el("li", {}, p.name);
+    li.addEventListener("click", () => openInViewer(p.path, true));
+    ul.appendChild(li);
+  }
+  aside.appendChild(ul);
+  main.appendChild(aside);
+
+  const content = el("section", { class: "content" });
+  content.appendChild(el("h2", { style: { marginTop: 0 } }, "Prompts"));
+  content.appendChild(el("p", { class: "legend" },
+    "These prompts in prompts/ are copied into each agent job's workspace as config/prompts/<name>. Each manifest's allowed_inputs lists exactly which prompts the agent saw."));
+  const grid = el("div", { class: "grid" });
+  for (const p of INDEX.shared_prompts) {
+    const c = stageCardRepo(p.name, p.path, `${(p.size/1024).toFixed(1)} kB`);
+    grid.appendChild(c);
+  }
+  content.appendChild(grid);
+  main.appendChild(content);
+}
+
+function stageCardRepo(label, path, valueText) {
+  const card = el("div", { class: "stage-card" });
+  card.appendChild(el("div", { class: "label" }, label));
+  card.appendChild(el("div", { class: "count" }, valueText));
+  card.addEventListener("click", () => openInViewer(path, true));
+  return card;
+}
+
+// ---------- logs tab ----------
+
+let LOG_FILTER = "";
+
+function renderLogs(main) {
+  main.innerHTML = "";
+  const aside = el("aside", { class: "side" });
+  aside.appendChild(el("h3", {}, "Filter"));
+  const inp = el("input", {
+    type: "text",
+    placeholder: "filter by job_id…",
+    value: LOG_FILTER,
+    style: "width:100%; padding:6px; background:var(--bg3); border:1px solid var(--border); border-radius:4px; color:inherit;"
+  });
+  inp.addEventListener("input", () => { LOG_FILTER = inp.value.toLowerCase(); renderLogList(); });
+  aside.appendChild(inp);
+  aside.appendChild(el("h3", {}, "Stages"));
+  const stages = new Set();
+  for (const m of RUN.manifests) if (m.stage) stages.add(m.stage);
+  const stageUl = el("ul");
+  for (const s of [...stages].sort()) {
+    const li = el("li", {}, s);
+    li.addEventListener("click", () => { LOG_FILTER = s.toLowerCase(); inp.value = s; renderLogList(); });
+    stageUl.appendChild(li);
+  }
+  aside.appendChild(stageUl);
+  main.appendChild(aside);
+
+  const content = el("section", { class: "content" });
+  content.appendChild(el("h2", { style: { marginTop: 0 } }, "Job logs"));
+  content.appendChild(el("p", { class: "legend" },
+    `${RUN.manifests.length} manifests describe agent invocations; ${RUN.logs.length} log groups capture the streaming output. Click a row to inspect manifest, last_message, and stderr together.`));
+  const list = el("div", { class: "file-tree", id: "log-list" });
+  content.appendChild(list);
+  main.appendChild(content);
+
+  function renderLogList() {
+    list.innerHTML = "";
+    // Build a map: job_id -> {manifest, log}
+    const byJob = new Map();
+    for (const m of RUN.manifests) {
+      if (!m.job_id) continue;
+      const k = m.job_id;
+      if (!byJob.has(k)) byJob.set(k, {});
+      byJob.get(k).manifest = m;
+    }
+    for (const lg of RUN.logs) {
+      if (!byJob.has(lg.job_id)) byJob.set(lg.job_id, {});
+      byJob.get(lg.job_id).log = lg;
+    }
+    const items = [...byJob.entries()]
+      .filter(([k, v]) => !LOG_FILTER || k.toLowerCase().includes(LOG_FILTER) || (v.manifest && v.manifest.stage && v.manifest.stage.toLowerCase().includes(LOG_FILTER)))
+      .sort(([a],[b]) => a.localeCompare(b));
+    for (const [job_id, v] of items) {
+      const m = v.manifest;
+      const lg = v.log;
+      const row = el("div", { style: { padding: "6px 8px", borderBottom: "1px solid var(--border)" } });
+      const head = el("div", { class: "row" });
+      head.appendChild(el("strong", {}, job_id));
+      if (m) {
+        head.appendChild(el("span", { style: { fontSize: "11px", color: "var(--fg-dim)" } },
+          `${m.stage_group || ""}/${m.stage || ""} · ${m.provider || ""} ${m.model || ""} · ${m.reasoning_effort || ""}`));
+      }
+      row.appendChild(head);
+      const links = el("div", { class: "row", style: { marginTop: "4px" } });
+      if (m && m.manifest_path) {
+        const a = el("span", { class: "file", onclick: () => openInViewer(m.manifest_path) }, "manifest");
+        links.appendChild(a);
+      }
+      if (lg && lg.last_message) {
+        const a = el("span", { class: "file", onclick: () => openInViewer(lg.last_message) }, "last_message");
+        links.appendChild(a);
+      }
+      if (lg && lg.jsonl) {
+        const a = el("span", { class: "file", onclick: () => openInViewer(lg.jsonl) }, "events.jsonl");
+        links.appendChild(a);
+      }
+      if (lg && lg.stderr) {
+        const a = el("span", { class: "file", onclick: () => openInViewer(lg.stderr) }, "stderr");
+        links.appendChild(a);
+      }
+      row.appendChild(links);
+      list.appendChild(row);
+    }
+  }
+  renderLogList();
+}
+
+// ---------- shared connector ----------
+
+function cycleConnector(label) {
+  return el("div", { class: "cycle-connector" },
+    el("span", { class: "line" }),
+    el("span", { class: "arrow" }, "↓"),
+    el("span", {}, label),
+    el("span", { class: "arrow" }, "↓"),
+    el("span", { class: "line" })
+  );
+}
+
+// ---------- graph tab ----------
+
+let GRAPH_CYCLE = "all";
+let GRAPH_GROUP_BY_CYCLE = true;
+
+function cycleMatchesFilter(m, filter) {
+  if (!filter || filter === "all") return true;
+  if (filter === "none") return m.cycle == null;
+  const num = parseInt(String(filter).replace(/[^\d]/g, ""), 10);
+  return m.cycle === num;
+}
+
+function stageColor(stage) {
+  if (!stage) return "var(--accent)";
+  const s = String(stage).toLowerCase();
+  if (s.includes("premise"))                     return "var(--c-premise)";
+  if (s.includes("outline"))                     return "var(--c-outline)";
+  if (s.includes("draft"))                       return "var(--c-draft)";
+  if (s.includes("seam") || s.includes("revision") || s.includes("revise")) return "var(--c-revision)";
+  if (s.includes("audit"))                       return "var(--c-audit)";
+  if (s.includes("review"))                      return "var(--c-review)";
+  if (s.includes("packet") || s.includes("aggregat") || s.includes("finding")) return "var(--c-findings)";
+  if (s.includes("gate"))                        return "var(--c-gate)";
+  if (s.includes("snapshot"))                    return "var(--c-snapshot)";
+  return "var(--accent)";
+}
+
+function renderGraph(panes) {
+  panes.innerHTML = "";
+  const aside = el("aside", { class: "side" });
+
+  aside.appendChild(el("h3", {}, "Filter"));
+  const cycleSel = el("select", { style: "width:100%; margin-bottom:10px;" });
+  cycleSel.appendChild(el("option", { value: "all" }, "All cycles"));
+  cycleSel.appendChild(el("option", { value: "none" }, "Pre-cycle (premise + outline)"));
+  for (const c of RUN.cycles) cycleSel.appendChild(el("option", { value: c.id }, c.id));
+  cycleSel.value = GRAPH_CYCLE;
+  cycleSel.addEventListener("change", () => { GRAPH_CYCLE = cycleSel.value; renderGraph(panes); });
+  aside.appendChild(cycleSel);
+
+  aside.appendChild(el("h3", {}, "Stage colors"));
+  const legend = el("div");
+  for (const [label, varName] of [
+    ["premise", "--c-premise"],
+    ["outline", "--c-outline"],
+    ["draft", "--c-draft"],
+    ["review", "--c-review"],
+    ["audit", "--c-audit"],
+    ["packet / findings", "--c-findings"],
+    ["gate", "--c-gate"],
+    ["revision / seam", "--c-revision"],
+    ["snapshot", "--c-snapshot"],
+  ]) {
+    const row = el("div", { style: "display:flex; align-items:center; gap:8px; padding:3px 0; font-size:11px; color: var(--fg-dim);" });
+    row.appendChild(el("span", { class: "legend-swatch", style: `background: var(${varName});` }));
+    row.appendChild(el("span", {}, label));
+    legend.appendChild(row);
+  }
+  aside.appendChild(legend);
+
+  aside.appendChild(el("h3", {}, "Reading"));
+  aside.appendChild(el("div", { style: "font-size:11px; color: var(--fg-dim); line-height:1.5;" },
+    "Each box is one agent job from the manifests. An edge A → B means a file produced by A appears in B's allowed_inputs. Hover a node to highlight its edges; click to open the manifest."));
+
+  panes.appendChild(aside);
+
+  const content = el("section", { class: "content" });
+  content.appendChild(el("h2", { style: { marginTop: 0 } }, "Job dependency graph"));
+  content.appendChild(el("p", { class: "legend" },
+    `${RUN.manifests.length} total jobs in this run. Stages flow left → right; rows within a column group by cycle and chapter. Same-column nodes generally run in parallel; downstream columns wait on their inbound edges.`));
+
+  const visible = RUN.manifests.filter(m => cycleMatchesFilter(m, GRAPH_CYCLE));
+  if (!visible.length) {
+    content.appendChild(el("div", { class: "empty-msg" }, "No jobs match this filter."));
+    panes.appendChild(content);
+    return;
+  }
+
+  const wrap = el("div", { class: "graph-wrap" });
+  wrap.appendChild(buildGraphSvg(visible, RUN.manifests));
+  content.appendChild(wrap);
+
+  panes.appendChild(content);
+}
+
+function buildGraphSvg(manifests, allManifests) {
+  const NS = "http://www.w3.org/2000/svg";
+
+  // producer index over ALL manifests
+  const producerByPath = new Map();
+  for (const m of allManifests) {
+    for (const out of (m.required_outputs || [])) producerByPath.set(out, m);
+  }
+
+  // stage column order = first-appearance in allManifests (manifests are filename-sorted = spawn order)
+  const stageOrder = [];
+  const stageIdx = new Map();
+  for (const m of allManifests) {
+    if (m.stage && !stageIdx.has(m.stage)) {
+      stageIdx.set(m.stage, stageOrder.length);
+      stageOrder.push(m.stage);
+    }
+  }
+
+  // group visible manifests by stage
+  const byStage = new Map();
+  for (const m of manifests) {
+    const s = m.stage || "(unknown)";
+    if (!byStage.has(s)) byStage.set(s, []);
+    byStage.get(s).push(m);
+  }
+  for (const arr of byStage.values()) {
+    arr.sort((a, b) =>
+      (a.cycle || 0) - (b.cycle || 0) ||
+      (a.chapter_id || "").localeCompare(b.chapter_id || "") ||
+      (a.job_id || "").localeCompare(b.job_id || ""));
+  }
+
+  const visibleStages = stageOrder.filter(s => byStage.has(s));
+  for (const s of byStage.keys()) {
+    if (!visibleStages.includes(s)) visibleStages.push(s);
+  }
+
+  const colW = 210;
+  const rowH = 50;
+  const nodeW = 188;
+  const nodeH = 40;
+  const padX = 24;
+  const padY = 44;
+
+  const pos = new Map();
+  let maxRows = 1;
+  visibleStages.forEach((stage, ci) => {
+    const arr = byStage.get(stage);
+    if (arr.length > maxRows) maxRows = arr.length;
+    arr.forEach((m, ri) => {
+      pos.set(m.job_id, {
+        x: ci * colW + padX,
+        y: ri * rowH + padY,
+        m,
+      });
+    });
+  });
+
+  const width = visibleStages.length * colW + padX * 2;
+  const height = maxRows * rowH + padY + 24;
+
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("width", width);
+  svg.setAttribute("height", height);
+  svg.setAttribute("xmlns", NS);
+
+  // column backgrounds
+  visibleStages.forEach((stage, ci) => {
+    const bg = document.createElementNS(NS, "rect");
+    bg.setAttribute("x", ci * colW + padX - 10);
+    bg.setAttribute("y", 30);
+    bg.setAttribute("width", nodeW + 20);
+    bg.setAttribute("height", height - padY);
+    bg.setAttribute("rx", 8);
+    bg.setAttribute("style", "fill: var(--bg3); opacity: 0.35;");
+    svg.appendChild(bg);
+  });
+
+  // column headers
+  visibleStages.forEach((stage, ci) => {
+    const text = document.createElementNS(NS, "text");
+    text.setAttribute("x", ci * colW + padX + nodeW / 2);
+    text.setAttribute("y", 22);
+    text.setAttribute("text-anchor", "middle");
+    text.setAttribute("font-size", "11");
+    text.setAttribute("font-weight", "700");
+    text.setAttribute("style", `fill: ${stageColor(stage)};`);
+    text.textContent = stage.length > 28 ? stage.slice(0, 26) + "…" : stage;
+    svg.appendChild(text);
+  });
+
+  // edges
+  const visibleIds = new Set(pos.keys());
+  for (const m of manifests) {
+    const seen = new Set();
+    for (const inp of (m.allowed_inputs || [])) {
+      const prod = producerByPath.get(inp);
+      if (!prod || prod.job_id === m.job_id) continue;
+      if (!visibleIds.has(prod.job_id)) continue;
+      if (seen.has(prod.job_id)) continue;
+      seen.add(prod.job_id);
+
+      const a = pos.get(prod.job_id);
+      const b = pos.get(m.job_id);
+      const x1 = a.x + nodeW;
+      const y1 = a.y + nodeH / 2;
+      const x2 = b.x;
+      const y2 = b.y + nodeH / 2;
+      const dx = Math.max((x2 - x1) / 2, 30);
+      const path = document.createElementNS(NS, "path");
+      path.setAttribute("d", `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`);
+      path.setAttribute("style", "fill: none; stroke: var(--fg-faint); stroke-width: 1; opacity: 0.32;");
+      path.setAttribute("data-from", prod.job_id);
+      path.setAttribute("data-to", m.job_id);
+      path.classList.add("g-edge");
+      svg.appendChild(path);
+    }
+  }
+
+  // nodes
+  for (const [jobId, p] of pos.entries()) {
+    const color = stageColor(p.m.stage);
+    const g = document.createElementNS(NS, "g");
+    g.setAttribute("transform", `translate(${p.x} ${p.y})`);
+    g.setAttribute("class", "g-node");
+    g.dataset.jobId = jobId;
+
+    const rect = document.createElementNS(NS, "rect");
+    rect.setAttribute("width", nodeW);
+    rect.setAttribute("height", nodeH);
+    rect.setAttribute("rx", 7);
+    rect.setAttribute("style", `fill: var(--bg2); stroke: ${color}; stroke-width: 1.5;`);
+    g.appendChild(rect);
+
+    const stripe = document.createElementNS(NS, "rect");
+    stripe.setAttribute("x", 0);
+    stripe.setAttribute("y", 0);
+    stripe.setAttribute("width", 4);
+    stripe.setAttribute("height", nodeH);
+    stripe.setAttribute("rx", 2);
+    stripe.setAttribute("style", `fill: ${color};`);
+    g.appendChild(stripe);
+
+    const stageTxt = (p.m.stage || "").length > 24 ? p.m.stage.slice(0, 22) + "…" : (p.m.stage || "(unknown)");
+    const t1 = document.createElementNS(NS, "text");
+    t1.setAttribute("x", 12);
+    t1.setAttribute("y", 16);
+    t1.setAttribute("font-size", "11");
+    t1.setAttribute("font-weight", "700");
+    t1.setAttribute("style", `fill: ${color};`);
+    t1.textContent = stageTxt;
+    g.appendChild(t1);
+
+    let sub = "";
+    if (p.m.cycle != null && p.m.chapter_id) sub = `cycle ${p.m.cycle} · ${p.m.chapter_id.replace("chapter_","ch ")}`;
+    else if (p.m.cycle != null) sub = `cycle ${p.m.cycle}`;
+    else if (p.m.chapter_id) sub = p.m.chapter_id;
+    else sub = (p.m.job_id || "").slice(0, 24);
+    if (sub.length > 26) sub = sub.slice(0, 24) + "…";
+    const t2 = document.createElementNS(NS, "text");
+    t2.setAttribute("x", 12);
+    t2.setAttribute("y", 31);
+    t2.setAttribute("font-size", "10");
+    t2.setAttribute("style", "fill: var(--fg-dim);");
+    t2.textContent = sub;
+    g.appendChild(t2);
+
+    const title = document.createElementNS(NS, "title");
+    title.textContent =
+      `${p.m.job_id}\n` +
+      `stage: ${p.m.stage || "-"}\n` +
+      `cycle: ${p.m.cycle ?? "-"} · chapter: ${p.m.chapter_id ?? "-"}\n` +
+      `model: ${p.m.provider || ""} ${p.m.model || ""}\n` +
+      `inputs: ${(p.m.allowed_inputs || []).length} · outputs: ${(p.m.required_outputs || []).length}`;
+    g.appendChild(title);
+
+    g.addEventListener("click", () => openInViewer(p.m.manifest_path));
+    g.addEventListener("mouseenter", () => highlightGraph(svg, jobId, true));
+    g.addEventListener("mouseleave", () => highlightGraph(svg, jobId, false));
+
+    svg.appendChild(g);
+  }
+
+  return svg;
+}
+
+function highlightGraph(svg, jobId, on) {
+  const edges = svg.querySelectorAll(".g-edge");
+  for (const path of edges) {
+    const matches = path.getAttribute("data-from") === jobId || path.getAttribute("data-to") === jobId;
+    if (on && matches) {
+      path.setAttribute("style", "fill: none; stroke: var(--accent-bright); stroke-width: 2; opacity: 1;");
+    } else if (on) {
+      path.setAttribute("style", "fill: none; stroke: var(--fg-faint); stroke-width: 1; opacity: 0.08;");
+    } else {
+      path.setAttribute("style", "fill: none; stroke: var(--fg-faint); stroke-width: 1; opacity: 0.32;");
+    }
+  }
+}
+
+// ---------- viewer (lower pane) ----------
+
+async function openInViewer(path, repoRelative = false) {
+  const panel = document.getElementById("viewer-panel");
+  panel.innerHTML = "";
+  panel.appendChild(el("div", { class: "viewer-resizer", id: "viewer-resizer" }));
+  attachResizer();
+  const url = repoRelative ? path : runFile(path);
+  const v = el("div", { class: "viewer" });
+  const head = el("div", { class: "viewer-head" });
+  head.appendChild(el("strong", {}, "Viewing"));
+  head.appendChild(el("span", { class: "path" }, url));
+  head.appendChild(el("a", { href: url, target: "_blank" }, "raw"));
+  head.appendChild(el("button", { onclick: () => clearViewer() }, "✕"));
+  v.appendChild(head);
+  const body = el("div", { class: "viewer-body" }, el("div", { class: "empty-msg" }, "Loading…"));
+  v.appendChild(body);
+  panel.appendChild(v);
+
+  try {
+    const text = await fetchText(url);
+    body.innerHTML = "";
+    if (path.endsWith(".md") || path.endsWith(".txt")) {
+      const div = el("div", { class: "markdown" });
+      div.innerHTML = marked.parse(text);
+      body.appendChild(div);
+    } else if (path.endsWith(".json")) {
+      try {
+        const obj = JSON.parse(text);
+        // Specialized rendering for known schemas
+        if (looksLikeReview(obj)) body.appendChild(renderReview(obj));
+        else if (looksLikeRevisionReport(obj)) body.appendChild(renderRevisionReport(obj));
+        else if (looksLikeGate(obj)) body.appendChild(renderGate(obj));
+        else if (looksLikeManifest(obj)) body.appendChild(renderManifest(obj));
+        else body.appendChild(renderJson(obj));
+      } catch (e) {
+        body.appendChild(el("pre", {}, text));
+      }
+    } else if (path.endsWith(".jsonl")) {
+      const lines = text.split("\n").filter(Boolean);
+      const wrap = el("div");
+      wrap.appendChild(el("p", { class: "legend" }, `${lines.length} JSON line(s).`));
+      for (let i = 0; i < lines.length; i++) {
+        try {
+          const obj = JSON.parse(lines[i]);
+          const det = el("details");
+          const summ = el("summary", {}, `[${i+1}] `, summarizeObj(obj));
+          det.appendChild(summ);
+          det.appendChild(renderJson(obj));
+          wrap.appendChild(det);
+        } catch {
+          wrap.appendChild(el("pre", {}, lines[i]));
+        }
+      }
+      body.appendChild(wrap);
+    } else if (path.endsWith(".tsv")) {
+      const lines = text.split("\n");
+      const tbl = el("table", { class: "markdown", style: { borderCollapse: "collapse" } });
+      lines.forEach((line, i) => {
+        if (!line.trim()) return;
+        const tr = el("tr");
+        for (const cell of line.split("\t")) {
+          tr.appendChild(el(i === 0 ? "th" : "td", {}, cell));
+        }
+        tbl.appendChild(tr);
+      });
+      body.appendChild(tbl);
+    } else {
+      body.appendChild(el("pre", {}, text));
+    }
+  } catch (e) {
+    body.innerHTML = "";
+    body.appendChild(el("div", { class: "empty-msg" }, `Error loading: ${e.message}`));
+  }
+}
+
+function summarizeObj(obj) {
+  // Heuristic: pick interesting top-level fields for jsonl event rows.
+  if (obj.type) {
+    let extra = "";
+    if (obj.item && obj.item.type) extra = ` · ${obj.item.type}`;
+    if (obj.item && obj.item.text) extra += " · " + (obj.item.text.slice(0, 80) + (obj.item.text.length > 80 ? "…" : ""));
+    return obj.type + extra;
+  }
+  if (obj.event) return obj.event;
+  if (obj.finding_id) return obj.finding_id + " — " + (obj.severity || "");
+  return JSON.stringify(obj).slice(0, 120);
+}
+
+// ---- specialized renderers ----
+
+function looksLikeReview(o) { return o && o.findings && o.verdicts && o.chapter_id; }
+function looksLikeRevisionReport(o) { return o && o.finding_results && o.pass_summaries; }
+function looksLikeGate(o) { return o && o.decision !== undefined && o.full_award_verdict !== undefined; }
+function looksLikeManifest(o) { return o && o.job_id && o.allowed_inputs; }
+
+function renderReview(o) {
+  const wrap = el("div");
+  const head = el("div", { class: "row", style: { marginBottom: "12px" } });
+  head.appendChild(el("h3", { style: { margin: 0 } }, o.chapter_id));
+  for (const [k, v] of Object.entries(o.verdicts || {})) {
+    const cls = v === "PASS" ? "pass" : v === "FAIL" ? "fail" : "warn";
+    head.appendChild(el("span", { class: `pill ${cls}` }, `${k}: ${v}`));
+  }
+  wrap.appendChild(head);
+  if (o.summary) {
+    wrap.appendChild(el("p", { class: "markdown" }, o.summary));
+  }
+  const list = el("div", { class: "findings-list" });
+  for (const f of (o.findings || [])) {
+    list.appendChild(renderFinding(f));
+  }
+  wrap.appendChild(list);
+  return wrap;
+}
+
+function renderFinding(f) {
+  const card = el("div", { class: "finding" });
+  const head = el("div", { class: "finding-head" });
+  head.appendChild(el("span", { class: "id" }, f.finding_id || "—"));
+  if (f.severity) head.appendChild(el("span", { class: `severity ${f.severity}` }, f.severity));
+  if (f.source) head.appendChild(el("span", { style: { fontSize: "11px", color: "var(--fg-dim)" } }, f.source));
+  if (f.status) head.appendChild(el("span", { class: `status-tag ${f.status}` }, f.status));
+  if (f.status_after_revision) head.appendChild(el("span", { class: `status-tag ${f.status_after_revision}` }, f.status_after_revision));
+  card.appendChild(head);
+  if (f.problem) card.appendChild(el("div", { class: "problem" }, f.problem));
+  if (f.evidence) card.appendChild(el("div", { class: "meta" }, "evidence: " + f.evidence));
+  if (f.notes) {
+    const d = el("details");
+    d.appendChild(el("summary", {}, "notes"));
+    d.appendChild(el("div", {}, f.notes));
+    card.appendChild(d);
+  }
+  if (f.rewrite_direction) {
+    const d = el("details");
+    d.appendChild(el("summary", {}, "rewrite direction"));
+    d.appendChild(el("div", {}, f.rewrite_direction));
+    card.appendChild(d);
+  }
+  if (f.acceptance_test) {
+    const d = el("details");
+    d.appendChild(el("summary", {}, "acceptance test"));
+    d.appendChild(el("div", {}, f.acceptance_test));
+    card.appendChild(d);
+  }
+  if (f.revision_note) {
+    const d = el("details");
+    d.appendChild(el("summary", {}, "revision note"));
+    d.appendChild(el("div", {}, f.revision_note));
+    card.appendChild(d);
+  }
+  return card;
+}
+
+function renderRevisionReport(o) {
+  const wrap = el("div");
+  wrap.appendChild(el("h3", { style: { marginTop: 0 } }, o.chapter_id || "revision report"));
+  if (o.summary) wrap.appendChild(el("p", {}, o.summary));
+  if (o.pass_summaries) {
+    wrap.appendChild(el("h4", {}, "Pass summaries"));
+    const ul = el("ul");
+    for (const p of o.pass_summaries) {
+      ul.appendChild(el("li", {}, el("strong", {}, p.pass_label || p.pass_key), ": " + (p.summary || "")));
+    }
+    wrap.appendChild(ul);
+  }
+  wrap.appendChild(el("h4", {}, "Finding results"));
+  const list = el("div", { class: "findings-list" });
+  for (const f of (o.finding_results || [])) {
+    list.appendChild(renderFinding(f));
+  }
+  wrap.appendChild(list);
+  return wrap;
+}
+
+function renderGate(o) {
+  const wrap = el("div");
+  const head = el("div", { class: "row" });
+  head.appendChild(el("h3", { style: { margin: 0 } }, "Gate · cycle " + o.cycle));
+  head.appendChild(pillForVerdict(o.decision));
+  wrap.appendChild(head);
+  const kvs = el("div", { class: "kvs", style: { marginTop: "10px" } });
+  for (const [k, v] of Object.entries(o)) {
+    if (k === "cycle" || k === "decision") continue;
+    kvs.appendChild(el("div", { class: "k" }, k));
+    kvs.appendChild(el("div", {}, typeof v === "object" ? JSON.stringify(v) : String(v)));
+  }
+  wrap.appendChild(kvs);
+  return wrap;
+}
+
+function renderManifest(o) {
+  const wrap = el("div");
+  wrap.appendChild(el("h3", { style: { marginTop: 0 } }, o.job_id));
+  const kvs = el("div", { class: "kvs" });
+  for (const k of ["stage", "stage_group", "cycle", "chapter_id", "provider", "model", "reasoning_effort", "agent_bin", "timeout_seconds", "idle_timeout_seconds", "dry_run"]) {
+    if (o[k] !== undefined) {
+      kvs.appendChild(el("div", { class: "k" }, k));
+      kvs.appendChild(el("div", {}, String(o[k])));
+    }
+  }
+  wrap.appendChild(kvs);
+  if (o.allowed_inputs) {
+    wrap.appendChild(el("h4", {}, "Allowed inputs"));
+    const ul = el("div", { class: "file-tree" });
+    for (const p of o.allowed_inputs) {
+      ul.appendChild(el("div", {}, el("span", { class: "file", onclick: () => openInViewer(p, p.startsWith("config/") || p.startsWith("prompts/")) }, p)));
+    }
+    wrap.appendChild(ul);
+  }
+  if (o.required_outputs) {
+    wrap.appendChild(el("h4", {}, "Required outputs"));
+    const ul = el("div", { class: "file-tree" });
+    for (const p of o.required_outputs) {
+      ul.appendChild(el("div", {}, el("span", { class: "file", onclick: () => openInViewer(p) }, p)));
+    }
+    wrap.appendChild(ul);
+  }
+  if (o.prompt_text) {
+    wrap.appendChild(el("h4", {}, "Prompt text"));
+    wrap.appendChild(el("pre", {}, o.prompt_text));
+  }
+  return wrap;
+}
+
+// generic JSON tree
+function renderJson(obj, key) {
+  if (obj === null) return el("span", { class: "json-null" }, "null");
+  if (typeof obj === "string") return el("span", { class: "json-string" }, JSON.stringify(obj));
+  if (typeof obj === "number") return el("span", { class: "json-number" }, String(obj));
+  if (typeof obj === "boolean") return el("span", { class: "json-bool" }, String(obj));
+  if (Array.isArray(obj)) {
+    if (!obj.length) return el("span", { class: "json-tree" }, "[]");
+    const det = el("details", {});
+    det.open = obj.length <= 5;
+    det.appendChild(el("summary", {}, `Array(${obj.length})`));
+    const inner = el("div");
+    obj.forEach((v, i) => {
+      const row = el("div");
+      row.appendChild(el("span", { class: "json-key" }, `${i}: `));
+      row.appendChild(renderJson(v));
+      inner.appendChild(row);
+    });
+    det.appendChild(inner);
+    return el("span", { class: "json-tree" }, det);
+  }
+  if (typeof obj === "object") {
+    const keys = Object.keys(obj);
+    if (!keys.length) return el("span", { class: "json-tree" }, "{}");
+    const det = el("details");
+    det.open = keys.length <= 6;
+    det.appendChild(el("summary", {}, `Object(${keys.length})`));
+    const inner = el("div");
+    for (const k of keys) {
+      const row = el("div");
+      row.appendChild(el("span", { class: "json-key" }, k + ": "));
+      row.appendChild(renderJson(obj[k]));
+      inner.appendChild(row);
+    }
+    det.appendChild(inner);
+    return el("span", { class: "json-tree" }, det);
+  }
+  return el("span", {}, String(obj));
+}
+
+</script>
+</body>
+</html>

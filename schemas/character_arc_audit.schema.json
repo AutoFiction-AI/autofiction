@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "character_id",
+    "cycle",
+    "verdict",
+    "summary",
+    "arc_map",
+    "findings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "character_id": {"type": "string", "minLength": 1},
+    "cycle": {"type": "integer", "minimum": 1},
+    "verdict": {"type": "string", "enum": ["PASS", "FAIL"]},
+    "summary": {"type": "string", "minLength": 1},
+    "arc_map": {
+      "type": "object",
+      "required": [
+        "entry_state",
+        "exit_state",
+        "arc_threshold_crossed",
+        "pivot_chapters",
+        "signature_lines",
+        "relationship_geometries"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "entry_state": {"type": "string"},
+        "exit_state": {"type": "string"},
+        "arc_threshold_crossed": {"type": "boolean"},
+        "pivot_chapters": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^chapter_[0-9]{2}$"}
+        },
+        "signature_lines": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "relationship_geometries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["counterpart_character_id", "change_summary"],
+            "additionalProperties": false,
+            "properties": {
+              "counterpart_character_id": {"type": "string"},
+              "change_summary": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "finding_id",
+          "category",
+          "severity",
+          "chapter_id",
+          "character_id",
+          "evidence",
+          "problem",
+          "rewrite_direction",
+          "acceptance_test",
+          "pass_hint"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "finding_id": {"type": "string", "minLength": 1},
+          "category": {
+            "type": "string",
+            "enum": [
+              "entry_state",
+              "exit_state",
+              "arc_legibility",
+              "irreversibility",
+              "change_earned_on_page",
+              "pressure_distribution_across_book",
+              "unique_register",
+              "presence_continuity",
+              "relationship_geometries",
+              "function_vs_person",
+              "voice_profile_fidelity",
+              "decision_under_pressure"
+            ]
+          },
+          "severity": {"type": "string", "enum": ["MEDIUM", "HIGH", "CRITICAL"]},
+          "chapter_id": {"type": "string", "pattern": "^chapter_[0-9]{2}$"},
+          "related_chapter_ids": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^chapter_[0-9]{2}$"}
+          },
+          "character_id": {"type": "string", "minLength": 1},
+          "evidence": {"type": "string", "minLength": 1},
+          "problem": {"type": "string", "minLength": 1},
+          "rewrite_direction": {"type": "string", "minLength": 1},
+          "acceptance_test": {"type": "string", "minLength": 1},
+          "pass_hint": {
+            "type": "string",
+            "enum": [
+              "p1_structural_craft",
+              "p2_dialogue_idiolect_cadence",
+              "p3_prose_copyedit"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

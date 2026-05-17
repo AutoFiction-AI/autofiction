@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "cycle",
+    "verdict",
+    "summary",
+    "architecture_map",
+    "findings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cycle": {"type": "integer", "minimum": 1},
+    "verdict": {"type": "string", "enum": ["PASS", "FAIL"]},
+    "summary": {"type": "string", "minLength": 1},
+    "architecture_map": {
+      "type": "object",
+      "required": [
+        "inciting_disturbance_location",
+        "midpoint_location",
+        "climax_location",
+        "denouement_span",
+        "central_dramatic_question",
+        "load_bearing_scenes",
+        "subplots"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "inciting_disturbance_location": {"type": "string"},
+        "midpoint_location": {"type": "string"},
+        "climax_location": {"type": "string"},
+        "denouement_span": {"type": "string"},
+        "central_dramatic_question": {"type": "string"},
+        "load_bearing_scenes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["chapter_id", "scene_summary", "judgment"],
+            "additionalProperties": false,
+            "properties": {
+              "chapter_id": {"type": "string", "pattern": "^chapter_[0-9]{2}$"},
+              "scene_summary": {"type": "string"},
+              "judgment": {"type": "string", "enum": ["strong", "adequate", "weak"]}
+            }
+          }
+        },
+        "subplots": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "convergence_status", "evidence"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {"type": "string"},
+              "convergence_status": {
+                "type": "string",
+                "enum": ["converged", "parallel", "fizzled"]
+              },
+              "evidence": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "finding_id",
+          "category",
+          "severity",
+          "chapter_id",
+          "evidence",
+          "problem",
+          "rewrite_direction",
+          "acceptance_test",
+          "pass_hint"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "finding_id": {"type": "string", "minLength": 1},
+          "category": {
+            "type": "string",
+            "enum": [
+              "opening_promise",
+              "inciting_disturbance",
+              "rising_action_curve",
+              "midpoint_load_bearing",
+              "subplot_convergence",
+              "climax_placement_and_energy",
+              "denouement_length",
+              "load_bearing_scenes",
+              "cuttable_chapters",
+              "tell_dont_show_at_structure",
+              "intent_vs_manuscript_divergence",
+              "escalation_vs_repetition"
+            ]
+          },
+          "severity": {"type": "string", "enum": ["MEDIUM", "HIGH", "CRITICAL"]},
+          "chapter_id": {"type": "string", "pattern": "^chapter_[0-9]{2}$"},
+          "related_chapter_ids": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^chapter_[0-9]{2}$"}
+          },
+          "evidence": {"type": "string", "minLength": 1},
+          "problem": {"type": "string", "minLength": 1},
+          "rewrite_direction": {"type": "string", "minLength": 1},
+          "acceptance_test": {"type": "string", "minLength": 1},
+          "pass_hint": {
+            "type": "string",
+            "enum": [
+              "p1_structural_craft",
+              "p2_dialogue_idiolect_cadence",
+              "p3_prose_copyedit"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
